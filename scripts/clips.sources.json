@@ -1,0 +1,228 @@
+{
+  "$comment": "Redistributable clip sources for scripts/fetch-clips.mjs. Only CC-BY or public-domain material goes here. Cut times (ss = start, t = length, both in seconds) refer to the exact file at `url`. `poster` is the poster-frame offset inside the cut (default t/3).",
+  "sources": [
+    {
+      "key": "tears-of-steel",
+      "title": "Tears of Steel",
+      "url": "https://download.blender.org/demo/movies/ToS/tears_of_steel_720p.mov",
+      "attribution": {
+        "author": "(CC) Blender Foundation | mango.blender.org",
+        "source": "https://mango.blender.org/",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "cuts": [
+        {
+          "id": "tos-breakup",
+          "title": "Tears of Steel: The Breakup",
+          "ss": 25,
+          "t": 28,
+          "tags": ["blender", "sci-fi", "dialogue", "drama"]
+        },
+        {
+          "id": "tos-adlib",
+          "title": "Tears of Steel: Good Ad-Lib",
+          "ss": 372,
+          "t": 42,
+          "tags": ["blender", "sci-fi", "dialogue", "robot"]
+        }
+      ]
+    },
+    {
+      "key": "cosmos-laundromat",
+      "title": "Cosmos Laundromat: First Cycle",
+      "url": "https://archive.org/download/CosmosLaundromatFirstCycle/Cosmos%20Laundromat%20-%20First%20Cycle%20(1080p).mp4",
+      "attribution": {
+        "author": "(CC) Blender Institute | gooseberry.blender.org",
+        "source": "https://gooseberry.blender.org/",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "cuts": [
+        {
+          "id": "cosmos-half-a-minute",
+          "title": "Cosmos Laundromat: Half a Minute",
+          "ss": 213,
+          "t": 39,
+          "poster": 4,
+          "tags": ["blender", "animation", "dialogue", "animals"]
+        }
+      ]
+    },
+    {
+      "key": "sintel",
+      "title": "Sintel",
+      "url": "https://archive.org/download/Sintel/sintel-2048-stereo.mp4",
+      "attribution": {
+        "author": "(c) copyright Blender Foundation | durian.blender.org",
+        "source": "https://durian.blender.org/",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "cuts": [
+        {
+          "id": "sintel-shaman",
+          "title": "Sintel: The Shaman's Hut",
+          "ss": 106,
+          "t": 42,
+          "tags": ["blender", "animation", "dialogue", "fantasy"]
+        }
+      ]
+    },
+    {
+      "key": "elephants-dream",
+      "title": "Elephants Dream",
+      "url": "https://download.blender.org/ED/elephantsdream-720-h264-st-aac.mov",
+      "attribution": {
+        "author": "(c) copyright 2006, Blender Foundation / Netherlands Media Art Institute | www.elephantsdream.org",
+        "source": "https://orange.blender.org/",
+        "license": "CC BY 2.5",
+        "licenseUrl": "https://creativecommons.org/licenses/by/2.5/"
+      },
+      "cuts": [
+        {
+          "id": "ed-at-the-left",
+          "title": "Elephants Dream: At the Left We Can See...",
+          "ss": 340,
+          "t": 38,
+          "poster": 4,
+          "tags": ["blender", "animation", "dialogue", "weird"]
+        }
+      ]
+    },
+    {
+      "key": "big-buck-bunny",
+      "title": "Big Buck Bunny",
+      "url": "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4",
+      "attribution": {
+        "author": "(c) copyright 2008, Blender Foundation | www.bigbuckbunny.org",
+        "source": "https://peach.blender.org/",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "cuts": [
+        {
+          "id": "bbb-bullies",
+          "title": "Big Buck Bunny: The Bullies",
+          "ss": 198,
+          "t": 42,
+          "poster": 22,
+          "tags": ["blender", "animation", "animals", "no-dialogue"]
+        }
+      ]
+    },
+    {
+      "key": "his-girl-friday",
+      "title": "His Girl Friday (1940)",
+      "url": "https://archive.org/download/his_girl_friday/his_girl_friday.mp4",
+      "attribution": {
+        "author": "Howard Hawks / Columbia Pictures, 1940 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/his_girl_friday",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      },
+      "cuts": [
+        {
+          "id": "hgf-water-buffalo",
+          "title": "His Girl Friday: The Insurance Man",
+          "ss": 660,
+          "t": 40,
+          "poster": 22,
+          "tags": ["classic", "comedy", "dialogue", "black-and-white"]
+        }
+      ]
+    },
+    {
+      "key": "charade",
+      "title": "Charade (1963)",
+      "url": "https://archive.org/download/charade-1963-cary-grant-audrey-hepburn-comedy-mystery-romance-thriller-full-movie/Charade_READY.mp4",
+      "attribution": {
+        "author": "Stanley Donen / Universal Pictures, 1963 (public domain, published without a valid copyright notice)",
+        "source": "https://archive.org/details/charade-1963-cary-grant-audrey-hepburn-comedy-mystery-romance-thriller-full-movie",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      },
+      "cuts": [
+        {
+          "id": "charade-ski-lodge",
+          "title": "Charade: Do We Know Each Other?",
+          "ss": 344,
+          "t": 44,
+          "poster": 16,
+          "tags": ["classic", "romance", "dialogue"]
+        }
+      ]
+    },
+    {
+      "key": "night-of-the-living-dead",
+      "title": "Night of the Living Dead (1968)",
+      "url": "https://archive.org/download/Night.Of.The.Living.Dead_1080p/NightOfTheLivingDead_DVD5.mp4",
+      "attribution": {
+        "author": "George A. Romero / Image Ten, 1968 (public domain, published without a copyright notice)",
+        "source": "https://archive.org/details/Night.Of.The.Living.Dead_1080p",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      },
+      "cuts": [
+        {
+          "id": "notld-barbara",
+          "title": "Night of the Living Dead: They're Coming to Get You, Barbara",
+          "ss": 356,
+          "t": 42,
+          "poster": 16,
+          "tags": ["classic", "horror", "dialogue", "black-and-white", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "plan-9",
+      "title": "Plan 9 from Outer Space (1959)",
+      "url": "https://archive.org/download/plan-9-from-outer-space_202009/Plan%209%20from%20Outer%20Space.mp4",
+      "attribution": {
+        "author": "Edward D. Wood Jr. / Reynolds Pictures, 1959 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/plan-9-from-outer-space_202009",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      },
+      "cuts": [
+        {
+          "id": "plan9-greetings",
+          "title": "Plan 9 from Outer Space: Greetings, My Friend",
+          "ss": 26,
+          "t": 44,
+          "poster": 14,
+          "tags": ["classic", "sci-fi", "monologue", "black-and-white", "meme"]
+        },
+        {
+          "id": "plan9-stupid-minds",
+          "title": "Plan 9 from Outer Space: Your Stupid Minds!",
+          "ss": 4036,
+          "t": 44,
+          "poster": 6,
+          "tags": ["classic", "sci-fi", "dialogue", "black-and-white", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "popeye-sindbad",
+      "title": "Popeye the Sailor Meets Sindbad the Sailor (1936)",
+      "url": "https://archive.org/download/popeye-the-sailor-meets-sindbad-the-sailor-1936/Popeye%20the%20Sailor%20Meets%20Sindbad%20the%20Sailor%20(1936).mp4",
+      "attribution": {
+        "author": "Dave Fleischer / Fleischer Studios, 1936 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/popeye-the-sailor-meets-sindbad-the-sailor-1936",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      },
+      "cuts": [
+        {
+          "id": "popeye-sindbad-song",
+          "title": "Popeye: I'm Sindbad the Sailor",
+          "ss": 100,
+          "t": 42,
+          "poster": 14,
+          "tags": ["classic", "cartoon", "song"]
+        }
+      ]
+    }
+  ]
+}

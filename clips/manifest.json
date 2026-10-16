@@ -1,0 +1,257 @@
+{
+  "clips": [
+    {
+      "id": "tos-breakup",
+      "title": "Tears of Steel: The Breakup",
+      "file": "tos-breakup.mp4",
+      "durationMs": 28000,
+      "width": 1280,
+      "height": 534,
+      "poster": "tos-breakup.jpg",
+      "tags": [
+        "blender",
+        "sci-fi",
+        "dialogue",
+        "drama"
+      ],
+      "attribution": {
+        "author": "(CC) Blender Foundation | mango.blender.org",
+        "source": "https://mango.blender.org/",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      }
+    },
+    {
+      "id": "tos-adlib",
+      "title": "Tears of Steel: Good Ad-Lib",
+      "file": "tos-adlib.mp4",
+      "durationMs": 42000,
+      "width": 1280,
+      "height": 534,
+      "poster": "tos-adlib.jpg",
+      "tags": [
+        "blender",
+        "sci-fi",
+        "dialogue",
+        "robot"
+      ],
+      "attribution": {
+        "author": "(CC) Blender Foundation | mango.blender.org",
+        "source": "https://mango.blender.org/",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      }
+    },
+    {
+      "id": "cosmos-half-a-minute",
+      "title": "Cosmos Laundromat: Half a Minute",
+      "file": "cosmos-half-a-minute.mp4",
+      "durationMs": 39000,
+      "width": 1280,
+      "height": 536,
+      "poster": "cosmos-half-a-minute.jpg",
+      "tags": [
+        "blender",
+        "animation",
+        "dialogue",
+        "animals"
+      ],
+      "attribution": {
+        "author": "(CC) Blender Institute | gooseberry.blender.org",
+        "source": "https://gooseberry.blender.org/",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    },
+    {
+      "id": "sintel-shaman",
+      "title": "Sintel: The Shaman's Hut",
+      "file": "sintel-shaman.mp4",
+      "durationMs": 42000,
+      "width": 1280,
+      "height": 546,
+      "poster": "sintel-shaman.jpg",
+      "tags": [
+        "blender",
+        "animation",
+        "dialogue",
+        "fantasy"
+      ],
+      "attribution": {
+        "author": "(c) copyright Blender Foundation | durian.blender.org",
+        "source": "https://durian.blender.org/",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      }
+    },
+    {
+      "id": "ed-at-the-left",
+      "title": "Elephants Dream: At the Left We Can See...",
+      "file": "ed-at-the-left.mp4",
+      "durationMs": 38000,
+      "width": 720,
+      "height": 404,
+      "poster": "ed-at-the-left.jpg",
+      "tags": [
+        "blender",
+        "animation",
+        "dialogue",
+        "weird"
+      ],
+      "attribution": {
+        "author": "(c) copyright 2006, Blender Foundation / Netherlands Media Art Institute | www.elephantsdream.org",
+        "source": "https://orange.blender.org/",
+        "license": "CC BY 2.5",
+        "licenseUrl": "https://creativecommons.org/licenses/by/2.5/"
+      }
+    },
+    {
+      "id": "bbb-bullies",
+      "title": "Big Buck Bunny: The Bullies",
+      "file": "bbb-bullies.mp4",
+      "durationMs": 42000,
+      "width": 640,
+      "height": 360,
+      "poster": "bbb-bullies.jpg",
+      "tags": [
+        "blender",
+        "animation",
+        "animals",
+        "no-dialogue"
+      ],
+      "attribution": {
+        "author": "(c) copyright 2008, Blender Foundation | www.bigbuckbunny.org",
+        "source": "https://peach.blender.org/",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      }
+    },
+    {
+      "id": "hgf-water-buffalo",
+      "title": "His Girl Friday: The Insurance Man",
+      "file": "hgf-water-buffalo.mp4",
+      "durationMs": 40007,
+      "width": 640,
+      "height": 480,
+      "poster": "hgf-water-buffalo.jpg",
+      "tags": [
+        "classic",
+        "comedy",
+        "dialogue",
+        "black-and-white"
+      ],
+      "attribution": {
+        "author": "Howard Hawks / Columbia Pictures, 1940 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/his_girl_friday",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      }
+    },
+    {
+      "id": "charade-ski-lodge",
+      "title": "Charade: Do We Know Each Other?",
+      "file": "charade-ski-lodge.mp4",
+      "durationMs": 44000,
+      "width": 1280,
+      "height": 720,
+      "poster": "charade-ski-lodge.jpg",
+      "tags": [
+        "classic",
+        "romance",
+        "dialogue"
+      ],
+      "attribution": {
+        "author": "Stanley Donen / Universal Pictures, 1963 (public domain, published without a valid copyright notice)",
+        "source": "https://archive.org/details/charade-1963-cary-grant-audrey-hepburn-comedy-mystery-romance-thriller-full-movie",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      }
+    },
+    {
+      "id": "notld-barbara",
+      "title": "Night of the Living Dead: They're Coming to Get You, Barbara",
+      "file": "notld-barbara.mp4",
+      "durationMs": 42009,
+      "width": 640,
+      "height": 480,
+      "poster": "notld-barbara.jpg",
+      "tags": [
+        "classic",
+        "horror",
+        "dialogue",
+        "black-and-white",
+        "meme"
+      ],
+      "attribution": {
+        "author": "George A. Romero / Image Ten, 1968 (public domain, published without a copyright notice)",
+        "source": "https://archive.org/details/Night.Of.The.Living.Dead_1080p",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      }
+    },
+    {
+      "id": "plan9-greetings",
+      "title": "Plan 9 from Outer Space: Greetings, My Friend",
+      "file": "plan9-greetings.mp4",
+      "durationMs": 44000,
+      "width": 1280,
+      "height": 720,
+      "poster": "plan9-greetings.jpg",
+      "tags": [
+        "classic",
+        "sci-fi",
+        "monologue",
+        "black-and-white",
+        "meme"
+      ],
+      "attribution": {
+        "author": "Edward D. Wood Jr. / Reynolds Pictures, 1959 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/plan-9-from-outer-space_202009",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      }
+    },
+    {
+      "id": "plan9-stupid-minds",
+      "title": "Plan 9 from Outer Space: Your Stupid Minds!",
+      "file": "plan9-stupid-minds.mp4",
+      "durationMs": 44000,
+      "width": 1280,
+      "height": 720,
+      "poster": "plan9-stupid-minds.jpg",
+      "tags": [
+        "classic",
+        "sci-fi",
+        "dialogue",
+        "black-and-white",
+        "meme"
+      ],
+      "attribution": {
+        "author": "Edward D. Wood Jr. / Reynolds Pictures, 1959 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/plan-9-from-outer-space_202009",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      }
+    },
+    {
+      "id": "popeye-sindbad-song",
+      "title": "Popeye: I'm Sindbad the Sailor",
+      "file": "popeye-sindbad-song.mp4",
+      "durationMs": 42000,
+      "width": 552,
+      "height": 416,
+      "poster": "popeye-sindbad-song.jpg",
+      "tags": [
+        "classic",
+        "cartoon",
+        "song"
+      ],
+      "attribution": {
+        "author": "Dave Fleischer / Fleischer Studios, 1936 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/popeye-the-sailor-meets-sindbad-the-sailor-1936",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+      }
+    }
+  ]
+}
