@@ -31,6 +31,7 @@ add up over the rounds.
 3. **Showcase & voting** — dubs are played one after another, author hidden. While a dub
    plays, every player sets a 0–10 score; it can be changed until that dub ends, then it is
    locked in. Players cannot rate their own dub **(decision)**. Then the next dub.
+   Voice chat is back on during the showcase (also while dubs play) — only DUBBING is silent.
 4. **Round results** — scores for the round are announced, then the next round starts.
 5. **Final** — after the last round the overall winner is announced, their winning dub is
    replayed and can be saved (downloaded as a video).

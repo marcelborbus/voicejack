@@ -144,7 +144,7 @@ FINAL --backToLobby(host)--> LOBBY (scores reset; usedClipIds kept so clips don'
 - **Voice** (`voice/VoiceMesh.ts`):
   - Full mesh using the "perfect negotiation" pattern. The player with the lower `playerId` is polite. Signaling goes through `{t:'rtc'}`; ICE servers come from `welcome.iceServers`.
   - Remote audio plays in hidden `<audio>` elements.
-  - **Muting policy** (`voicePolicy.ts`, pure): the outgoing track's `enabled` flag and the remote elements' `muted` follow `voiceAllowed(phase, showcase.status)`. Voice is allowed in LOBBY, ROUND_RESULTS and FINAL, and in SHOWCASE only while LOADING or LOCKED. Connections stay up; only the audio is gated, which gives instant resume.
+  - **Muting policy** (`voicePolicy.ts`, pure): the outgoing track's `enabled` flag and the remote elements' `muted` follow `voiceAllowed(phase, showcase.status)`. Voice is allowed in every phase except DUBBING — including while showcase clips play, so friends hear each other while voting (owner request 2026-10-16). Connections stay up; only the audio is gated, which gives instant resume.
   - Each player tile shows connection state (connecting / connected / failed: "no direct route").
 - **Render** (`render/renderDub.ts`):
   - Hidden `<video>` (same origin, so the canvas is not tainted) is drawn onto a `<canvas>` every frame (`requestVideoFrameCallback`). `canvas.captureStream(30)` provides the video track, and a DubPlayer outputs into a `MediaStreamAudioDestinationNode`.

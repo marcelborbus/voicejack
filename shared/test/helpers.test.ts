@@ -309,7 +309,7 @@ describe('voiceAllowed', () => {
     ['LOBBY', null, true],
     ['DUBBING', null, false],
     ['SHOWCASE', 'LOADING', true],
-    ['SHOWCASE', 'PLAYING', false],
+    ['SHOWCASE', 'PLAYING', true],
     ['SHOWCASE', 'LOCKED', true],
     ['ROUND_RESULTS', null, true],
     ['FINAL', null, true],
