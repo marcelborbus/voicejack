@@ -3,6 +3,8 @@ import { ArrowRight, Ban, DoorOpen, Home as HomeIcon, LogOut, Users, WifiOff } f
 import { useEffect, useState, type ComponentType, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { unlockAudio } from '@/audio/context';
+import { releaseMic } from '@/audio/mic';
+import { SoundUnlockOverlay } from '@/audio/SoundUnlockOverlay';
 import { InviteButton } from '@/components/InviteButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,6 +80,7 @@ export function Room() {
     <div className="flex flex-col gap-6">
       <RoomHeader code={code} />
       {/* VOICE_SLOT */}
+      <SoundUnlockOverlay />
       <div key={phase} className="animate-fade-up">
         <PhaseView />
       </div>
@@ -96,8 +99,13 @@ function RoomHeader({ code }: { code: string }) {
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex items-baseline gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Room</span>
-          <span data-testid="room-code" className="font-mono text-lg font-bold tracking-[0.2em] text-zinc-100">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            Room
+          </span>
+          <span
+            data-testid="room-code"
+            className="font-mono text-lg font-bold tracking-[0.2em] text-zinc-100"
+          >
             {code}
           </span>
         </div>
@@ -126,6 +134,7 @@ function RoomHeader({ code }: { code: string }) {
               data-testid="leave-room"
               onClick={() => {
                 leaveRoom();
+                releaseMic();
                 navigate('/');
               }}
             >
@@ -139,7 +148,15 @@ function RoomHeader({ code }: { code: string }) {
   );
 }
 
-function NamePrompt({ code, notice, onSubmit }: { code: string; notice?: string; onSubmit: (name: string) => void }) {
+function NamePrompt({
+  code,
+  notice,
+  onSubmit,
+}: {
+  code: string;
+  notice?: string;
+  onSubmit: (name: string) => void;
+}) {
   const [name, setName] = useState(getSavedName);
   const [info, setInfo] = useState<RoomInfoResponse | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
@@ -186,11 +203,15 @@ function NamePrompt({ code, notice, onSubmit }: { code: string; notice?: string;
               </Badge>
             )}
           </div>
-          {notice && <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-sm text-amber-200">{notice}</p>}
+          {notice && (
+            <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-sm text-amber-200">{notice}</p>
+          )}
           {blocked ? (
             <div className="flex flex-col gap-4 text-center">
               <p className="text-zinc-300">
-                {info.playerCount >= info.maxPlayers ? errorText('ROOM_FULL') : errorText('GAME_IN_PROGRESS')}
+                {info.playerCount >= info.maxPlayers
+                  ? errorText('ROOM_FULL')
+                  : errorText('GAME_IN_PROGRESS')}
               </p>
               <Button asChild variant="secondary">
                 <Link to="/">
@@ -227,14 +248,22 @@ function NamePrompt({ code, notice, onSubmit }: { code: string; notice?: string;
 
 function FatalScreen({ code, message }: { code: string; message: string }) {
   return (
-    <div className="flex flex-1 items-center justify-center" data-testid="fatal-screen" data-code={code}>
+    <div
+      className="flex flex-1 items-center justify-center"
+      data-testid="fatal-screen"
+      data-code={code}
+    >
       <Card className="w-full max-w-md animate-fade-up">
         <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
           <span className="inline-flex size-14 items-center justify-center rounded-3xl bg-rose-500/15 ring-1 ring-rose-500/30">
             <Ban className="size-7 text-rose-300" />
           </span>
           <h2 className="font-display text-2xl font-bold">
-            {code === 'KICKED' ? 'You were removed' : code === 'ROOM_NOT_FOUND' ? 'Room not found' : "Can't join"}
+            {code === 'KICKED'
+              ? 'You were removed'
+              : code === 'ROOM_NOT_FOUND'
+                ? 'Room not found'
+                : "Can't join"}
           </h2>
           <p className="text-zinc-400">{errorText(code, message)}</p>
           <div className="flex gap-2">
@@ -256,7 +285,10 @@ function FatalScreen({ code, message }: { code: string; message: string }) {
 
 function Connecting() {
   return (
-    <div className="flex flex-1 animate-fade-in flex-col items-center justify-center gap-4 text-zinc-400" data-testid="connecting">
+    <div
+      className="flex flex-1 animate-fade-in flex-col items-center justify-center gap-4 text-zinc-400"
+      data-testid="connecting"
+    >
       <Spinner className="size-8" />
       <p>Joining the party…</p>
     </div>

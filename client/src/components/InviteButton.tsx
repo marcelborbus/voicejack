@@ -58,7 +58,11 @@ export function InviteButton({
       onClick={async () => {
         if (await copyText(inviteUrl(code))) {
           setCopied(true);
-          toast('Invite link copied', { variant: 'success', description: 'Send it to your friends.', durationMs: 2500 });
+          toast('Invite link copied', {
+            variant: 'success',
+            description: 'Send it to your friends.',
+            durationMs: 2500,
+          });
         } else {
           toast('Could not copy', { variant: 'warning', description: inviteUrl(code) });
         }
@@ -73,9 +77,17 @@ export function InviteButton({
 /** Read-only invite link field with a copy button. */
 export function InviteLinkField({ code, className }: { code: string; className?: string }) {
   return (
-    <div className={cn('flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-zinc-950/60 p-1.5 pl-3', className)}>
+    <div
+      className={cn(
+        'flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-zinc-950/60 p-1.5 pl-3',
+        className,
+      )}
+    >
       <Link2 className="size-4 shrink-0 text-fuchsia-300" />
-      <span data-testid="invite-link" className="min-w-0 flex-1 truncate font-mono text-sm text-zinc-300">
+      <span
+        data-testid="invite-link"
+        className="min-w-0 flex-1 truncate font-mono text-sm text-zinc-300"
+      >
         {inviteUrl(code).replace(/^https?:\/\//, '')}
       </span>
       <InviteButton code={code} label="Copy" variant="default" testId="invite-field-copy" />

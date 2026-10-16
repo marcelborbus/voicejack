@@ -55,7 +55,13 @@ const welcome = (token = 'tok-1', serverNow = 1_000_000): S2C => ({
   token,
   serverNow,
   iceServers: [],
-  limits: { maxPlayers: 8, maxChunksPerSubmission: 40, maxChunkBytes: 1, maxSubmissionBytes: 1, minChunkMs: 300 },
+  limits: {
+    maxPlayers: 8,
+    maxChunksPerSubmission: 40,
+    maxChunkBytes: 1,
+    maxSubmissionBytes: 1,
+    minChunkMs: 300,
+  },
 });
 
 let clock = 0;
@@ -95,7 +101,12 @@ describe('RoomSocket hello/welcome', () => {
     s.connect();
     expect(s.status).toBe('connecting');
     last().open();
-    expect(last().sent[0]).toEqual({ t: 'hello', v: PROTOCOL_VERSION, code: 'ABCDEF', name: 'Ada' });
+    expect(last().sent[0]).toEqual({
+      t: 'hello',
+      v: PROTOCOL_VERSION,
+      code: 'ABCDEF',
+      name: 'Ada',
+    });
     last().recv(welcome('secret'));
     expect(token).toBe('secret');
     expect(s.status).toBe('open');
@@ -107,7 +118,12 @@ describe('RoomSocket hello/welcome', () => {
     const s = makeSocket('Ignored');
     s.connect();
     last().open();
-    expect(last().sent[0]).toEqual({ t: 'hello', v: PROTOCOL_VERSION, code: 'ABCDEF', token: 'stored' });
+    expect(last().sent[0]).toEqual({
+      t: 'hello',
+      v: PROTOCOL_VERSION,
+      code: 'ABCDEF',
+      token: 'stored',
+    });
   });
 
   it('drops sends before welcome', () => {
@@ -134,7 +150,9 @@ describe('RoomSocket hello/welcome', () => {
 
 describe('RoomSocket reconnect', () => {
   it('backs off 0.5 → 1 → 2 → 4 → 5 s (capped)', () => {
-    expect([0, 1, 2, 3, 4, 5, 10].map(backoffDelay)).toEqual([500, 1000, 2000, 4000, 5000, 5000, 5000]);
+    expect([0, 1, 2, 3, 4, 5, 10].map(backoffDelay)).toEqual([
+      500, 1000, 2000, 4000, 5000, 5000, 5000,
+    ]);
   });
 
   it('reconnects with backoff and reuses the token from welcome', () => {
@@ -156,7 +174,12 @@ describe('RoomSocket reconnect', () => {
     vi.advanceTimersByTime(1);
     expect(FakeWs.all).toHaveLength(3);
     last().open();
-    expect(last().sent[0]).toEqual({ t: 'hello', v: PROTOCOL_VERSION, code: 'ABCDEF', token: 'tok-A' });
+    expect(last().sent[0]).toEqual({
+      t: 'hello',
+      v: PROTOCOL_VERSION,
+      code: 'ABCDEF',
+      token: 'tok-A',
+    });
     last().recv(welcome('tok-A'));
     expect(s.status).toBe('open');
     // welcome resets the backoff
@@ -313,7 +336,8 @@ describe('normalizeRoomCode', () => {
 
 describe('session (store wiring)', () => {
   it('reuses the socket across release+join (StrictMode) and fills the store', async () => {
-    const { joinRoom, releaseRoom, leaveRoom, onServerMessage } = await import('../src/state/session');
+    const { joinRoom, releaseRoom, leaveRoom, onServerMessage } =
+      await import('../src/state/session');
     const { useRoomStore } = await import('../src/state/room');
     const deps = {
       createSocket: (url: string) => new FakeWs(url),
@@ -329,8 +353,16 @@ describe('session (store wiring)', () => {
     const off = onServerMessage('rtc', (m) => rtc.push(m.from));
     last().open();
     last().recv(welcome());
-    last().recv({ t: 'state', state: { rev: 2, code: 'ABCDEF', phase: 'LOBBY' } as RoomSnapshot, serverNow: 1 });
-    last().recv({ t: 'state', state: { rev: 1, code: 'ABCDEF', phase: 'DUBBING' } as RoomSnapshot, serverNow: 1 });
+    last().recv({
+      t: 'state',
+      state: { rev: 2, code: 'ABCDEF', phase: 'LOBBY' } as RoomSnapshot,
+      serverNow: 1,
+    });
+    last().recv({
+      t: 'state',
+      state: { rev: 1, code: 'ABCDEF', phase: 'DUBBING' } as RoomSnapshot,
+      serverNow: 1,
+    });
     last().recv({ t: 'rtc', from: 'p2', data: { kind: 'candidate', candidate: null } });
     const st = useRoomStore.getState();
     expect(st.status).toBe('open');

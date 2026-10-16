@@ -40,7 +40,11 @@ export function Home() {
       navigate(`/r/${res.code}`);
     } catch (err) {
       const code = err instanceof ApiRequestError ? err.code : 'NETWORK';
-      setError(code === 'ROOM_FULL' ? 'The server is full right now. Try again in a bit.' : errorText(code));
+      setError(
+        code === 'ROOM_FULL'
+          ? 'The server is full right now. Try again in a bit.'
+          : errorText(code),
+      );
     } finally {
       setBusy(false);
     }
@@ -55,7 +59,11 @@ export function Home() {
     try {
       const info = await getRoomInfo(normalizedCode);
       if (!info.joinable) {
-        setError(info.playerCount >= info.maxPlayers ? errorText('ROOM_FULL') : errorText('GAME_IN_PROGRESS'));
+        setError(
+          info.playerCount >= info.maxPlayers
+            ? errorText('ROOM_FULL')
+            : errorText('GAME_IN_PROGRESS'),
+        );
         return;
       }
       saveName(trimmed);
@@ -81,8 +89,8 @@ export function Home() {
           <span className="text-brand">the same scene.</span>
         </h1>
         <p className="mt-5 max-w-md text-lg text-zinc-400">
-          One famous clip, three and a half minutes, your voice only. Then the dubs play back anonymously and
-          everyone votes.
+          One famous clip, three and a half minutes, your voice only. Then the dubs play back
+          anonymously and everyone votes.
         </p>
         <ul className="mt-8 grid max-w-md gap-3 text-sm text-zinc-300 sm:grid-cols-3">
           <li className="flex items-center gap-2">
@@ -99,7 +107,10 @@ export function Home() {
 
       <Card className="animate-fade-up [animation-delay:80ms]">
         <CardContent className="flex flex-col gap-6">
-          <div role="tablist" className="grid grid-cols-2 gap-1 rounded-2xl border border-white/[0.06] bg-zinc-950/60 p-1">
+          <div
+            role="tablist"
+            className="grid grid-cols-2 gap-1 rounded-2xl border border-white/[0.06] bg-zinc-950/60 p-1"
+          >
             {(
               [
                 ['create', 'Start a party', PartyPopper],
@@ -118,16 +129,27 @@ export function Home() {
                 }}
                 className={cn(
                   'flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all',
-                  tab === id ? 'bg-zinc-800 text-white shadow-md shadow-black/30' : 'text-zinc-400 hover:text-zinc-200',
+                  tab === id
+                    ? 'bg-zinc-800 text-white shadow-md shadow-black/30'
+                    : 'text-zinc-400 hover:text-zinc-200',
                 )}
               >
-                <Icon className={cn('size-4', tab === id && (id === 'create' ? 'text-fuchsia-300' : 'text-orange-300'))} />
+                <Icon
+                  className={cn(
+                    'size-4',
+                    tab === id && (id === 'create' ? 'text-fuchsia-300' : 'text-orange-300'),
+                  )}
+                />
                 {label}
               </button>
             ))}
           </div>
 
-          <form key={tab} onSubmit={tab === 'create' ? onCreate : onJoin} className="flex animate-fade-in flex-col gap-4">
+          <form
+            key={tab}
+            onSubmit={tab === 'create' ? onCreate : onJoin}
+            className="flex animate-fade-in flex-col gap-4"
+          >
             {tab === 'join' && (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="code">Room code</Label>
@@ -161,7 +183,11 @@ export function Home() {
               />
             </div>
             {error && (
-              <p role="alert" data-testid="home-error" className="animate-fade-in rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+              <p
+                role="alert"
+                data-testid="home-error"
+                className="animate-fade-in rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-300"
+              >
                 {error}
               </p>
             )}

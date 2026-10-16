@@ -9,7 +9,11 @@ export function Shell() {
     <div className="relative flex min-h-dvh flex-col">
       <Backdrop />
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
-        <Link to="/" className="rounded-2xl transition-opacity hover:opacity-90" aria-label="DubParty home">
+        <Link
+          to="/"
+          className="rounded-2xl transition-opacity hover:opacity-90"
+          aria-label="DubParty home"
+        >
           <Logo />
         </Link>
       </header>

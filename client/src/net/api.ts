@@ -31,7 +31,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     } catch {
       /* not JSON */
     }
-    const code = body.error ?? (res.status === 429 ? 'RATE_LIMITED' : res.status === 404 ? 'ROOM_NOT_FOUND' : 'INVALID');
+    const code =
+      body.error ??
+      (res.status === 429 ? 'RATE_LIMITED' : res.status === 404 ? 'ROOM_NOT_FOUND' : 'INVALID');
     throw new ApiRequestError(code, body.message ?? res.statusText, res.status);
   }
   return (await res.json()) as T;

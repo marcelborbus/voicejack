@@ -26,7 +26,9 @@ export const useToasts = create<ToastState>((set) => ({
     // Keep at most 4 on screen; same title+description replaces the older one.
     set((s) => ({
       toasts: [
-        ...s.toasts.filter((x) => !(x.title === item.title && x.description === item.description)).slice(-3),
+        ...s.toasts
+          .filter((x) => !(x.title === item.title && x.description === item.description))
+          .slice(-3),
         item,
       ],
     }));

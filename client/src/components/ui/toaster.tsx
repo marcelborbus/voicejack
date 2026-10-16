@@ -41,7 +41,9 @@ export function Toaster() {
           >
             <Icon className={cn('mt-0.5 size-5 shrink-0', ICON_COLOR[t.variant])} />
             <div className="min-w-0 flex-1">
-              <ToastPrimitive.Title className="text-sm font-semibold text-zinc-50">{t.title}</ToastPrimitive.Title>
+              <ToastPrimitive.Title className="text-sm font-semibold text-zinc-50">
+                {t.title}
+              </ToastPrimitive.Title>
               {t.description && (
                 <ToastPrimitive.Description className="mt-0.5 text-sm text-zinc-400">
                   {t.description}

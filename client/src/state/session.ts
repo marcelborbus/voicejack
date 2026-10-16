@@ -63,10 +63,15 @@ export function joinRoom(code: RoomCode, opts: JoinOptions = {}): RoomSocket {
       if (cur && cur.code === m.state.code && m.state.rev < cur.rev) return;
       useRoomStore.setState({ snapshot: m.state });
     }),
-    s.on('voteAck', (m) => useRoomStore.setState({ lastVoteAck: { submissionId: m.submissionId, score: m.score } })),
+    s.on('voteAck', (m) =>
+      useRoomStore.setState({ lastVoteAck: { submissionId: m.submissionId, score: m.score } }),
+    ),
     s.on('error', (m) => {
       if (s.fatal) return; // shown by the fatal screen
-      toast(errorText(m.code, m.message), { variant: 'error', description: m.code === 'INVALID' ? m.message : undefined });
+      toast(errorText(m.code, m.message), {
+        variant: 'error',
+        description: m.code === 'INVALID' ? m.message : undefined,
+      });
     }),
   ];
   // Fan out every message type to global listeners (they survive socket re-creation).
@@ -124,7 +129,10 @@ export function setSticky(key: string, msg: C2S | null): void {
 }
 
 /** Subscribe to a server message type for as long as you like (across reconnects). */
-export function onServerMessage<T extends S2CType>(type: T, fn: (msg: S2COf<T>) => void): () => void {
+export function onServerMessage<T extends S2CType>(
+  type: T,
+  fn: (msg: S2COf<T>) => void,
+): () => void {
   let set = globalListeners.get(type);
   if (!set) globalListeners.set(type, (set = new Set()));
   const f = fn as AnyListener;

@@ -1,4 +1,10 @@
-import { LIMITS, type IceServer, type Limits, type PlayerPublic, type RoomSnapshot } from '@dub/shared';
+import {
+  LIMITS,
+  type IceServer,
+  type Limits,
+  type PlayerPublic,
+  type RoomSnapshot,
+} from '@dub/shared';
 import { create } from 'zustand';
 import type { ConnStatus, FatalError } from '@/net/socket';
 
@@ -44,7 +50,8 @@ export const selectMe = (s: RoomState): PlayerPublic | null => {
   if (!snap) return null;
   return snap.players.find((p) => p.id === snap.you.playerId) ?? null;
 };
-export const selectIsHost = (s: RoomState) => !!s.snapshot && s.snapshot.hostId === s.snapshot.you.playerId;
+export const selectIsHost = (s: RoomState) =>
+  !!s.snapshot && s.snapshot.hostId === s.snapshot.you.playerId;
 
 const EMPTY_PLAYERS: PlayerPublic[] = [];
 
