@@ -28,7 +28,7 @@ dubbing-game/
   package.json            # workspace scripts: dev, build, test, typecheck, e2e
   pnpm-workspace.yaml     # packages: shared, server, client, e2e
   tsconfig.base.json      # strict, ES2023, moduleResolution bundler/nodenext
-  vitest.workspace.ts
+  vitest.config.ts        # test.projects = shared, server, client (vitest 5 dropped workspace files)
   shared/   src/protocol/{common,c2s,s2c,rest}.ts  src/constants.ts  src/helpers/*.ts  src/index.ts
   server/   src/{main,config}.ts  src/http/app.ts  src/routes/{rooms,chunks,clips}.ts
             src/ws/gateway.ts  src/room/{Room,RoomManager,timers}.ts  src/clips/ClipLibrary.ts
@@ -42,7 +42,7 @@ dubbing-game/
 ```
 
 **Libraries (kept small):**
-- shared: `zod`. Client-to-server messages and REST bodies are zod schemas, and their types come from `z.infer`.
+- shared (package name `@dub/shared`, consumed via `"@dub/shared": "workspace:*"`): `zod`. Client-to-server messages and REST bodies are zod schemas, and their types come from `z.infer`.
 - server: `fastify@5`, `@fastify/websocket` (ws), `@fastify/static` (Range support for video), `@fastify/rate-limit`, `nanoid`.
 - client: `react@19`, `react-router`, `zustand`, `tailwindcss@4`, `@radix-ui/*` primitives for shadcn-style components (`button, card, input, slider, switch, select, badge, dialog, tooltip, progress, toast`), `lucide-react`, `clsx` + `tailwind-merge`.
 - tests: `vitest`, `@playwright/test`.
@@ -310,10 +310,11 @@ export type S2C =
 Legend: **Deps** = tasks that must be checked first. **‖** = groups that can run in parallel because their file sets don't overlap.
 
 ### Phase A: foundation
-- [ ] **T01: Workspace scaffold + pinned protocol** · role: impl · Deps: – · Touches: root `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `vitest.workspace.ts`, `.gitignore`, `.editorconfig`, `.prettierrc`, `shared/**` (package, `src/protocol/*`, `src/constants.ts`, `src/index.ts`), `server/package.json`+`tsconfig.json`+`src/main.ts` (stub), `client/package.json` (stub), `PLAN.md`, `SPEC.md`
+- [x] **T01: Workspace scaffold + pinned protocol** · role: impl · Deps: – · Touches: root `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `vitest.config.ts`, `.gitignore`, `.editorconfig`, `.prettierrc`, `shared/**` (package, `src/protocol/*`, `src/constants.ts`, `src/index.ts`), `server/package.json`+`tsconfig.json`+`src/main.ts` (stub), `client/package.json` (stub), `PLAN.md`, `SPEC.md`
   - Goal: workspace builds. Section 3 is implemented exactly, as zod schemas (`C2SSchema` as a discriminated union on `t`, `GameSettingsSchema`, `ChunkMetaSchema`, `ClipManifestSchema`) plus the TS types. Constants: `NORMAL_SETTINGS`, ranges, `LIMITS`, `ROOM_CODE_ALPHABET`.
   - `.gitignore`: `node_modules`, `dist`, `clips/*.mp4`, `.cache`, `e2e/fixtures/clips/*.mp4`, `test-results`.
   - Accept: `pnpm install && pnpm typecheck && pnpm test` (shared has a schema round-trip test, e.g. a valid and an invalid `vote`).
+  > NOTE T01: `@dub/shared` has no build step: its `exports` point at `src/index.ts` (relative imports use `.js` suffixes so nodenext, tsx and Vite all resolve them); the prod server image (T20) must bundle the server with esbuild so shared is inlined. All §2 libraries are pinned in T01 (one lockfile); `vitest.config.ts` with `test.projects` replaces `vitest.workspace.ts`; `allowBuilds: esbuild` is set in `pnpm-workspace.yaml` (pnpm 11).
 
 ### Phase B (‖ after T01: T02, T03, T04, T09)
 - [ ] **T02: Shared pure helpers** · impl · Deps: T01 · Touches: `shared/src/helpers/**`, `shared/test/**`

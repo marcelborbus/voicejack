@@ -1,0 +1,9 @@
+node_modules
+dist
+clips/*.mp4
+.cache
+e2e/fixtures/clips/*.mp4
+test-results
+playwright-report
+*.log
+.DS_Store
