@@ -2,11 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
 import { ClipLibrary, toClipInfo } from './clips/ClipLibrary.js';
 import { RoomManager } from './room/RoomManager.js';
+import { ChunkStore } from './uploads/ChunkStore.js';
 import { buildApp } from './http/app.js';
 
 export interface RunningServer {
   app: FastifyInstance;
   rooms: RoomManager;
+  store: ChunkStore;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -19,8 +21,10 @@ export async function startServer(
   opts: { logger?: boolean | { level: string } } = {},
 ): Promise<RunningServer> {
   const clips = ClipLibrary.load(config.clipsDir);
-  const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo) });
-  const app = await buildApp({ config, clips, rooms }, opts);
+  const store = new ChunkStore(config.dataDir);
+  await store.init();
+  const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo), store });
+  const app = await buildApp({ config, clips, rooms, store }, opts);
   app.addHook('onClose', async () => {
     await rooms.stop();
   });
@@ -34,6 +38,7 @@ export async function startServer(
   return {
     app,
     rooms,
+    store,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),
