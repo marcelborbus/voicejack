@@ -394,6 +394,7 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
 - [ ] **T18: Voice chat mesh** · impl · Deps: T10, T11 · Touches: `client/src/voice/**`, `client/src/components/VoiceStatus.tsx`, one `<VoiceProvider>` line in `pages/Room.tsx` (coordinate: T10 owns `Room.tsx` and adds `{/* VOICE_SLOT */}`, which T18 replaces)
   - Perfect negotiation, peers follow the roster, gating via `voiceAllowed`, per-peer state, speaking indicator (an AnalyserNode on each remote stream), and a self-mute button in allowed phases.
   - Accept: unit test of the gating policy and of roster diffing (which peers to open or close). Manually, 2 Chrome profiles hear each other in the lobby, and the voice is silent during DUBBING and while a clip plays.
+  > NOTE T18: partial. Done: `voice/{voicePolicy,voiceStore,Peer,VoiceMesh,VoiceProvider}`, `components/VoiceStatus.tsx` (connection dot, speaking bars, per-peer mute), `<VoiceProvider />` in Room.tsx (floating dock with self-mute); voice sends a clone of the mic track and gating runs synchronously in the store subscription. Left: unit test `client/test/voice.test.ts` (voiceGate, diffPeers, isPolite), and the two-context headless Playwright check (pc reaches `connected`, `[data-testid=voice-audio] audio` gets a track; may need `--disable-features=WebRtcHideLocalIpsWithMdns`), then fix whatever that turns up.
 
 ### Phase E: end-to-end, ship
 - [ ] **T19: Playwright e2e smoke** · test · Deps: T12, T15, T16, T17 · Touches: `e2e/**`

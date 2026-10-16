@@ -23,6 +23,7 @@ import { Final } from './phases/Final';
 import { Lobby } from './phases/Lobby';
 import { RoundResults } from './phases/RoundResults';
 import { Showcase } from './phases/Showcase';
+import { VoiceProvider } from '@/voice/VoiceProvider';
 
 const PHASES: Record<Phase, ComponentType> = {
   LOBBY: Lobby,
@@ -79,7 +80,7 @@ export function Room() {
   return (
     <div className="flex flex-col gap-6">
       <RoomHeader code={code} />
-      {/* VOICE_SLOT */}
+      <VoiceProvider />
       <SoundUnlockOverlay />
       <div key={phase} className="animate-fade-up">
         <PhaseView />
