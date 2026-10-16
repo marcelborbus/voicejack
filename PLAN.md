@@ -402,6 +402,7 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
   - Three contexts run: create, join via the invite URL, mic OK (the fake beep), ready, start (extended: 1 round, 15 s dubbing). Each records one chunk (press R, wait 2 s, press R), then clicks Done. They vote in the showcase. The test asserts on round results and then the Final view. A second spec covers reload during DUBBING keeping the chunk.
   - Stable `data-testid`s should be added by the owning tasks; if any are missing, add them here as minimal edits.
   - Accept: `pnpm e2e` green headless in under 2 min.
+  > NOTE T19 (orchestrator): Playwright's bundled Chromium has no H.264/AAC, so e2e fixture clips must be VP9/Opus webm (see T13 note, `.cache/dev-clips`); real Chrome/Firefox play the mp4 library fine. Voice check for T18 may need `--disable-features=WebRtcHideLocalIpsWithMdns`.
 - [x] **T20: Docker image + compose + nginx** · impl · Deps: T06, T07, T09 · Touches: `deploy/**`, `.dockerignore`, root `package.json` (`docker:build` script only)
   - Multi-stage on `node:24-alpine`: build with `pnpm -r build`, then `pnpm deploy --filter server --prod /out`, and copy `client/dist`. Runtime runs as non-root with `tini`, `NODE_OPTIONS=--max-old-space-size=192`, and a healthcheck on `/api/health`.
   - `compose.yaml`: `ports: ["127.0.0.1:${PORT:-3087}:3000"]`, `mem_limit: 320m`, `cpus: 1.0`, volumes `./clips:/app/clips:ro` and `./data:/app/data`, `restart: unless-stopped`.
