@@ -12,6 +12,8 @@
 3. `git status`. Uncommitted changes are a half-finished task from an interrupted session. Find their task from the file paths. Finish it, or `git stash` them if you can't tell what they are. Never commit somebody else's paths.
 4. Before starting, run `pnpm install && pnpm typecheck && pnpm test`. It must be green. If it is red, fix that first in a separate `fix:` commit.
 
+**GitHub issues** (github.com/marcelborbus/dubparty): T01=#1, T02=#2, T03=#3, T04=#4, T05=#6, T06=#7, T07=#8, T08=#9, T09=#5, T10=#10, T11=#11, T12=#12, T13=#13, T14=#14, T15=#15, T16=#16, T17=#17, T18=#18, T19=#19, T20=#20, T21=#21, T22=#22. Put `Closes #N` in the task's commit body; the orchestrator pushes.
+
 **Conventions**
 - **One commit per task.** Commit only your own paths: `git commit -m "T07: …" -- <paths> PLAN.md`. Check the task's box in PLAN.md **in that same commit**. Commit message trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Agents running in parallel must not edit files owned by another task. The "Touches" column gives ownership. Shared registration points are created in their final form in an earlier task, so that later tasks only add files.
