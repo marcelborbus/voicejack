@@ -51,7 +51,7 @@ Clips are never baked into the image. Fetch them locally, then rsync the manifes
 ```sh
 node scripts/fetch-clips.mjs         # fills clips/ (manifest.json + *.mp4)
 ssh hetzner 'install -d /opt/dubbing-game/clips'
-rsync -av --delete clips/manifest.json clips/*.mp4 hetzner:/opt/dubbing-game/clips/
+rsync -av --delete clips/manifest.json clips/*.mp4 clips/*.jpg hetzner:/opt/dubbing-game/clips/
 ```
 
 Owner-provided clips (`"local": true` in the manifest) are fine to rsync to the private box,
