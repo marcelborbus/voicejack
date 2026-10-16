@@ -1,0 +1,33 @@
+import type { FastifyInstance } from 'fastify';
+import type { Config } from './config.js';
+import { ClipLibrary } from './clips/ClipLibrary.js';
+import { buildApp } from './http/app.js';
+
+export interface RunningServer {
+  app: FastifyInstance;
+  /** e.g. `http://127.0.0.1:3000` */
+  url: string;
+  port: number;
+  close(): Promise<void>;
+}
+
+/** Builds every dependency from `config`, then listens. Used by main.ts and integration tests. */
+export async function startServer(
+  config: Config,
+  opts: { logger?: boolean | { level: string } } = {},
+): Promise<RunningServer> {
+  const clips = ClipLibrary.load(config.clipsDir);
+  const app = await buildApp({ config, clips }, opts);
+  for (const w of clips.warnings) app.log.warn(w);
+  app.log.info(`clips: ${clips.size} from ${config.clipsDir}`);
+  await app.listen({ port: config.port, host: config.host });
+  const addr = app.server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : config.port;
+  const host = config.host === '0.0.0.0' || config.host === '::' ? '127.0.0.1' : config.host;
+  return {
+    app,
+    url: `http://${host}:${port}`,
+    port,
+    close: () => app.close(),
+  };
+}

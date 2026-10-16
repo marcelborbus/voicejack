@@ -1,4 +1,12 @@
-// Stub entry point (T01). T04 replaces this with the real Fastify bootstrap.
-import { PROTOCOL_VERSION } from '@dub/shared';
+import { loadConfig } from './config.js';
+import { startServer } from './bootstrap.js';
 
-console.log(`DubParty server stub (protocol v${PROTOCOL_VERSION})`);
+const config = loadConfig();
+const server = await startServer(config, { logger: { level: config.logLevel } });
+server.app.log.info(`DubParty listening on ${server.url} (timings=${config.timingsName})`);
+
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(sig, () => {
+    void server.close().then(() => process.exit(0));
+  });
+}
