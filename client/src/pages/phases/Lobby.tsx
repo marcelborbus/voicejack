@@ -1,5 +1,99 @@
-import { PhasePlaceholder } from '@/components/layout/PhasePlaceholder';
+import { MAX_PLAYERS } from '@dub/shared';
+import { Film, UserPlus, Users } from 'lucide-react';
+import { InviteLinkField } from '@/components/InviteButton';
+import { PlayerCard } from '@/components/lobby/PlayerCard';
+import { ReadyPanel } from '@/components/lobby/ReadyPanel';
+import { SettingsPanel } from '@/components/lobby/SettingsPanel';
+import { StartPanel } from '@/components/lobby/StartPanel';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useIsHost, useMe, useRoom, useSnapshot } from '@/state/room';
 
 export function Lobby() {
-  return <PhasePlaceholder title="Lobby" hint="Coming soon." />;
+  const snap = useSnapshot();
+  const me = useMe();
+  const isHost = useIsHost();
+  const maxPlayers = useRoom((s) => s.limits.maxPlayers) || MAX_PLAYERS;
+  if (!snap || !me) return null;
+  const { players, you } = snap;
+  const host = players.find((p) => p.id === snap.hostId);
+  const openSlots = Math.max(0, maxPlayers - players.length);
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]" data-testid="lobby">
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
+        <Card className="order-2 lg:order-none">
+          <CardHeader className="gap-4">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="size-6 text-fuchsia-300" /> The cast
+                </CardTitle>
+                <p className="mt-1 text-sm text-zinc-400">
+                  <span className="tabular-nums">
+                    {players.length}/{maxPlayers}
+                  </span>{' '}
+                  players · everyone can hear each other here
+                </p>
+              </div>
+            </div>
+            <InviteLinkField code={snap.code} />
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-3 sm:grid-cols-2" data-testid="player-list">
+              {players.map((p, i) => (
+                <PlayerCard
+                  key={p.id}
+                  player={p}
+                  isSelf={p.id === you.playerId}
+                  canKick={isHost}
+                  index={i}
+                />
+              ))}
+              {openSlots > 0 && (
+                <li className="flex items-center gap-3 rounded-3xl border border-dashed border-white/10 p-3 text-zinc-500">
+                  <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-dashed border-white/15">
+                    <UserPlus className="size-5" />
+                  </span>
+                  <span className="text-sm">
+                    {players.length < 2
+                      ? 'Invite at least one friend'
+                      : `${openSlots} seat${openSlots === 1 ? '' : 's'} left`}
+                  </span>
+                </li>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <div className="order-3 lg:order-none">
+          <StartPanel
+            isHost={isHost}
+            canStart={you.canStart}
+            blockers={you.startBlockers}
+            players={players}
+            hostName={host?.name ?? 'the host'}
+          />
+        </div>
+      </div>
+
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
+        <div className="order-1 lg:order-none">
+          <ReadyPanel me={me} />
+        </div>
+        <div className="order-4 lg:order-none">
+          <SettingsPanel
+            settings={snap.settings}
+            availableTags={snap.availableTags}
+            clipCount={snap.clipCount}
+            isHost={isHost}
+          />
+        </div>
+        <p className="order-5 flex items-start gap-2 px-2 lg:order-none text-xs text-zinc-500">
+          <Film className="mt-0.5 size-3.5 shrink-0" />
+          All clips are Creative Commons or public domain. Each clip's author and license are shown
+          while you dub it.
+        </p>
+      </div>
+    </div>
+  );
 }
