@@ -342,9 +342,10 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
   - Accept: `pnpm --filter client build`, `pnpm typecheck`. A screenshot of `/` with the dark theme looks right.
 
 ### Phase C: server core (T05 → T06 ‖ T07 → T08)
-- [ ] **T05: Room state machine** · impl · Deps: T02 · Touches: `server/src/room/{Room,timers,types}.ts`, `server/test/room.test.ts`
+- [x] **T05: Room state machine** · impl · Deps: T02 · Touches: `server/src/room/{Room,timers,types}.ts`, `server/test/room.test.ts`
   - The whole of §2.2 as a pure class: join, reconnect, kick, host migration, settings validation (normal forces 3/210), start blockers, dubbing (manifest storage, dubDone early end, finalize with an `isUploaded(subId, chunkId)` dependency), showcase sub-phases and voting rules, results, final, backToLobby, per-recipient snapshot builder.
   - Accept: `pnpm --filter server test room` with vitest fake timers: a 3-player game through every phase. Must cover: self-vote rejected, vote after lock rejected, auto-advance, disconnect/reconnect mid-DUBBING keeps the manifest, clip non-repeat across rounds and after backToLobby, `ALLOW_SOLO`.
+  > NOTE T05: during the upload grace the phase stays `DUBBING` (with `phaseEndsAt` pulled to now when everyone is done); `snapshot.clipCount` = clips still available for the current tag filter (minus used). Duplicate names get a ` 2` suffix. `leave` removes in LOBBY, otherwise counts as disconnect. Room API used by T06/T07: `join/connect/disconnect/leave/handle/authenticate/info/uploadTarget/canDownload/notify/resend/dispose`.
 - [ ] **T06: RoomManager + WS gateway + rooms REST** · impl · Deps: T04, T05 · Touches: `server/src/room/RoomManager.ts`, `server/src/ws/gateway.ts`, `server/src/routes/rooms.ts`, `server/test/gateway.test.ts`
   - Covers: codes, caps, disposal (calls `store.deleteRoom` when available), token→player, zod parsing, per-socket rate limit, message size cap, Origin check, `rtc` relay (same room only, ≤16 KB), ping/pong, welcome with `ICE_SERVERS`.
   - Accept: test that creates a room via `inject`, connects 2 `ws` clients, and checks state broadcast, relay, `ROOM_FULL` on the 9th, a bad message → `INVALID`, and token reconnect.
