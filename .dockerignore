@@ -1,0 +1,14 @@
+# Build context for deploy/Dockerfile: only manifests + shared/server/client sources.
+**/node_modules
+**/dist
+.git
+.cache
+.claude
+clips
+e2e
+test-results
+playwright-report
+**/*.log
+**/.DS_Store
+**/*.tsbuildinfo
+data

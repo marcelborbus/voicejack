@@ -1,0 +1,42 @@
+# DubParty on hetzner: Compose project in /opt/dubbing-game (see README-deploy.md).
+# Public access only through host nginx (dub.borbus.eu); the port is loopback-only.
+name: dubbing-game
+
+services:
+  dubparty:
+    image: dubparty:latest
+    build:
+      # Works both from the repo (deploy/compose.yaml → context ..) and on the host, where
+      # src/ is a checkout of the repo: set DUB_SRC=./src in .env.
+      context: ${DUB_SRC:-..}
+      dockerfile: deploy/Dockerfile
+    container_name: dubparty
+    restart: unless-stopped
+    ports:
+      # Loopback only — host nginx terminates TLS for dub.borbus.eu.
+      - '127.0.0.1:${PORT:-3087}:3000'
+    environment:
+      # Optional: JSON array of ICE servers (e.g. a TURN server later), sent to clients.
+      ICE_SERVERS: ${ICE_SERVERS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      # Clip library (manifest.json + mp4s), rsynced from the dev box; never in the image.
+      - ./clips:/app/clips:ro
+      # Uploads live in ./data/uploads and are wiped on every start. ./data must be
+      # writable by uid 1000 (the image's `node` user).
+      - ./data:/app/data
+    mem_limit: 320m
+    memswap_limit: 320m
+    cpus: 1.0
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
