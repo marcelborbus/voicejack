@@ -357,10 +357,11 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
   - Accept: `pnpm --filter server test integration` green in under 20 s.
 
 ### Phase D: client (‖: T10 & T11 & T13 after T09; then T12, T14, T16, T18 ‖ where deps allow)
-- [ ] **T10: Net layer, store, Home & join flow** · impl · Deps: T09 (T06 for live testing) · Touches: `client/src/net/**`, `client/src/state/**`, `client/src/pages/Home.tsx`, `client/src/pages/Room.tsx`, `client/test/net.test.ts`
+- [x] **T10: Net layer, store, Home & join flow** · impl · Deps: T09 (T06 for live testing) · Touches: `client/src/net/**`, `client/src/state/**`, `client/src/pages/Home.tsx`, `client/src/pages/Room.tsx`, `client/test/net.test.ts`
   - Socket with backoff, clock sync, `serverToPerf`, `useRoom()` selectors, error toasts, fatal error screen (`ROOM_NOT_FOUND` → back home).
   - Name prompt when there is no token. Invite link copy button (`/r/CODE`). Create and join both unlock the AudioContext (this calls `audio/context.ts`, which is created here as a minimal file and extended by T11; T11 owns it afterwards).
   - Accept: vitest for the clock-offset wiring and reconnect logic (mock WebSocket). Manually: two tabs join the same room and see each other.
+  > NOTE T10: `net/socket.ts` (`RoomSocket`, injectable deps) + `state/session.ts` singleton: `joinRoom/releaseRoom/leaveRoom`, `send(msg)`, `setSticky(key,msg)` (re-sent after every welcome), `onServerMessage(type,fn)` (survives reconnects), `serverToPerf/serverNow`. Store `state/room.ts`: `useRoom(sel)`, `useSnapshot/usePhase/useMe/useYou/usePlayers/useIsHost/useConnStatus`, `lastVoteAck`, `iceServers`, `limits`. Fatal codes or `kicked` stop reconnecting; BAD_TOKEN clears the token and re-shows the name prompt. Verified against a throwaway mock gateway (real T05 `Room`) since T06 had not landed.
 - [ ] **T11: Audio foundation: mic, meter, recorder** · impl · Deps: T09 (T10 if `context.ts` exists) · Touches: `client/src/audio/**`, `client/src/components/MicCheck.tsx`, `client/test/audio.test.ts`
   - Mic acquisition with the constraints in §2.3, `LevelMeter` component, micOk detection, `pickRecorderMime`, a `Recorder` class that returns `{blob, mime, offsetMs, durationMs}` (it takes a `startVideo()` callback and implements the latency compensation in §2.3), and the sound-unlock overlay.
   - Accept: unit tests for mime picking and the micOk detector (fed synthetic RMS series). Manual MicCheck works in Chrome and Firefox.
