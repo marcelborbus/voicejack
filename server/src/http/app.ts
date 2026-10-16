@@ -13,6 +13,7 @@ import {
 } from '@dub/shared';
 import type { Config } from '../config.js';
 import type { ClipLibrary } from '../clips/ClipLibrary.js';
+import type { RoomManager } from '../room/RoomManager.js';
 import * as clipsRoutes from '../routes/clips.js';
 import * as roomsRoutes from '../routes/rooms.js';
 import * as chunksRoutes from '../routes/chunks.js';
@@ -21,15 +22,10 @@ import * as gateway from '../ws/gateway.js';
 /** Global request body limit (largest chunk is 2 MiB). */
 export const BODY_LIMIT = Math.floor(2.5 * 1024 * 1024);
 
-/** Minimal views of the room manager / chunk store that app.ts itself needs. */
-export interface RoomStats {
-  stats(): { rooms: number; players: number };
-}
-
 export interface AppDeps {
   config: Config;
   clips: ClipLibrary;
-  rooms?: RoomStats;
+  rooms?: RoomManager;
   store?: unknown;
   /** Epoch ms the process started (health uptime). */
   startedAt?: number;

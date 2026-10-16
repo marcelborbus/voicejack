@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
-import { ClipLibrary } from './clips/ClipLibrary.js';
+import { ClipLibrary, toClipInfo } from './clips/ClipLibrary.js';
+import { RoomManager } from './room/RoomManager.js';
 import { buildApp } from './http/app.js';
 
 export interface RunningServer {
   app: FastifyInstance;
+  rooms: RoomManager;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -17,7 +19,12 @@ export async function startServer(
   opts: { logger?: boolean | { level: string } } = {},
 ): Promise<RunningServer> {
   const clips = ClipLibrary.load(config.clipsDir);
-  const app = await buildApp({ config, clips }, opts);
+  const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo) });
+  const app = await buildApp({ config, clips, rooms }, opts);
+  app.addHook('onClose', async () => {
+    await rooms.stop();
+  });
+  rooms.start();
   for (const w of clips.warnings) app.log.warn(w);
   app.log.info(`clips: ${clips.size} from ${config.clipsDir}`);
   await app.listen({ port: config.port, host: config.host });
@@ -26,6 +33,7 @@ export async function startServer(
   const host = config.host === '0.0.0.0' || config.host === '::' ? '127.0.0.1' : config.host;
   return {
     app,
+    rooms,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),
