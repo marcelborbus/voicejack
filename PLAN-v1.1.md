@@ -58,3 +58,7 @@ a month." If a TURN relay is added later, that becomes the main bandwidth cost.
 pays out via Stripe/PayPal to a German bank account / SEPA) or **GitHub Sponsors** (no platform
 fee, Stripe payout to bank; repo already on GitHub; USD with ~2 % FX conversion). Ko-fi is an
 alternative (0 % on one-off donations, PayPal/Stripe). Owner must create the account (manual step).
+
+## Status
+
+- [x] V03 DB + migrations + guest profiles (#26)

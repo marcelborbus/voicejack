@@ -39,6 +39,7 @@ RUN apk add --no-cache tini \
  && chown node:node /app/data
 WORKDIR /app
 COPY --from=build --chown=root:root /out/server.mjs /app/server.mjs
+COPY --from=build --chown=root:root /out/migrations /app/migrations
 COPY --from=build --chown=root:root /out/public /app/public
 
 # TRUST_PROXY: nginx reaches the container from the Docker bridge gateway (172.x), not
@@ -47,12 +48,16 @@ COPY --from=build --chown=root:root /out/public /app/public
 # can talk to us at all.
 # DATA_DIR is a subdirectory of the /app/data volume on purpose: the server wipes DATA_DIR
 # with rm -r on startup, which cannot remove a mount point itself.
+# DB_PATH (SQLite, V03) is a sibling of DATA_DIR in the same volume, so it survives the wipe;
+# the server creates /app/data/db itself. node:sqlite needs no flag on Node 24; we only
+# silence its ExperimentalWarning.
 ENV NODE_ENV=production \
-    NODE_OPTIONS=--max-old-space-size=192 \
+    NODE_OPTIONS="--max-old-space-size=192 --disable-warning=ExperimentalWarning" \
     PORT=3000 \
     HOST=0.0.0.0 \
     CLIPS_DIR=/app/clips \
     DATA_DIR=/app/data/uploads \
+    DB_PATH=/app/data/db/voicejack.sqlite \
     CLIENT_DIST=/app/public \
     TRUST_PROXY=loopback,uniquelocal
 

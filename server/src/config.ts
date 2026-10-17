@@ -42,6 +42,10 @@ export interface Config {
   host: string;
   clipsDir: string;
   dataDir: string;
+  /** SQLite file (`:memory:` in tests). Must live outside dataDir, which is wiped. */
+  dbPath: string;
+  /** `Secure` attribute on the session cookie (default: NODE_ENV=production). */
+  cookieSecure: boolean;
   clientDist: string;
   timingsName: TimingsName;
   timings: Timings;
@@ -84,6 +88,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     host: env.HOST ?? '0.0.0.0',
     clipsDir: path.resolve(env.CLIPS_DIR ?? path.join(REPO_ROOT, 'clips')),
     dataDir: path.resolve(env.DATA_DIR ?? path.join(REPO_ROOT, '.cache/data')),
+    dbPath:
+      env.DB_PATH === ':memory:'
+        ? ':memory:'
+        : path.resolve(env.DB_PATH ?? path.join(REPO_ROOT, '.cache/db/voicejack.sqlite')),
+    cookieSecure: bool(env.COOKIE_SECURE, env.NODE_ENV === 'production'),
     clientDist: path.resolve(env.CLIENT_DIST ?? path.join(REPO_ROOT, 'client/dist')),
     timingsName,
     timings: { ...TIMINGS_PRESETS[timingsName] },

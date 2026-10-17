@@ -36,6 +36,8 @@ interface PlayerState {
   id: PlayerId;
   name: string;
   token: string;
+  /** Account (V03) behind the player's session cookie. Server-side only, never in snapshots. */
+  userId?: string;
   seq: number;
   connected: boolean;
   disconnectedAt: number | null;
@@ -150,6 +152,16 @@ export class Room {
   }
   playerIds(): PlayerId[] {
     return [...this.players.keys()];
+  }
+  /** Links a player to an account (gateway, on hello). Returns the player's name, or null. */
+  linkUser(playerId: PlayerId, userId: string): string | null {
+    const p = this.players.get(playerId);
+    if (!p) return null;
+    p.userId = userId;
+    return p.name;
+  }
+  userIdOf(playerId: PlayerId): string | null {
+    return this.players.get(playerId)?.userId ?? null;
   }
 
   authenticate(token: string): PlayerId | null {

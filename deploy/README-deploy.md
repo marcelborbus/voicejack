@@ -13,12 +13,14 @@ include `snippets/acme.conf`, and keep an eye on the ~1 GB of free RAM.
 | Image           | `voicejack:latest`, ~170 MB (node:24-alpine + one bundled `server.mjs` + `client/dist`) |
 | Memory          | `mem_limit 320m` (no swap), `NODE_OPTIONS=--max-old-space-size=192`; ~26 MB idle       |
 | CPU             | `cpus: 1.0`                                                                            |
-| State           | none worth keeping. `./clips` (read-only), `./data/uploads` (wiped on every start)     |
+| State           | **`./data/db/voicejack.sqlite`** (SQLite + WAL: guest/registered accounts, sessions) — **back it up**. `./clips` (read-only), `./data/uploads` (wiped on every start) |
 | Secrets         | none                                                                                   |
 
 **Why public:** guests join through an invite link (`/r/<CODE>`) and have no borbus account.
 Rooms are anonymous and live at most 3 h, and uploads never survive a restart, so there is no
-persistent user data a login would protect. Abuse is bounded by the app (30 rooms × 8 players,
+persistent user data a login would protect. (Since v1.1/V03 there are guest profiles in
+SQLite: an anonymous id, the last display name and game stats per browser cookie, no personal
+data until V04 adds optional email login.) Abuse is bounded by the app (30 rooms × 8 players,
 per-route REST limits, per-socket WS rate/size caps, Origin check) and by the `limit_req` /
 `limit_conn` zones (`dub_*`) in the vhost. If accounts or persistent storage are ever added,
 put an Authelia gate in front of it.
@@ -64,7 +66,7 @@ empty library (warning in the log); if it is invalid the server refuses to start
 ssh hetzner
 cd /opt/voicejack
 # compose.yaml: copy deploy/compose.yaml from the repo (scp deploy/compose.yaml hetzner:/opt/voicejack/)
-install -d -o 1000 -g 1000 data      # the container runs as uid 1000 (node); must be writable
+install -d -o 1000 -g 1000 data data/db   # the container runs as uid 1000 (node); must be writable
 free -h && docker stats --no-stream  # headroom check before starting anything
 docker compose up -d                 # uses the loaded voicejack:latest, no build
 docker compose ps                    # wait for (healthy)
@@ -76,6 +78,22 @@ add a TURN server here later, no client change needed), `LOG_LEVEL=info`.
 
 To build on the host instead of shipping the image: clone the repo to `/opt/voicejack/src`,
 put `DUB_SRC=./src` in `.env`, and `docker compose up -d --build` (watch the RAM).
+
+### Database and backups (V03)
+
+The server keeps a SQLite database at `/opt/voicejack/data/db/voicejack.sqlite` (container
+`DB_PATH=/app/data/db/voicejack.sqlite`, WAL mode, so `-wal`/`-shm` files sit next to it). It is
+created and migrated automatically at startup (`db: … at schema vN` in the log). It holds the
+guest/registered accounts and sessions, so unlike the rest of `./data` it **must be kept**:
+
+- `data/db` must exist and be owned by uid 1000 (`install -d -o 1000 -g 1000 data/db`); the
+  server would create it itself if `data` is writable, but create it explicitly.
+- **Add `/opt/voicejack/data/db` to the host's backups in `/opt/backups`** (follow how the other
+  services' state is backed up there). For a consistent copy of a live WAL database use
+  `sqlite3 data/db/voicejack.sqlite ".backup '/path/voicejack-$(date +%F).sqlite'"` (or copy the
+  `.sqlite`, `-wal` and `-shm` files together while the container is stopped).
+- Never put it under `data/uploads` (wiped on start; the server refuses that `DB_PATH`).
+- Restoring: stop the container, replace the three files, start it.
 
 **Why `./data/uploads` and not `./data`:** the server wipes `DATA_DIR` with `rm -r` at startup,
 which cannot remove a mount point, so the image sets `DATA_DIR=/app/data/uploads`.

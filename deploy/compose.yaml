@@ -22,8 +22,9 @@ services:
     volumes:
       # Clip library (manifest.json + mp4s), rsynced from the dev box; never in the image.
       - ./clips:/app/clips:ro
-      # Uploads live in ./data/uploads and are wiped on every start. ./data must be
-      # writable by uid 1000 (the image's `node` user).
+      # Uploads live in ./data/uploads and are wiped on every start. The SQLite DB (accounts,
+      # V03) lives in ./data/db (DB_PATH=/app/data/db/voicejack.sqlite) and is kept: back up
+      # /opt/voicejack/data/db. ./data and ./data/db must be writable by uid 1000 (`node`).
       - ./data:/app/data
     mem_limit: 320m
     memswap_limit: 320m

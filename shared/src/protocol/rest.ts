@@ -15,6 +15,7 @@ export const paths = {
     `/api/rooms/${encodeURIComponent(code)}/rounds/${round}/subs/${encodeURIComponent(subId)}/chunks/${encodeURIComponent(chunkId)}`,
   clip: (file: string) => `/clips/${encodeURIComponent(file)}`,
   health: () => '/api/health',
+  me: () => '/api/me',
 } as const;
 
 export const routes = {
@@ -24,6 +25,7 @@ export const routes = {
   chunk: '/api/rooms/:code/rounds/:round/subs/:subId/chunks/:chunkId',
   clip: '/clips/:file',
   health: '/api/health',
+  me: '/api/me',
 } as const;
 
 /** Every REST error body. */
@@ -62,4 +64,18 @@ export interface HealthResponse {
   rooms: number;
   players: number;
   uptimeS: number;
+}
+
+// GET /api/me — the browser's profile. Creates a guest user + `vj_session` cookie (HttpOnly,
+// 30 d) on first call. 429 if guest creation is rate limited.
+export interface MeUser {
+  id: string;
+  kind: 'guest' | 'registered';
+  /** Last name played under; null until the first room join. */
+  displayName: string | null;
+  elo: number;
+  publicGamesPlayed: number;
+}
+export interface MeResponse {
+  user: MeUser;
 }

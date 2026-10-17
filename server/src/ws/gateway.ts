@@ -50,7 +50,9 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
       },
     },
     (socket, req) => {
-      new Session(socket, rooms, deps, req.log);
+      // The session cookie rides on the upgrade request; resolved once per socket.
+      const userId = deps.accounts?.userIdFromCookie(req.headers.cookie) ?? null;
+      new Session(socket, rooms, deps, req.log, userId);
     },
   );
 }
@@ -69,6 +71,8 @@ class Session implements Connection {
     private readonly rooms: RoomManager,
     private readonly deps: AppDeps,
     private readonly log: FastifyInstance['log'],
+    /** Account behind the upgrade's `vj_session` cookie (never sent to other players). */
+    private readonly userId: string | null = null,
   ) {
     this.helloTimer = setTimeout(() => this.close(4008, 'hello timeout'), HELLO_TIMEOUT_MS);
     this.heartbeat = setInterval(() => {
@@ -181,6 +185,7 @@ class Session implements Connection {
     this.room = room;
     this.playerId = playerId;
     this.rooms.attach(room.code, playerId, this);
+    if (this.userId) this.linkUser(room, playerId, msg.name);
     this.send({
       t: 'welcome',
       v: PROTOCOL_VERSION,
@@ -191,6 +196,18 @@ class Session implements Connection {
       limits: { ...LIMITS },
     });
     room.connect(playerId);
+  }
+
+  /** Links the room player to the cookie's account and remembers the name for next visit. */
+  private linkUser(room: Room, playerId: PlayerId, helloName: string | undefined): void {
+    const name = room.linkUser(playerId, this.userId!);
+    const display = helloName?.trim() || name;
+    if (!display) return;
+    try {
+      this.deps.accounts?.setDisplayName(this.userId!, display);
+    } catch (e) {
+      this.log.warn({ err: e }, 'saving display name failed');
+    }
   }
 
   private relay(msg: C2SOf<'rtc'>): void {

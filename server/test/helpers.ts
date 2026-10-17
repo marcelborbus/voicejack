@@ -35,6 +35,7 @@ export function testConfig(over: Partial<Config> = {}, env: NodeJS.ProcessEnv = 
     host: '127.0.0.1',
     clientDist: path.join(os.tmpdir(), 'dub-no-client'),
     dataDir: tmpDir('dub-data-'),
+    dbPath: ':memory:',
     ...over,
   };
 }

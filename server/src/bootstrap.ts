@@ -1,14 +1,23 @@
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
 import { ClipLibrary, toClipInfo } from './clips/ClipLibrary.js';
 import { RoomManager } from './room/RoomManager.js';
 import { ChunkStore } from './uploads/ChunkStore.js';
 import { buildApp } from './http/app.js';
+import { openDb, type Db } from './db/index.js';
+import { migrate } from './db/migrate.js';
+import { Accounts } from './accounts/Accounts.js';
+
+/** Expired sessions / idle guests are purged this often (and once at startup). */
+export const DB_CLEANUP_MS = 3600_000;
 
 export interface RunningServer {
   app: FastifyInstance;
   rooms: RoomManager;
   store: ChunkStore;
+  db: Db;
+  accounts: Accounts;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -23,11 +32,34 @@ export async function startServer(
   const clips = ClipLibrary.load(config.clipsDir);
   const store = new ChunkStore(config.dataDir);
   await store.init();
+  const dataDir = path.resolve(config.dataDir) + path.sep;
+  if (config.dbPath !== ':memory:' && path.resolve(config.dbPath).startsWith(dataDir)) {
+    throw new Error(`DB_PATH (${config.dbPath}) must not be inside DATA_DIR, which is wiped`);
+  }
+  const db = openDb(config.dbPath);
+  const mig = migrate(db);
+  const accounts = new Accounts(db);
   const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo), store });
-  const app = await buildApp({ config, clips, rooms, store }, opts);
+  const app = await buildApp({ config, clips, rooms, store, accounts }, opts);
+  const cleanup = () => {
+    try {
+      const n = accounts.cleanup();
+      if (n.sessions || n.guests) app.log.info(n, 'db cleanup');
+    } catch (e) {
+      app.log.error(e, 'db cleanup failed');
+    }
+  };
+  const cleanupTimer = setInterval(cleanup, DB_CLEANUP_MS);
+  cleanupTimer.unref();
   app.addHook('onClose', async () => {
+    clearInterval(cleanupTimer);
     await rooms.stop();
+    db.close();
   });
+  if (mig.applied.length) app.log.info(`db: applied ${mig.applied.join(', ')}`);
+  if (mig.unknown.length) app.log.warn(`db: has migrations newer than this build: ${mig.unknown}`);
+  app.log.info(`db: ${config.dbPath} at schema v${mig.version}`);
+  cleanup();
   rooms.start();
   for (const w of clips.warnings) app.log.warn(w);
   app.log.info(`clips: ${clips.size} from ${config.clipsDir}`);
@@ -39,6 +71,8 @@ export async function startServer(
     app,
     rooms,
     store,
+    db,
+    accounts,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),

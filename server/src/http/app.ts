@@ -15,9 +15,12 @@ import type { Config } from '../config.js';
 import type { ClipLibrary } from '../clips/ClipLibrary.js';
 import type { RoomManager } from '../room/RoomManager.js';
 import type { ChunkStore } from '../uploads/ChunkStore.js';
+import type { Accounts } from '../accounts/Accounts.js';
+import type { GuestLimiter } from '../accounts/GuestLimiter.js';
 import * as clipsRoutes from '../routes/clips.js';
 import * as roomsRoutes from '../routes/rooms.js';
 import * as chunksRoutes from '../routes/chunks.js';
+import * as meRoutes from '../routes/me.js';
 import * as gateway from '../ws/gateway.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
@@ -28,6 +31,9 @@ export interface AppDeps {
   clips: ClipLibrary;
   rooms?: RoomManager;
   store?: ChunkStore;
+  /** Users + sessions (SQLite). Without it /api/me is absent and rooms never link users. */
+  accounts?: Accounts;
+  guestLimiter?: GuestLimiter;
   /** Epoch ms the process started (health uptime). */
   startedAt?: number;
 }
@@ -88,6 +94,7 @@ export async function buildApp(
     clipsRoutes.register,
     roomsRoutes.register,
     chunksRoutes.register,
+    meRoutes.register,
     gateway.register,
   ];
   for (const register of modules) await register(app, deps);

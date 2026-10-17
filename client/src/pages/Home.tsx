@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { ApiRequestError, createRoom, getRoomInfo } from '@/net/api';
 import { errorText } from '@/net/errors';
 import { getSavedName, normalizeRoomCode, saveName, setToken } from '@/state/storage';
+import { usePrefillName } from '@/state/me';
 
 type Tab = 'create' | 'join';
 
@@ -20,6 +21,7 @@ export function Home() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('create');
   const [name, setName] = useState(getSavedName);
+  usePrefillName(name, setName);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
