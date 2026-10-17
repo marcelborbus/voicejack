@@ -55,6 +55,7 @@ interface Live {
 /** Fade applied when a source starts mid-buffer or is cut off, to avoid clicks. */
 const FADE_SEC = 0.008;
 const MAX_LATENCY_SEC = 0.4;
+const MOTION_WINDOW_MS = 30;
 
 /**
  * The one playback engine for editor, showcase, final replay and render (§2.3).
@@ -100,7 +101,8 @@ export class DubPlayer {
 
   private readonly listeners: [string, () => void][];
   private readonly onCtxState = () => {
-    if (this.ctx.state === 'running' && this.isVideoRunning()) this.scheduleWhenMoving('audio-resumed');
+    if (this.ctx.state === 'running' && this.isVideoRunning())
+      this.scheduleWhenMoving('audio-resumed');
   };
 
   constructor(opts: DubPlayerOptions) {
@@ -246,14 +248,28 @@ export class DubPlayer {
     if (!this.waitForMotion) return this.schedule(reason);
     this.stopAll(null);
     this.clearMotion();
+    // Chromium's clock creeps for ~50–80 ms after a seek (a few ms, a hold, then full speed).
+    // Anchoring on its first step put the audio ahead and cost one resync after every scrub,
+    // so wait until the clock has run at (nearly) full rate over the last MOTION_WINDOW_MS.
     const from = this.video.currentTime;
     const since = this.perfNow();
+    const samples: [number, number][] = [];
     const poll = () => {
       this.motionTimer = null;
       const v = this.video;
       if (this.disposed || v.paused || v.seeking || v.ended) return;
-      if (v.currentTime !== from || this.perfNow() - since > 400) this.schedule(reason);
-      else this.motionTimer = this.timers.setTimeout(poll, 8);
+      const now = this.perfNow();
+      const cur = v.currentTime;
+      if (now - since > 400) return this.schedule(reason);
+      if (cur !== from) {
+        samples.push([now, cur]);
+        const rate = v.playbackRate > 0 ? v.playbackRate : 1;
+        let ref: [number, number] | undefined;
+        for (const s of samples) if (now - s[0] >= MOTION_WINDOW_MS) ref = s;
+        if (ref && (cur - ref[1]) * 1000 >= 0.7 * (now - ref[0]) * rate)
+          return this.schedule(reason);
+      }
+      this.motionTimer = this.timers.setTimeout(poll, 8);
     };
     this.motionTimer = this.timers.setTimeout(poll, 8);
   }
@@ -377,7 +393,10 @@ export class DubPlayer {
     const v = this.video;
     const now = this.perfNow();
     const expected = now - start;
-    const end = Math.min(this.syncDurationMs, Number.isFinite(v.duration) ? v.duration * 1000 : Infinity);
+    const end = Math.min(
+      this.syncDurationMs,
+      Number.isFinite(v.duration) ? v.duration * 1000 : Infinity,
+    );
     if (expected >= end - 100 || v.ended) return;
     if (v.seeking) return;
     if (v.paused) {

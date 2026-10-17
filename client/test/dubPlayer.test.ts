@@ -211,6 +211,67 @@ function expectMatchesPlan(ctx: FakeCtx, mediaMs: number, rate: number, t0: numb
 
 // ---------- tests ----------
 
+describe('DubPlayer wait-for-motion', () => {
+  it('anchors only once the video clock runs at full rate (Chromium post-seek creep)', () => {
+    const ctx = new FakeCtx();
+    const video = new FakeVideo();
+    const timers = new FakeTimers();
+    const events: DubPlayerEvent[] = [];
+    const player = new DubPlayer({
+      video,
+      ctx,
+      timers,
+      perfNow: () => timers.now,
+      onEvent: (e) => events.push(e),
+    });
+    player.setChunks(CHUNKS);
+    video.currentTime = 0.9;
+    video.startPlaying();
+    // Trace from headless Chromium: +3 ms, +3 ms, +7 ms, then held for ~50 ms, then 1:1.
+    const trace: [number, number][] = [
+      [13, 0.903],
+      [24, 0.906],
+      [34, 0.913],
+      [85, 0.922],
+    ];
+    for (const [t, c] of trace) {
+      timers.advance(t - timers.now);
+      video.currentTime = c;
+    }
+    expect(events.filter((e) => e.type === 'schedule')).toHaveLength(0);
+    // from here the clock runs at full speed
+    for (let i = 0; i < 10; i++) {
+      timers.advance(8);
+      ctx.currentTime += 0.008;
+      video.currentTime += 0.008;
+    }
+    const sched = events.filter((e) => e.type === 'schedule');
+    expect(sched).toHaveLength(1);
+    expect((sched[0] as { mediaMs: number }).mediaMs).toBeGreaterThan(922);
+    player.dispose();
+  });
+
+  it('still anchors after 400 ms if the clock never looks steady', () => {
+    const ctx = new FakeCtx();
+    const video = new FakeVideo();
+    const timers = new FakeTimers();
+    const events: DubPlayerEvent[] = [];
+    const player = new DubPlayer({
+      video,
+      ctx,
+      timers,
+      perfNow: () => timers.now,
+      onEvent: (e) => events.push(e),
+    });
+    video.startPlaying();
+    timers.advance(390);
+    expect(events.filter((e) => e.type === 'schedule')).toHaveLength(0);
+    timers.advance(30);
+    expect(events.filter((e) => e.type === 'schedule')).toHaveLength(1);
+    player.dispose();
+  });
+});
+
 describe('DubPlayer (editor mode)', () => {
   let ctx: FakeCtx;
   let video: FakeVideo;
