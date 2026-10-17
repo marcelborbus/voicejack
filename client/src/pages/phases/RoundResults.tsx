@@ -1,12 +1,13 @@
 import { formatClock } from '@dub/shared';
 import { ArrowRight, Flag, Trophy } from 'lucide-react';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { buildStandings, Leaderboard } from '@/components/results/Leaderboard';
 import { RevealList } from '@/components/results/RevealList';
 import { ClipAttribution } from '@/components/showcase/ClipAttribution';
 import { useServerNow } from '@/components/showcase/useServerNow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { play } from '@/lib/sfx';
 import { useIsHost, useSnapshot } from '@/state/room';
 import { send } from '@/state/session';
 
@@ -14,6 +15,10 @@ export function RoundResults() {
   const snap = useSnapshot();
   const isHost = useIsHost();
   const result = snap?.roundResult ?? null;
+  const resultRound = result?.round ?? -1;
+  useEffect(() => {
+    if (resultRound >= 0) play('tada');
+  }, [resultRound]);
   const standings = useMemo(
     () => (snap && result ? buildStandings(snap.players, result.entries) : []),
     [snap, result],
@@ -28,19 +33,15 @@ export function RoundResults() {
     <div className="flex flex-col gap-5" data-testid="round-results">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+          <p className="tape max-w-full">
             <Flag className="size-3.5" /> Round {result.round + 1} of {snap.totalRounds} ·{' '}
             {result.clip.title}
           </p>
-          <h2 className="mt-1 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+          <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
             The votes are <span className="text-brand">in</span>
           </h2>
         </div>
-        <AdvanceBar
-          isHost={isHost}
-          isLast={isLast}
-          endsAt={snap.phaseEndsAt}
-        />
+        <AdvanceBar isHost={isHost} isLast={isLast} endsAt={snap.phaseEndsAt} />
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">

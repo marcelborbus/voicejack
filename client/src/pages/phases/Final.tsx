@@ -1,11 +1,15 @@
-import { Crown, Medal, MicOff, RotateCcw, Trophy } from 'lucide-react';
-import { useState } from 'react';
+import { Crown, Medal, MicOff, RotateCcw, Share2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sparkle } from '@/components/doodles';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { BestDubReplay, useDubChunks } from '@/components/results/BestDubReplay';
 import { Confetti, CountUp } from '@/components/results/motion';
 import { SaveVideo } from '@/components/results/SaveVideo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { play } from '@/lib/sfx';
+import { shareResults } from '@/lib/shareCard';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useIsHost, useSnapshot } from '@/state/room';
 import { send } from '@/state/session';
@@ -20,6 +24,10 @@ export function Final() {
   const snap = useSnapshot();
   const isHost = useIsHost();
   const final = snap?.final ?? null;
+  const hasFinal = !!final;
+  useEffect(() => {
+    if (hasFinal) play('tada');
+  }, [hasFinal]);
   if (!snap || !final) return null;
   const youId = snap.you.playerId;
   const winnerNames = final.standings
@@ -31,12 +39,22 @@ export function Final() {
     <div className="flex flex-col gap-6" data-testid="final">
       {final.winners.length > 0 && <Confetti />}
       <section className="flex flex-col items-center gap-4 pt-2 text-center">
-        <span className="dub-trophy inline-flex size-24 items-center justify-center rounded-[2rem] bg-gradient-to-br from-amber-300 via-orange-400 to-fuchsia-500 shadow-2xl shadow-orange-500/40 ring-1 ring-white/30">
-          <Trophy className="size-12 text-white drop-shadow" strokeWidth={2.25} />
-        </span>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
-          {final.winners.length > 1 ? 'Shared victory' : 'And the winner is'}
-        </p>
+        <div className="dub-trophy relative">
+          {winnerNames.length > 0 ? (
+            <PlayerAvatar name={winnerNames[0]!} size="xl" className="size-28 rounded-[2.25rem]" />
+          ) : (
+            <PlayerAvatar name="?" mystery size="xl" />
+          )}
+          {winnerNames.length > 0 && (
+            <Crown
+              aria-hidden
+              strokeWidth={2.5}
+              className="absolute -right-5 -top-7 size-12 rotate-[18deg] fill-sun text-[#1a1027]"
+            />
+          )}
+          <Sparkle className="absolute -left-10 top-2 size-7 animate-sway text-jack" />
+        </div>
+        <p className="tape">{final.winners.length > 1 ? 'Shared victory' : 'And the winner is'}</p>
         <h2
           data-testid="final-winner"
           className="animate-pop font-display text-5xl font-extrabold tracking-tight sm:text-7xl"
@@ -73,6 +91,7 @@ export function Final() {
                   Waiting for the host to start another game…
                 </p>
               )}
+              <ShareResultsButton final={final} rounds={snap.totalRounds} />
               <p className="text-center text-xs text-zinc-500">
                 Scores reset in the lobby. Clips you've played won't come up again in this room.
               </p>
@@ -81,6 +100,44 @@ export function Final() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ShareResultsButton({ final, rounds }: { final: FinalResult; rounds: number }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      variant="secondary"
+      size="lg"
+      data-testid="share-results"
+      disabled={busy || final.standings.length === 0}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const r = await shareResults({
+            rounds,
+            standings: final.standings.map((s) => ({
+              name: s.name,
+              total: s.total,
+              winner: final.winners.includes(s.playerId),
+            })),
+          });
+          if (r === 'downloaded')
+            toast('Results card saved', {
+              variant: 'success',
+              description: 'Post it in the group chat.',
+              durationMs: 2500,
+            });
+        } catch (e) {
+          console.error('[share] results card failed', e);
+          toast('Could not make the results card', { variant: 'warning' });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <Share2 /> {busy ? 'Drawing…' : 'Share results'}
+    </Button>
   );
 }
 
@@ -146,17 +203,22 @@ function Standings({ final, youId }: { final: FinalResult; youId: string }) {
                   'flex animate-fade-up items-center gap-3 rounded-2xl px-3 py-2.5',
                   winner
                     ? 'dub-glow bg-gradient-to-r from-amber-400/[0.12] to-transparent'
-                    : 'bg-white/[0.025]',
+                    : 'bg-ink-850',
                   s.playerId === youId && !winner && 'ring-1 ring-fuchsia-400/25',
                 )}
               >
-                <span className={cn('w-5 text-center font-display font-bold', winner ? 'text-amber-300' : 'text-zinc-500')}>
+                <span
+                  className={cn(
+                    'w-5 text-center font-display font-bold',
+                    winner ? 'text-amber-300' : 'text-zinc-500',
+                  )}
+                >
                   {i + 1}
                 </span>
                 <div className="relative">
                   <PlayerAvatar name={s.name} seed={s.playerId} size="sm" />
                   {winner && (
-                    <Crown className="absolute -right-2 -top-2.5 size-4 rotate-12 fill-amber-400 text-amber-400" />
+                    <Crown className="absolute -right-2 -top-2.5 size-4 rotate-12 fill-sun text-[#1a1027]" />
                   )}
                 </div>
                 <span className="min-w-0 flex-1">
@@ -179,4 +241,3 @@ function Standings({ final, youId }: { final: FinalResult; youId: string }) {
     </Card>
   );
 }
-

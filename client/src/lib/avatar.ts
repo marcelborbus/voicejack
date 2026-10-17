@@ -5,7 +5,9 @@
  */
 
 const INK = '#1a1027';
-const S = `stroke="${INK}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"`;
+const Sw = (w: number) =>
+  `stroke="${INK}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"`;
+const S = Sw(2.6);
 
 export const AVATAR_BG = [
   '#ff5fa2',
@@ -71,19 +73,19 @@ const ACCESSORIES: Acc[] = [
   () => '',
   // headphones (jack cyan cups)
   (t) =>
-    `<path d="M13 38 q0 -${(40 - t + 3).toFixed(1)} 19 -${(40 - t + 3).toFixed(1)} q19 0 19 ${(40 - t + 3).toFixed(1)}" fill="none" ${S} stroke-width="3.4"/><rect x="9" y="33" width="8" height="12" rx="3.5" fill="#2de2e6" ${S}/><rect x="47" y="33" width="8" height="12" rx="3.5" fill="#2de2e6" ${S}/>`,
+    `<path d="M13 38 q0 -${(40 - t + 3).toFixed(1)} 19 -${(40 - t + 3).toFixed(1)} q19 0 19 ${(40 - t + 3).toFixed(1)}" fill="none" ${Sw(3.4)}/><rect x="9" y="33" width="8" height="12" rx="3.5" fill="#2de2e6" ${S}/><rect x="47" y="33" width="8" height="12" rx="3.5" fill="#2de2e6" ${S}/>`,
   // beanie
   (t) =>
-    `<path d="M15.5 ${t + 6} q0 -14 16.5 -14 q16.5 0 16.5 14z" fill="#ff4d6d" ${S}/><path d="M14 ${t + 6} h36" ${S} stroke-width="4"/><circle cx="32" cy="${t - 9}" r="3.4" fill="#fff" ${S}/>`,
+    `<path d="M15.5 ${t + 6} q0 -14 16.5 -14 q16.5 0 16.5 14z" fill="#ff4d6d" ${S}/><path d="M14 ${t + 6} h36" ${Sw(4)}/><circle cx="32" cy="${t - 9}" r="3.4" fill="#fff" ${S}/>`,
   // cap
   (t) =>
-    `<path d="M16 ${t + 6} q0 -13 16 -13 q16 0 16 13z" fill="#38bdf8" ${S}/><path d="M38 ${t + 5} q10 -1 15 3" fill="none" ${S} stroke-width="3.4"/>`,
+    `<path d="M16 ${t + 6} q0 -13 16 -13 q16 0 16 13z" fill="#38bdf8" ${S}/><path d="M38 ${t + 5} q10 -1 15 3" fill="none" ${Sw(3.4)}/>`,
   // round glasses (sit on the eyes)
   () =>
     `<circle cx="25.5" cy="35" r="6" fill="#ffffff33" ${S}/><circle cx="38.5" cy="35" r="6" fill="#ffffff33" ${S}/><path d="M31.5 35 h1" ${S}/>`,
   // handheld mic at the mouth
   () =>
-    `<path d="M45.5 52 l6 10" ${S} stroke-width="4.4"/><circle cx="42" cy="47.5" r="5.6" fill="#52525b" ${S}/><path d="M38.5 45 l7 5 M37.6 48.6 l5 3.6 M40.4 43 l5 3.6" stroke="#d4d4d8" stroke-width="1.3" stroke-linecap="round"/>`,
+    `<path d="M45.5 52 l6 10" ${Sw(4.4)}/><circle cx="42" cy="47.5" r="5.6" fill="#52525b" ${S}/><path d="M38.5 45 l7 5 M37.6 48.6 l5 3.6 M40.4 43 l5 3.6" stroke="#d4d4d8" stroke-width="1.3" stroke-linecap="round"/>`,
   // bow
   (t) =>
     `<path d="M32 ${t + 1} l-8 -5 v10z M32 ${t + 1} l8 -5 v10z" fill="#ff5fa2" ${S}/><circle cx="32" cy="${t + 1}" r="2.4" fill="#ff5fa2" ${S}/>`,
