@@ -75,6 +75,8 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
       reply.header('Cache-Control', 'no-store');
       const s = accounts.session(readCookie(req.headers.cookie, SESSION_COOKIE));
       if (!s) return reply.status(401).send(sendError('BAD_TOKEN', 'no session'));
+      // V06: the user's private clip libraries go with the account (files included).
+      deps.clips.deleteUserLibraries(s.user.id);
       accounts.deleteAccount(s.user.id);
       req.log.info({ userId: s.user.id }, 'account deleted');
       const user = accounts.createGuest();

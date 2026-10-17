@@ -234,27 +234,101 @@ export async function normalize(opts: {
   };
 }
 
-/** Runs jobs strictly one after another; refuses new ones beyond `maxPending`. */
+export type JobPriority = 'admin' | 'user';
+
+export interface JobOptions {
+  /** Admin jobs always run before queued user jobs (default 'admin'). */
+  priority?: JobPriority;
+  /** Job owner (user id) for the per-owner limit. */
+  owner?: string;
+}
+
+interface QueuedJob {
+  run: () => Promise<void>;
+  priority: JobPriority;
+  owner: string | undefined;
+}
+
+/**
+ * One normalize queue shared by admin and user uploads (V06): jobs run strictly one at a time,
+ * queued admin jobs first, then user jobs, each in arrival order. Admin and user jobs have
+ * separate caps (`maxPending`, `maxUserPending`, queued + running) and an owner may have at
+ * most `maxPerOwner` (queued + running).
+ */
 export class JobQueue {
-  private tail: Promise<unknown> = Promise.resolve();
-  private pending = 0;
-  constructor(readonly maxPending = 5) {}
+  private readonly queue: QueuedJob[] = [];
+  private running: QueuedJob | null = null;
+  private idleWaiters: (() => void)[] = [];
 
+  constructor(
+    readonly maxPending = 5,
+    readonly maxUserPending = 10,
+    readonly maxPerOwner = 1,
+  ) {}
+
+  /** Queued + running jobs. */
   get size(): number {
-    return this.pending;
+    return this.queue.length + (this.running ? 1 : 0);
   }
 
-  /** Null if the queue is full; else the job's promise. */
-  push<T>(job: () => Promise<T>): Promise<T> | null {
-    if (this.pending >= this.maxPending) return null;
-    this.pending++;
-    const p = this.tail.then(job).finally(() => this.pending--);
-    this.tail = p.catch(() => {});
-    return p;
+  private all(): QueuedJob[] {
+    return this.running ? [this.running, ...this.queue] : this.queue;
   }
 
-  /** Resolves once everything queued so far has finished. */
+  sizeOf(priority: JobPriority): number {
+    return this.all().filter((j) => j.priority === priority).length;
+  }
+
+  /** Queued + running jobs of `owner`. */
+  pendingFor(owner: string): number {
+    return this.all().filter((j) => j.owner === owner).length;
+  }
+
+  /** Why a job with `opts` would be refused right now, or null if it fits. */
+  refusal(opts: JobOptions = {}): 'busy' | 'owner' | null {
+    const priority = opts.priority ?? 'admin';
+    if (opts.owner && this.pendingFor(opts.owner) >= this.maxPerOwner) return 'owner';
+    const cap = priority === 'admin' ? this.maxPending : this.maxUserPending;
+    return this.sizeOf(priority) >= cap ? 'busy' : null;
+  }
+
+  /** Null if the job is refused (see `refusal`); else the job's promise. */
+  push<T>(job: () => Promise<T>, opts: JobOptions = {}): Promise<T> | null {
+    if (this.refusal(opts)) return null;
+    const priority = opts.priority ?? 'admin';
+    return new Promise<T>((resolve, reject) => {
+      const q: QueuedJob = {
+        priority,
+        owner: opts.owner,
+        run: () => Promise.resolve().then(job).then(resolve, reject),
+      };
+      if (priority === 'admin') {
+        const firstUser = this.queue.findIndex((j) => j.priority === 'user');
+        this.queue.splice(firstUser < 0 ? this.queue.length : firstUser, 0, q);
+      } else this.queue.push(q);
+      this.next();
+    });
+  }
+
+  private next(): void {
+    if (this.running) return;
+    const j = this.queue.shift();
+    if (!j) {
+      const w = this.idleWaiters;
+      this.idleWaiters = [];
+      for (const fn of w) fn();
+      return;
+    }
+    this.running = j;
+    void j.run().finally(() => {
+      this.running = null;
+      this.next();
+    });
+  }
+
+  /** Resolves once the queue is empty and nothing runs. */
   idle(): Promise<void> {
-    return this.tail.then(() => {});
+    if (!this.running && this.queue.length === 0) return Promise.resolve();
+    return new Promise((res) => this.idleWaiters.push(res));
   }
 }

@@ -5,6 +5,7 @@ import {
   type AdminLibrariesResponse,
   type AdminLibrary,
   type AdminMeResponse,
+  type AdminUserLibrariesResponse,
   type CreateLibraryBody,
   type UpdateClipBody,
   type UpdateLibraryBody,
@@ -65,6 +66,16 @@ export const adminApi = {
   updateClip: (id: string, body: UpdateClipBody) =>
     call<{ clip: AdminClip }>(libraryPaths.adminClip(id), json('PATCH', body)),
   deleteClip: (id: string) => call<void>(libraryPaths.adminClip(id), json('DELETE')),
+  // V06 moderation of private (user) libraries.
+  userLibraries: () => call<AdminUserLibrariesResponse>(libraryPaths.adminUserLibraries()),
+  setLibraryDisabled: (id: string, disabled: boolean) =>
+    call<{ library: AdminLibrary }>(
+      libraryPaths.adminLibraryDisabled(id),
+      json('POST', { disabled }),
+    ),
+  setUploadBan: (userId: string, banned: boolean) =>
+    call<{ uploadBanned: boolean }>(libraryPaths.adminUploadBan(userId), json('POST', { banned })),
+  resolveReport: (id: number) => call<void>(libraryPaths.adminReportResolve(id), json('POST')),
 };
 
 /** Raw-body upload with progress (fetch has no upload progress). Resolves with the new clip. */
@@ -74,13 +85,23 @@ export function uploadClip(
   meta: UploadClipQuery,
   onProgress: (fraction: number) => void,
 ): { promise: Promise<AdminClip>; abort: () => void } {
+  return uploadTo(libraryPaths.adminLibraryClips(libraryId), file, meta, onProgress);
+}
+
+/** `uploadClip` against any upload endpoint (V06: `/api/my/libraries/:id/clips`). */
+export function uploadTo(
+  url: string,
+  file: File,
+  meta: Record<string, unknown>,
+  onProgress: (fraction: number) => void,
+): { promise: Promise<AdminClip>; abort: () => void } {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(meta)) {
     if (v !== undefined && v !== '') qs.set(k, String(v));
   }
   const xhr = new XMLHttpRequest();
   const promise = new Promise<AdminClip>((resolve, reject) => {
-    xhr.open('POST', `${libraryPaths.adminLibraryClips(libraryId)}?${qs}`);
+    xhr.open('POST', `${url}?${qs}`);
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
     xhr.onload = () => {

@@ -1,25 +1,21 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { Transform, type Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { nanoid } from 'nanoid';
 import {
   ADMIN_UPLOAD_MAX_BYTES,
   CreateLibraryBodySchema,
+  SetDisabledBodySchema,
   UpdateClipBodySchema,
   UpdateLibraryBodySchema,
+  UploadBanBodySchema,
   UploadClipQuerySchema,
   libraryRoutes,
   type AdminClipsResponse,
   type AdminLibrariesResponse,
   type AdminMeResponse,
-  type ClipAttribution,
-  type UploadClipResponse,
+  type AdminUserLibrariesResponse,
 } from '@dub/shared';
 import { sendError, type AppDeps } from '../http/app.js';
-import { LibraryError } from '../clips/ClipLibrary.js';
-import { JobQueue, hasFfmpeg, normalize, probe, resolveTrim } from '../clips/normalize.js';
+import { hostLibraries } from '../clips/HostLibraries.js';
+import { acceptRawVideo, bad, handleUpload, libraryFail } from '../clips/upload.js';
 import { compileTrust } from '../security/trustedProxy.js';
 import { originAllowed } from '../ws/gateway.js';
 
@@ -67,37 +63,12 @@ export function adminIdentity(
   return { user, groups, dev: false };
 }
 
-function libraryFail(reply: FastifyReply, e: unknown) {
-  if (e instanceof LibraryError) {
-    const status = e.code === 'NOT_FOUND' ? 404 : e.code === 'CONFLICT' ? 409 : 400;
-    return reply.status(status).send(sendError('INVALID', e.message));
-  }
-  throw e;
-}
-
-function bad(reply: FastifyReply, message: string) {
-  return reply.status(400).send(sendError('INVALID', message));
-}
-
-/** Byte counter that errors once more than `max` bytes went through. */
-function limit(max: number): Transform {
-  let n = 0;
-  return new Transform({
-    transform(chunk: Buffer, _enc, cb) {
-      n += chunk.length;
-      if (n > max) cb(Object.assign(new Error('upload too large'), { statusCode: 413 }));
-      else cb(null, chunk);
-    },
-  });
-}
-
 /** `/api/admin/*` (V05): libraries + clip CRUD and uploads, admins only. */
 export function register(app: FastifyInstance, deps: AppDeps): void {
   const { config, clips } = deps;
   const trusted = compileTrust(config.trustProxy);
   const dev = config.adminDev;
-  const jobs = new JobQueue(5);
-  let ffmpeg: boolean | null = null;
+  const host = hostLibraries(clips);
 
   void app.register(async (admin) => {
     admin.addHook('onRequest', async (req, reply) => {
@@ -110,18 +81,13 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
       req.admin = who;
     });
     // Uploads are streamed to disk, never buffered.
-    const passThrough = (
-      _req: FastifyRequest,
-      payload: Readable,
-      done: (e: null, b: Readable) => void,
-    ) => done(null, payload);
-    admin.addContentTypeParser('application/octet-stream', passThrough);
-    admin.addContentTypeParser(/^video\//, passThrough);
+    acceptRawVideo(admin);
 
     admin.get(libraryRoutes.adminMe, async (req): Promise<AdminMeResponse> => req.admin!);
 
+    // Official libraries; private ones are under /api/admin/user-libraries (V06).
     admin.get(libraryRoutes.adminLibraries, async (): Promise<AdminLibrariesResponse> => ({
-      libraries: clips.adminLibraries(),
+      libraries: clips.adminLibraries({ visibility: 'official' }),
     }));
 
     admin.post(libraryRoutes.adminLibraries, async (req, reply) => {
@@ -199,99 +165,78 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
           const i = q.error.issues[0];
           return bad(reply, `invalid ${i?.path.join('.') || 'query'}: ${i?.message ?? ''}`);
         }
-        if (!(req.body && typeof (req.body as Readable).pipe === 'function')) {
-          return bad(reply, 'send the video as the raw body (application/octet-stream)');
+        return handleUpload(req, reply, {
+          clips,
+          libraryId: req.params.id,
+          query: q.data,
+          maxBytes: ADMIN_UPLOAD_MAX_BYTES,
+          job: { priority: 'admin' },
+          logTag: 'admin',
+        });
+      },
+    );
+
+    // ---------------------------------------------------------- V06 moderation
+
+    admin.get(libraryRoutes.adminUserLibraries, async (): Promise<AdminUserLibrariesResponse> => ({
+      libraries: host.adminOverview(),
+      reports: host.clipReports(),
+    }));
+
+    // Private clips are only served to owners / room members on /clips; admins preview here.
+    admin.get<{ Params: { id: string; kind: string } }>(
+      libraryRoutes.adminClipFile,
+      async (req, reply) => {
+        const c = clips.clipMeta(req.params.id);
+        const file = req.params.kind === 'poster' ? c?.poster : c?.file;
+        if (
+          !c ||
+          !c.dir ||
+          !file ||
+          (req.params.kind !== 'poster' && req.params.kind !== 'video')
+        ) {
+          return reply.status(404).send(sendError('INVALID', 'unknown clip'));
         }
-        const len = Number(req.headers['content-length'] ?? 0);
-        if (len > ADMIN_UPLOAD_MAX_BYTES) {
-          return reply.status(413).send(sendError('LIMIT', 'upload is larger than 200 MB'));
-        }
-        let dir: string;
+        return reply.sendFile(file, c.dir, { acceptRanges: true, cacheControl: false });
+      },
+    );
+
+    admin.post<{ Params: { id: string } }>(
+      libraryRoutes.adminLibraryDisabled,
+      async (req, reply) => {
+        const body = SetDisabledBodySchema.safeParse(req.body);
+        if (!body.success) return bad(reply, 'disabled: boolean');
         try {
-          dir = clips.uploadDir(req.params.id);
+          const library = clips.setLibraryDisabled(req.params.id, body.data.disabled);
+          req.log.info(
+            { library: library.id, disabled: library.disabled, by: req.admin!.user },
+            'admin: library disabled',
+          );
+          return { library };
         } catch (e) {
           return libraryFail(reply, e);
         }
-        ffmpeg ??= hasFfmpeg();
-        if (!ffmpeg) return reply.status(503).send(sendError('INVALID', 'ffmpeg is not installed'));
-        if (jobs.size >= jobs.maxPending) {
-          return reply.status(503).send(sendError('RATE_LIMITED', 'busy, try again in a minute'));
-        }
-
-        const tmpDir = path.join(clips.libraryDir!, '.tmp');
-        fs.mkdirSync(tmpDir, { recursive: true });
-        const tmp = path.join(tmpDir, `${nanoid(16)}.upload`);
-        let queued = false;
-        try {
-          try {
-            await pipeline(
-              req.body as Readable,
-              limit(ADMIN_UPLOAD_MAX_BYTES),
-              fs.createWriteStream(tmp),
-            );
-          } catch (e) {
-            if ((e as { statusCode?: number }).statusCode === 413) {
-              return reply.status(413).send(sendError('LIMIT', 'upload is larger than 200 MB'));
-            }
-            throw e;
-          }
-          let input;
-          let trim;
-          try {
-            input = await probe(tmp);
-            trim = resolveTrim(input, { ss: q.data.ss, t: q.data.t });
-          } catch (e) {
-            return bad(reply, (e as Error).message);
-          }
-          const attribution: ClipAttribution = {
-            author: q.data.author.trim(),
-            source: q.data.source.trim(),
-            license: q.data.license.trim(),
-          };
-          if (q.data.licenseUrl?.trim()) attribution.licenseUrl = q.data.licenseUrl.trim();
-          const tags = [
-            ...new Set(
-              q.data.tags
-                .split(',')
-                .map((t) => t.trim().toLowerCase())
-                .filter((t) => t && t.length <= 32),
-            ),
-          ].slice(0, 32);
-          const up = clips.createUpload(req.params.id, {
-            title: q.data.title,
-            tags,
-            attribution,
-          });
-          const job = jobs.push(async () => {
-            try {
-              const res = await normalize({
-                input: tmp,
-                probe: input,
-                trim,
-                outFile: path.join(dir, up.file),
-                posterFile: path.join(dir, up.poster),
-              });
-              clips.finishUpload(up.id, res);
-              req.log.info({ clip: up.id, ...res }, 'admin: clip normalized');
-            } catch (e) {
-              req.log.warn({ clip: up.id, err: (e as Error).message }, 'admin: normalize failed');
-              clips.failUpload(up.id, (e as Error).message);
-            } finally {
-              fs.rmSync(tmp, { force: true });
-            }
-          });
-          if (!job) {
-            clips.failUpload(up.id, 'queue full');
-            return reply.status(503).send(sendError('RATE_LIMITED', 'busy, try again later'));
-          }
-          queued = true;
-          void job.catch(() => {});
-          const res: UploadClipResponse = { clip: clips.adminClip(up.id) };
-          return reply.status(202).send(res);
-        } finally {
-          if (!queued) fs.rmSync(tmp, { force: true });
-        }
       },
     );
+
+    admin.post<{ Params: { id: string } }>(libraryRoutes.adminUploadBan, async (req, reply) => {
+      const body = UploadBanBodySchema.safeParse(req.body);
+      if (!body.success) return bad(reply, 'banned: boolean');
+      if (!host.setUploadBanned(req.params.id, body.data.banned)) {
+        return reply.status(404).send(sendError('INVALID', 'unknown user'));
+      }
+      req.log.info(
+        { userId: req.params.id, banned: body.data.banned, by: req.admin!.user },
+        'admin: upload ban',
+      );
+      return { userId: req.params.id, uploadBanned: body.data.banned };
+    });
+
+    admin.post<{ Params: { id: string } }>(libraryRoutes.adminReportResolve, async (req, reply) => {
+      if (!host.resolveReport(Number(req.params.id))) {
+        return reply.status(404).send(sendError('INVALID', 'unknown or resolved report'));
+      }
+      return reply.status(204).send();
+    });
   });
 }

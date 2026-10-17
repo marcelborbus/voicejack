@@ -4,6 +4,7 @@ import {
   type AdminClip,
   type AdminLibrary,
   type AdminMeResponse,
+  type UpdateClipBody,
 } from '@dub/shared';
 import {
   Film,
@@ -14,6 +15,7 @@ import {
   Star,
   Trash2,
   Upload,
+  Users,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -34,6 +36,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { AdminError, adminApi, uploadClip } from './api';
+import { UserLibraries } from './UserLibraries';
 
 /** Admin page (V05): official clip libraries. Gated by Authelia at nginx + server re-check. */
 export default function AdminPage() {
@@ -42,6 +45,7 @@ export default function AdminPage() {
   const [libraries, setLibraries] = useState<AdminLibrary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [view, setView] = useState<'official' | 'users'>('official');
 
   const refreshLibraries = useCallback(async () => {
     try {
@@ -101,48 +105,75 @@ export default function AdminPage() {
             {me.dev && ' (ADMIN_DEV)'}
           </p>
         </div>
-        <Button onClick={() => setCreating(true)} data-testid="admin-new-library">
-          <FolderPlus /> New library
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={view === 'official' ? 'secondary' : 'ghost'}
+            onClick={() => setView('official')}
+          >
+            Official
+          </Button>
+          <Button
+            size="sm"
+            variant={view === 'users' ? 'secondary' : 'ghost'}
+            onClick={() => setView('users')}
+            data-testid="admin-user-libraries-tab"
+          >
+            <Users /> User libraries
+          </Button>
+          {view === 'official' && (
+            <Button onClick={() => setCreating(true)} data-testid="admin-new-library">
+              <FolderPlus /> New library
+            </Button>
+          )}
+        </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <nav className="flex flex-col gap-2" aria-label="Libraries">
-          {libraries.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => setSelectedId(l.id)}
-              aria-current={l.id === selectedId}
-              className={cn(
-                'flex flex-col gap-1 rounded-2xl border px-4 py-3 text-left transition-colors',
-                l.id === selectedId
-                  ? 'border-fuchsia-400/40 bg-fuchsia-400/[0.07]'
-                  : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15',
-              )}
-            >
-              <span className="flex items-center gap-2 font-semibold">
-                <Library className="size-4 text-zinc-400" />
-                <span className="truncate">{l.name}</span>
-                {l.isDefault && (
-                  <Badge variant="accent" className="ml-auto">
-                    default
-                  </Badge>
+      {view === 'users' ? (
+        <UserLibraries />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+          <nav className="flex flex-col gap-2" aria-label="Libraries">
+            {libraries.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => setSelectedId(l.id)}
+                aria-current={l.id === selectedId}
+                className={cn(
+                  'flex flex-col gap-1 rounded-2xl border px-4 py-3 text-left transition-colors',
+                  l.id === selectedId
+                    ? 'border-fuchsia-400/40 bg-fuchsia-400/[0.07]'
+                    : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15',
                 )}
-              </span>
-              <span className="text-xs text-zinc-500">
-                {l.clipCount} playable · {l.totalClips} total
-              </span>
-            </button>
-          ))}
-        </nav>
+              >
+                <span className="flex items-center gap-2 font-semibold">
+                  <Library className="size-4 text-zinc-400" />
+                  <span className="truncate">{l.name}</span>
+                  {l.isDefault && (
+                    <Badge variant="accent" className="ml-auto">
+                      default
+                    </Badge>
+                  )}
+                </span>
+                <span className="text-xs text-zinc-500">
+                  {l.clipCount} playable · {l.totalClips} total
+                </span>
+              </button>
+            ))}
+          </nav>
 
-        {selected ? (
-          <LibraryView key={selected.id} library={selected} onLibrariesChanged={refreshLibraries} />
-        ) : (
-          <p className="text-zinc-400">No libraries yet.</p>
-        )}
-      </div>
+          {selected ? (
+            <LibraryView
+              key={selected.id}
+              library={selected}
+              onLibrariesChanged={refreshLibraries}
+            />
+          ) : (
+            <p className="text-zinc-400">No libraries yet.</p>
+          )}
+        </div>
+      )}
 
       <LibraryDialog
         open={creating}
@@ -307,16 +338,19 @@ function LibraryView({
   );
 }
 
-function ClipCard({
+export function ClipCard({
   clip,
   onToggle,
   onEdit,
   onDelete,
+  children,
 }: {
   clip: AdminClip;
   onToggle: (enabled: boolean) => void;
-  onEdit: () => void;
+  onEdit?: () => void;
   onDelete: () => void;
+  /** Extra lines under the attribution (V06: uploader, rights). */
+  children?: ReactNode;
 }) {
   return (
     <Card className="overflow-hidden p-0" data-testid="admin-clip">
@@ -375,15 +409,18 @@ function ClipCard({
           {clip.width > 0 && ` · ${clip.width}×${clip.height}`}
           {clip.bytes > 0 && ` · ${(clip.bytes / 1e6).toFixed(1)} MB`}
         </p>
+        {children}
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onEdit}
-            disabled={clip.status === 'processing'}
-          >
-            <Pencil /> Edit
-          </Button>
+          {onEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onEdit}
+              disabled={clip.status === 'processing'}
+            >
+              <Pencil /> Edit
+            </Button>
+          )}
           {!clip.builtin && (
             <Button
               size="sm"
@@ -401,7 +438,7 @@ function ClipCard({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
@@ -542,16 +579,18 @@ function UploadForm({
   );
 }
 
-function LibraryDialog({
+export function LibraryDialog({
   open,
   onOpenChange,
   title,
+  hint = 'Official libraries can be picked by every host.',
   initial,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
+  hint?: string;
   initial?: AdminLibrary;
   onSubmit: (body: { name: string; description: string }) => Promise<void>;
 }) {
@@ -569,7 +608,7 @@ function LibraryDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>Official libraries can be picked by every host.</DialogDescription>
+          <DialogDescription>{hint}</DialogDescription>
         </DialogHeader>
         <form
           className="flex flex-col gap-4"
@@ -600,14 +639,17 @@ function LibraryDialog({
   );
 }
 
-function ClipDialog({
+export function ClipDialog({
   clip,
   onClose,
   onSaved,
+  save = adminApi.updateClip,
 }: {
   clip: AdminClip | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /** V06: the /library page saves through /api/my. */
+  save?: (id: string, body: UpdateClipBody) => Promise<unknown>;
 }) {
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
@@ -637,20 +679,19 @@ function ClipDialog({
             e.preventDefault();
             if (!clip) return;
             setBusy(true);
-            adminApi
-              .updateClip(clip.id, {
-                title: title.trim(),
-                tags: tags
-                  .split(',')
-                  .map((x) => x.trim())
-                  .filter(Boolean),
-                attribution: {
-                  author: author.trim(),
-                  source: source.trim(),
-                  license: license.trim(),
-                  ...(licenseUrl.trim() ? { licenseUrl: licenseUrl.trim() } : {}),
-                },
-              })
+            save(clip.id, {
+              title: title.trim(),
+              tags: tags
+                .split(',')
+                .map((x) => x.trim())
+                .filter(Boolean),
+              attribution: {
+                author: author.trim(),
+                source: source.trim(),
+                license: license.trim(),
+                ...(licenseUrl.trim() ? { licenseUrl: licenseUrl.trim() } : {}),
+              },
+            })
               .then(onSaved)
               .then(onClose, fail('Could not save the clip'))
               .finally(() => setBusy(false));
@@ -699,7 +740,7 @@ function ClipDialog({
   );
 }
 
-function ConfirmDialog({
+export function ConfirmDialog({
   state,
   onClose,
 }: {

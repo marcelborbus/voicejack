@@ -1,10 +1,14 @@
 import type { ClipInfo } from '@dub/shared';
 import { Film } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ReportClipButton } from '@/pages/library/ReportClipButton';
 
 const isUrl = (s: string) => /^https?:\/\//i.test(s);
 
-/** One line of clip credit: title, author, source and license (with links where known). */
+/**
+ * One line of clip credit: title, author, source and license (with links where known). Clips of
+ * a host's private library (V06) get a "Report clip" button; their credit fields may be empty.
+ */
 export function ClipAttribution({ clip, className }: { clip: ClipInfo; className?: string }) {
   const a = clip.attribution;
   const link = 'text-zinc-300 underline-offset-4 hover:text-fuchsia-200 hover:underline';
@@ -15,8 +19,9 @@ export function ClipAttribution({ clip, className }: { clip: ClipInfo; className
     >
       <Film className="mt-0.5 size-3.5 shrink-0" />
       <span>
-        <span className="text-zinc-400">“{clip.title}”</span> by {a.author}
-        {' · '}
+        <span className="text-zinc-400">“{clip.title}”</span>
+        {a.author && ` by ${a.author}`}
+        {a.source && ' · '}
         {isUrl(a.source) ? (
           <a className={link} href={a.source} target="_blank" rel="noreferrer">
             {a.source.replace(/^https?:\/\//i, '').replace(/\/$/, '')}
@@ -24,7 +29,7 @@ export function ClipAttribution({ clip, className }: { clip: ClipInfo; className
         ) : (
           a.source
         )}
-        {' · '}
+        {a.license && ' · '}
         {a.licenseUrl ? (
           <a className={link} href={a.licenseUrl} target="_blank" rel="noreferrer">
             {a.license}
@@ -33,6 +38,7 @@ export function ClipAttribution({ clip, className }: { clip: ClipInfo; className
           a.license
         )}
       </span>
+      <ReportClipButton clip={clip} />
     </p>
   );
 }

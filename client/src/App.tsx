@@ -9,6 +9,8 @@ import { Room } from '@/pages/Room';
 
 // Admin (V05): own chunk, only fetched on /admin.
 const AdminPage = lazy(() => import('@/admin/AdminPage'));
+// V06 "My clips" (registered users' private libraries).
+const LibraryPage = lazy(() => import('@/pages/library/LibraryPage'));
 // Dev-only pages (dead code in production builds).
 const DevPlayerPage = import.meta.env.DEV ? lazy(() => import('@/dub/DevPlayerPage')) : null;
 
@@ -25,6 +27,14 @@ export function App() {
               element={
                 <Suspense>
                   <AdminPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="library"
+              element={
+                <Suspense>
+                  <LibraryPage />
                 </Suspense>
               }
             />

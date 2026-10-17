@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { LogIn, LogOut, Trash2 } from 'lucide-react';
+import { Library, LogIn, LogOut, Trash2 } from 'lucide-react';
+import { Link } from 'react-router';
 import { NAME_MAX_LENGTH } from '@dub/shared';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { Button } from '@/components/ui/button';
@@ -135,6 +136,11 @@ function AccountDialog({ className }: { className?: string }) {
               </Button>
             </div>
           </form>
+          <Button asChild variant="secondary" className="mt-4 justify-start">
+            <Link to="/library" onClick={() => setOpen(false)} data-testid="my-clips-link">
+              <Library /> My clips
+            </Link>
+          </Button>
           <Separator className="my-5" />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Button

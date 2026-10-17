@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { customAlphabet } from 'nanoid';
 import {
   ClipAttributionSchema,
@@ -18,6 +19,7 @@ import {
 } from '@dub/shared';
 import { openDb, tx, type Db } from '../db/index.js';
 import { migrate } from '../db/migrate.js';
+import { JobQueue } from './normalize.js';
 
 /** Id of the official library imported from `CLIPS_DIR/manifest.json`. */
 export const BUILTIN_LIBRARY_ID = 'classics';
@@ -57,8 +59,31 @@ interface LibraryRow {
   owner_user_id: string | null;
   visibility: LibraryVisibility;
   is_default: number;
+  disabled: number;
   created_at: number;
   updated_at: number;
+}
+
+/** Ownership facts of a library (V06 access checks). */
+export interface LibraryAccess {
+  id: string;
+  visibility: LibraryVisibility;
+  ownerUserId: string | null;
+  disabled: boolean;
+}
+
+/** Server-side facts about any clip row (V06 ownership / reports). */
+export interface ClipMeta {
+  id: string;
+  libraryId: string;
+  title: string;
+  origin: ClipOrigin;
+  status: ClipStatus;
+  uploadedBy: string | null;
+  file: string;
+  poster: string | null;
+  /** Directory the clip's files live in (null if uploads are not configured). */
+  dir: string | null;
 }
 
 interface ClipRow {
@@ -78,6 +103,7 @@ interface ClipRow {
   status: ClipStatus;
   error: string | null;
   uploaded_by: string | null;
+  rights_confirmed_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -158,6 +184,8 @@ export class ClipLibrary implements RoomLibrarySource {
   private serve = new Map<string, string>();
   private defaultLib: string | null = null;
   private readonly listeners = new Set<() => void>();
+  /** The one normalize queue, shared by admin and user uploads (V06: admin jobs go first). */
+  readonly jobs = new JobQueue(5, 10, 1);
 
   constructor(
     readonly db: Db,
@@ -262,11 +290,13 @@ export class ClipLibrary implements RoomLibrarySource {
     this.libs = new Map(libs.map((l) => [l.id, l]));
     this.rows = new Map(rows.map((r) => [r.id, r]));
     this.defaultLib = libs.find((l) => l.is_default === 1)?.id ?? null;
-    this.playable = new Map(libs.map((l) => [l.id, []]));
+    // Disabled libraries (V06) have no playable list: `clipsOf` is null, rooms fall back.
+    this.playable = new Map(libs.filter((l) => l.disabled !== 1).map((l) => [l.id, []]));
     this.byId = new Map();
     this.serve = new Map();
     for (const r of rows) {
       if (r.status !== 'ready') continue;
+      if (this.libs.get(r.library_id)?.disabled === 1) continue;
       const dir = this.dirOf(r);
       if (!dir || !fs.existsSync(path.join(dir, r.file))) continue;
       const hasPoster = !!r.poster && fs.existsSync(path.join(dir, r.poster));
@@ -334,7 +364,7 @@ export class ClipLibrary implements RoomLibrarySource {
   /** Official libraries are open to every host; private ones (V06) only to their owner. */
   canUse(libraryId: string, userId: string | undefined): boolean {
     const l = this.libs.get(libraryId);
-    if (!l) return false;
+    if (!l || l.disabled === 1) return false;
     return l.visibility === 'official' || (!!userId && l.owner_user_id === userId);
   }
 
@@ -366,12 +396,51 @@ export class ClipLibrary implements RoomLibrarySource {
     return collectTags(this.clips);
   }
 
-  /** Official libraries for the lobby picker, default first. */
-  summaries(): LibrarySummary[] {
-    return [...this.libs.values()]
-      .filter((l) => l.visibility === 'official')
+  /**
+   * Libraries for the lobby picker: official ones (default first), then `userId`'s own private
+   * ones (V06, not disabled).
+   */
+  summaries(userId?: string | null): LibrarySummary[] {
+    const official = [...this.libs.values()]
+      .filter((l) => l.visibility === 'official' && l.disabled !== 1)
       .map((l) => this.summary(l))
       .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name));
+    const own = userId
+      ? [...this.libs.values()]
+          .filter((l) => l.visibility === 'private' && l.owner_user_id === userId && !l.disabled)
+          .sort((a, b) => a.created_at - b.created_at)
+          .map((l) => this.summary(l))
+      : [];
+    return [...official, ...own];
+  }
+
+  /** Visibility / owner / disabled of a library, or null if unknown. */
+  access(libraryId: string): LibraryAccess | null {
+    const l = this.libs.get(libraryId);
+    if (!l) return null;
+    return {
+      id: l.id,
+      visibility: l.visibility,
+      ownerUserId: l.owner_user_id,
+      disabled: l.disabled === 1,
+    };
+  }
+
+  /** Any clip row (also processing / failed / disabled), or null. */
+  clipMeta(id: string): ClipMeta | null {
+    const r = this.rows.get(id);
+    if (!r) return null;
+    return {
+      id: r.id,
+      libraryId: r.library_id,
+      title: r.title,
+      origin: r.origin,
+      status: r.status,
+      uploadedBy: r.uploaded_by,
+      file: r.file,
+      poster: r.poster,
+      dir: this.dirOf(r),
+    };
   }
 
   private summary(l: LibraryRow): LibrarySummary {
@@ -407,11 +476,16 @@ export class ClipLibrary implements RoomLibrarySource {
     return false;
   }
 
-  adminLibraries(): AdminLibrary[] {
+  /** All libraries, or only those of one visibility / owner. */
+  adminLibraries(
+    filter: { visibility?: LibraryVisibility; ownerUserId?: string } = {},
+  ): AdminLibrary[] {
     const totals = new Map<string, number>();
     for (const r of this.rows.values())
       totals.set(r.library_id, (totals.get(r.library_id) ?? 0) + 1);
     return [...this.libs.values()]
+      .filter((l) => !filter.visibility || l.visibility === filter.visibility)
+      .filter((l) => !filter.ownerUserId || l.owner_user_id === filter.ownerUserId)
       .sort((a, b) => b.is_default - a.is_default || a.created_at - b.created_at)
       .map((l) => ({
         ...this.summary(l),
@@ -419,6 +493,7 @@ export class ClipLibrary implements RoomLibrarySource {
         totalClips: totals.get(l.id) ?? 0,
         builtin: this.isBuiltinLib(l.id),
         createdAt: l.created_at,
+        disabled: l.disabled === 1,
       }));
   }
 
@@ -476,6 +551,45 @@ export class ClipLibrary implements RoomLibrarySource {
     return this.adminLibrary(id);
   }
 
+  /** V06 admin: disables / re-enables a private library (its clips stop being played/served). */
+  setLibraryDisabled(id: string, disabled: boolean): AdminLibrary {
+    const l = this.requireLib(id);
+    if (l.visibility !== 'private') {
+      throw new LibraryError('INVALID', 'only private libraries can be disabled');
+    }
+    this.db
+      .prepare('UPDATE libraries SET disabled = ?, updated_at = ? WHERE id = ?')
+      .run(disabled ? 1 : 0, this.now(), id);
+    this.reload();
+    return this.adminLibrary(id);
+  }
+
+  /** V06 quotas: what `userId` owns / uploaded. */
+  usage(userId: string): { libraries: number; clips: number; bytes: number } {
+    const libs = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM libraries WHERE owner_user_id = ?`)
+      .get(userId) as { n: number };
+    const clips = this.db
+      .prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM clips WHERE uploaded_by = ?`)
+      .get(userId) as { n: number; b: number };
+    return { libraries: libs.n, clips: clips.n, bytes: clips.b };
+  }
+
+  /** V06: removes every private library of `userId` with its files (account deletion). */
+  deleteUserLibraries(userId: string): void {
+    const ids = [...this.libs.values()]
+      .filter((l) => l.owner_user_id === userId && l.visibility === 'private')
+      .map((l) => l.id);
+    if (!ids.length) return;
+    for (const id of ids) {
+      this.db.prepare('DELETE FROM libraries WHERE id = ?').run(id);
+      if (this.libraryDir) {
+        fs.rmSync(path.join(this.libraryDir, id), { recursive: true, force: true });
+      }
+    }
+    this.reload();
+  }
+
   /** Deletes a library with all its uploads. The default and the built-in one are protected. */
   deleteLibrary(id: string): void {
     const l = this.requireLib(id);
@@ -524,6 +638,8 @@ export class ClipLibrary implements RoomLibrarySource {
       builtin: r.origin === 'manifest',
       playable: this.byId.has(r.id),
       createdAt: r.created_at,
+      uploadedBy: r.uploaded_by,
+      rightsConfirmedAt: r.rights_confirmed_at,
     };
   }
 
@@ -544,18 +660,22 @@ export class ClipLibrary implements RoomLibrarySource {
       tags: string[];
       attribution: ClipAttribution;
       uploadedBy?: string | null;
+      rightsConfirmedAt?: number | null;
     },
   ): { id: string; file: string; poster: string } {
-    this.requireLib(libraryId);
+    const l = this.requireLib(libraryId);
     const id = `u${newId()}`;
-    const file = `${id}.mp4`;
-    const poster = `${id}.jpg`;
+    // V06: private clips get a random, unguessable file name (not derived from the clip id
+    // that every room member sees); see routes/clips.ts for the access check.
+    const base = l.visibility === 'private' ? randomBytes(16).toString('hex') : id;
+    const file = `${base}.mp4`;
+    const poster = `${base}.jpg`;
     const now = this.now();
     this.db
       .prepare(
         `INSERT INTO clips (id, library_id, title, file, poster, tags, attribution, enabled, origin,
-                            status, uploaded_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'upload', 'processing', ?, ?, ?)`,
+                            status, uploaded_by, rights_confirmed_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'upload', 'processing', ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -566,6 +686,7 @@ export class ClipLibrary implements RoomLibrarySource {
         JSON.stringify(meta.tags),
         JSON.stringify(meta.attribution),
         meta.uploadedBy ?? null,
+        meta.rightsConfirmedAt ?? null,
         now,
         now,
       );

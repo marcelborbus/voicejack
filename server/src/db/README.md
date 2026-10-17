@@ -72,6 +72,28 @@ more than 15 min (kept that long so the rate limit still sees them), guests idle
   (upsert by clip id: technical fields follow the manifest, admin edits are kept) and marks
   clips left `processing` by a restart as failed. Built-in clips can only be disabled.
 
+## Host libraries (V06, `005_user_libraries.sql`, `clips/HostLibraries.ts`)
+
+- Columns: `users.upload_banned` (admin "ban from uploading"; libraries stay playable),
+  `libraries.disabled` (admin, private libraries only: not playable, not served, not listed),
+  `clips.rights_confirmed_at` (uploader ticked the rights / takedown notice; NULL for admin
+  uploads), `reports.clip_id` ("Report clip" rows: `context='room'`, the room code, the uploader
+  as `reported_user_id`, `reported_name = 'clip: <title>'`). Table `clip_uploads`
+  (`user_id`, `created_at`): one row per accepted user upload for the rolling 24 h limit (kept
+  2 days).
+- Quotas per registered user (`shared` `USER_MAX_*`): 5 libraries (`libraries.owner_user_id`),
+  30 clips and 300 MB (`clips.uploaded_by` count / `SUM(bytes)`, every status; checked before
+  the body is read, again after it arrived, and the size once more after normalizing), 10
+  uploads per 24 h, 200 MB raw input. One normalize queue for admin + users
+  (`ClipLibrary.jobs`): admin jobs first, at most one queued/running job per user.
+- Private clip files get a random 32-hex file name (not the clip id). `/clips/<lib>/<file>` of a
+  private library is served only if the request's `vj_session` cookie is the owner's or that of
+  a player in a live room whose selected library it is (`Room.servesLibraryTo`); everyone else
+  gets 404. Admins preview through `/api/admin/clips/:id/video|poster` (Authelia-gated).
+- Rooms: only an owner who hosts may select a private library (`canUse`); public rooms have no
+  human host. In the lobby `Room.enforceLibrary` resets to the default when the host can no
+  longer use it (owner left, disabled, deleted). Account deletion deletes the user's libraries.
+
 ## Friends + DMs (V10, `004_friends.sql`, `friends/Friends.ts`)
 
 Registered users only. `friendships` holds one row per pair (`user_a < user_b`), `pending` until

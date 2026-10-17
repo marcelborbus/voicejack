@@ -212,6 +212,12 @@ export class Room {
   userIdOf(playerId: PlayerId): string | null {
     return this.players.get(playerId)?.userId ?? null;
   }
+  /** V06: `userId` plays here and the room's selected library is `libraryId` (clip access). */
+  servesLibraryTo(userId: string, libraryId: string): boolean {
+    if (this.settings.libraryId !== libraryId) return false;
+    for (const p of this.players.values()) if (p.userId === userId) return true;
+    return false;
+  }
 
   authenticate(token: string): PlayerId | null {
     return this.tokens.get(token) ?? null;
@@ -1029,8 +1035,24 @@ export class Room {
 
   private changed(): void {
     if (this.disposed) return;
+    this.enforceLibrary();
     this.rev++;
     for (const p of this.players.values()) if (p.connected) this.sendSnapshot(p.id);
+  }
+
+  /**
+   * V06: a private library stays selected only while its owner hosts. In the lobby a library
+   * the host may not use (owner left and the host migrated, disabled or deleted by an admin)
+   * falls back to the default; a running game keeps going.
+   */
+  private enforceLibrary(): void {
+    const lib = this.deps.library;
+    const id = this.settings.libraryId;
+    if (!lib || !id || this.phase !== 'LOBBY') return;
+    if (lib.canUse(id, this.players.get(this.hostId)?.userId) && lib.clipsOf(id)) return;
+    const { libraryId: _old, ...rest } = this.settings;
+    const d = lib.defaultId();
+    this.settings = { ...rest, tags: [], ...(d && d !== id ? { libraryId: d } : {}) };
   }
 
   /** Mutation only visible to one player (own manifest). */

@@ -38,6 +38,8 @@ export interface AdminLibrary extends LibrarySummary {
   /** Built-in (imported from clips/manifest.json): cannot be deleted. */
   builtin: boolean;
   createdAt: number;
+  /** V06: disabled by an admin (private libraries only): not playable, not served. */
+  disabled: boolean;
 }
 
 export type ClipStatus = 'processing' | 'ready' | 'failed';
@@ -62,6 +64,10 @@ export interface AdminClip {
   /** True if the clip can be picked in a game right now. */
   playable: boolean;
   createdAt: number;
+  /** V06: user id of the uploader (null for built-in clips and admin uploads). */
+  uploadedBy: string | null;
+  /** V06: when the uploader confirmed they hold the rights (takedown notice). */
+  rightsConfirmedAt: number | null;
 }
 
 export interface AdminMeResponse {
@@ -131,6 +137,83 @@ export interface UploadClipResponse {
   clip: AdminClip;
 }
 
+// ---------- V06: host libraries (/api/my/*, registered users) ----------
+
+/** Per-user quotas for private libraries. */
+export const USER_MAX_LIBRARIES = 5;
+export const USER_MAX_CLIPS = 30;
+export const USER_MAX_BYTES = 300 * 1024 * 1024;
+export const USER_UPLOADS_PER_DAY = 10;
+/** Raw upload cap for users (input before normalization). */
+export const USER_UPLOAD_MAX_BYTES = 200 * 1024 * 1024;
+
+export interface UserQuota {
+  libraries: number;
+  maxLibraries: number;
+  /** Clips the user uploaded (every status). */
+  clips: number;
+  maxClips: number;
+  /** Bytes of the user's normalized clips. */
+  bytes: number;
+  maxBytes: number;
+  /** Uploads in the last 24 h. */
+  uploadsToday: number;
+  maxUploadsPerDay: number;
+  /** Banned from uploading by an admin. */
+  uploadBanned: boolean;
+}
+
+export interface MyLibrariesResponse {
+  libraries: AdminLibrary[];
+  quota: UserQuota;
+}
+export interface MyClipsResponse {
+  clips: AdminClip[];
+}
+
+/** Users edit title, tags, attribution and enabled of their own clips. */
+export const UpdateMyClipBodySchema = UpdateClipBodySchema;
+
+/** As the admin upload, plus the takedown notice checkbox (`rights=1`). */
+export const UploadMyClipQuerySchema = UploadClipQuerySchema.extend({
+  rights: z.literal('1', { message: 'confirm that you have the rights to this clip' }),
+});
+export type UploadMyClipQuery = z.input<typeof UploadMyClipQuerySchema>;
+
+/** POST /api/clips/:id/report — players of a private room report a clip. */
+export const ReportClipBodySchema = z.object({ reason: z.string().trim().min(1).max(500) });
+export type ReportClipBody = z.infer<typeof ReportClipBodySchema>;
+
+/** Admin moderation of private libraries. */
+export interface AdminLibraryOwner {
+  id: string;
+  email: string | null;
+  displayName: string;
+  uploadBanned: boolean;
+}
+export interface AdminUserLibrary extends AdminLibrary {
+  owner: AdminLibraryOwner | null;
+  clips: AdminClip[];
+}
+export interface AdminClipReport {
+  id: number;
+  createdAt: number;
+  clipId: string;
+  /** Null once the clip is deleted. */
+  clipTitle: string | null;
+  libraryId: string | null;
+  roomCode: string | null;
+  reporterName: string;
+  reason: string;
+  resolvedAt: number | null;
+}
+export interface AdminUserLibrariesResponse {
+  libraries: AdminUserLibrary[];
+  reports: AdminClipReport[];
+}
+export const SetDisabledBodySchema = z.object({ disabled: z.boolean() });
+export const UploadBanBodySchema = z.object({ banned: z.boolean() });
+
 export const libraryPaths = {
   libraries: () => '/api/libraries',
   libraryClip: (libraryId: string, file: string) =>
@@ -141,6 +224,17 @@ export const libraryPaths = {
   adminLibraryDefault: (id: string) => `/api/admin/libraries/${encodeURIComponent(id)}/default`,
   adminLibraryClips: (id: string) => `/api/admin/libraries/${encodeURIComponent(id)}/clips`,
   adminClip: (id: string) => `/api/admin/clips/${encodeURIComponent(id)}`,
+  adminClipFile: (id: string, kind: 'video' | 'poster') =>
+    `/api/admin/clips/${encodeURIComponent(id)}/${kind}`,
+  adminUserLibraries: () => '/api/admin/user-libraries',
+  adminLibraryDisabled: (id: string) => `/api/admin/libraries/${encodeURIComponent(id)}/disabled`,
+  adminUploadBan: (userId: string) => `/api/admin/users/${encodeURIComponent(userId)}/upload-ban`,
+  adminReportResolve: (id: number) => `/api/admin/reports/${id}/resolve`,
+  myLibraries: () => '/api/my/libraries',
+  myLibrary: (id: string) => `/api/my/libraries/${encodeURIComponent(id)}`,
+  myLibraryClips: (id: string) => `/api/my/libraries/${encodeURIComponent(id)}/clips`,
+  myClip: (id: string) => `/api/my/clips/${encodeURIComponent(id)}`,
+  reportClip: (id: string) => `/api/clips/${encodeURIComponent(id)}/report`,
 } as const;
 
 export const libraryRoutes = {
@@ -152,4 +246,14 @@ export const libraryRoutes = {
   adminLibraryDefault: '/api/admin/libraries/:id/default',
   adminLibraryClips: '/api/admin/libraries/:id/clips',
   adminClip: '/api/admin/clips/:id',
+  adminClipFile: '/api/admin/clips/:id/:kind',
+  adminUserLibraries: '/api/admin/user-libraries',
+  adminLibraryDisabled: '/api/admin/libraries/:id/disabled',
+  adminUploadBan: '/api/admin/users/:id/upload-ban',
+  adminReportResolve: '/api/admin/reports/:id/resolve',
+  myLibraries: '/api/my/libraries',
+  myLibrary: '/api/my/libraries/:id',
+  myLibraryClips: '/api/my/libraries/:id/clips',
+  myClip: '/api/my/clips/:id',
+  reportClip: '/api/clips/:id/report',
 } as const;

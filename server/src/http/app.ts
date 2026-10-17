@@ -20,6 +20,7 @@ import type { GuestLimiter } from '../accounts/GuestLimiter.js';
 import type { Mailer } from '../mail/Mailer.js';
 import * as clipsRoutes from '../routes/clips.js';
 import * as adminRoutes from '../routes/admin.js';
+import * as myLibrariesRoutes from '../routes/myLibraries.js';
 import * as roomsRoutes from '../routes/rooms.js';
 import * as chunksRoutes from '../routes/chunks.js';
 import * as meRoutes from '../routes/me.js';
@@ -112,6 +113,7 @@ export async function buildApp(
   const modules: RegisterFn[] = [
     clipsRoutes.register,
     adminRoutes.register,
+    myLibrariesRoutes.register,
     roomsRoutes.register,
     chunksRoutes.register,
     meRoutes.register,
@@ -128,7 +130,7 @@ export async function buildApp(
     if (
       hasClient &&
       req.method === 'GET' &&
-      (url === '/' || url.startsWith('/r/') || /^\/admin(\/|$)/.test(url))
+      (url === '/' || url.startsWith('/r/') || /^\/(admin|library)(\/|$)/.test(url))
     ) {
       return reply.type('text/html').sendFile('index.html', config.clientDist);
     }
