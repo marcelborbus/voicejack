@@ -40,7 +40,7 @@ green on main, tag `v1.0`). Conventions as in PLAN.md §1 (one commit per task, 
 | V08 | **Public matchmaking ("Join random game")**: server-hosted public rooms, normal settings, auto-start at 3–6 players after a countdown, **voice opt-in muted by default** + report/vote-kick | V07 |
 | V09 | **Elo**: pairwise multiplayer Elo from final standings (each pair a match, K=32/(n−1)), start 1000, only public/ranked games; ranked unlocked after 3 public games; matchmaking window ±100 widening +50 every 5 s, any after 45 s or if <3 in window; guest Elo saved to guest profile + "register to keep your rating" prompt after the game | V04, V08 |
 | V10 | **Friends + DMs**: after a game, friend-request other logged-in players; friends list w/ online status on home; invite friend to private room (presence push); text DMs (rate limits, block/report, 90-day retention) | V04, V07 |
-| V11 | **Support prompt** after Final: "Solo dev on a toaster — DubParty costs ≈ €X/month for Y players" + link; numbers from a `costs.json` the owner edits | V02 |
+| V11 | **Support prompt** after Final: "Solo dev on a toaster — DubParty costs ≈ €X/month for Y players" + link; numbers from a `costs.json` the owner edits. Link: `https://liberapay.com/marcel.borbus/donate` (owner's Liberapay). Use a plain link styled as our button (or Liberapay's `donate.svg` self-hosted) — **don't load `liberapay.com/.../button.js`**: no third-party script on the page (CSP, privacy/Datenschutz, no tracking). | V02 |
 | V12 | **Legal pages + privacy** (Impressum, Datenschutz, takedown contact) | V04 |
 | V13 | v1.1 e2e (bots make solo e2e cheap) + deploy | all |
 
