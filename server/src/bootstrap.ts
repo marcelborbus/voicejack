@@ -8,6 +8,7 @@ import { buildApp } from './http/app.js';
 import { openDb, type Db } from './db/index.js';
 import { migrate } from './db/migrate.js';
 import { Accounts } from './accounts/Accounts.js';
+import { Presence } from './presence/Presence.js';
 
 /** Expired sessions / idle guests are purged this often (and once at startup). */
 export const DB_CLEANUP_MS = 3600_000;
@@ -18,6 +19,7 @@ export interface RunningServer {
   store: ChunkStore;
   db: Db;
   accounts: Accounts;
+  presence: Presence;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -40,7 +42,8 @@ export async function startServer(
   const mig = migrate(db);
   const accounts = new Accounts(db);
   const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo), store });
-  const app = await buildApp({ config, clips, rooms, store, accounts }, opts);
+  const presence = new Presence({ rooms });
+  const app = await buildApp({ config, clips, rooms, store, accounts, presence }, opts);
   const cleanup = () => {
     try {
       const n = accounts.cleanup();
@@ -53,6 +56,7 @@ export async function startServer(
   cleanupTimer.unref();
   app.addHook('onClose', async () => {
     clearInterval(cleanupTimer);
+    presence.dispose();
     await rooms.stop();
     db.close();
   });
@@ -73,6 +77,7 @@ export async function startServer(
     store,
     db,
     accounts,
+    presence,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),

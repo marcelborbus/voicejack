@@ -22,6 +22,9 @@ import * as roomsRoutes from '../routes/rooms.js';
 import * as chunksRoutes from '../routes/chunks.js';
 import * as meRoutes from '../routes/me.js';
 import * as gateway from '../ws/gateway.js';
+import * as presenceGateway from '../ws/presenceGateway.js';
+import * as statsRoutes from '../routes/stats.js';
+import type { Presence } from '../presence/Presence.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
 export const BODY_LIMIT = Math.floor(2.5 * 1024 * 1024);
@@ -34,6 +37,8 @@ export interface AppDeps {
   /** Users + sessions (SQLite). Without it /api/me is absent and rooms never link users. */
   accounts?: Accounts;
   guestLimiter?: GuestLimiter;
+  /** Online/in-game counts + `/ws/presence` (V07). Without it the presence socket is absent. */
+  presence?: Presence;
   /** Epoch ms the process started (health uptime). */
   startedAt?: number;
 }
@@ -96,6 +101,8 @@ export async function buildApp(
     chunksRoutes.register,
     meRoutes.register,
     gateway.register,
+    presenceGateway.register,
+    statsRoutes.register,
   ];
   for (const register of modules) await register(app, deps);
 

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 import { unlockAudio } from '@/audio/context';
 import { CurlyArrow, Sparkle, Squiggle } from '@/components/doodles';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { OnlineCount, RandomGameButton } from '@/components/presence';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -244,6 +245,7 @@ export function Home() {
             >
               {busy ? <Spinner className="text-white" /> : null}
               {tab === 'create' ? 'Create room' : 'Join room'}
+              {tab === 'create' && <OnlineCount />}
               {!busy && <ArrowRight />}
             </Button>
             <p className="text-center text-xs text-zinc-500">
@@ -252,6 +254,7 @@ export function Home() {
                 : 'Got a link instead? Just open it.'}
             </p>
           </form>
+          <RandomGameButton />
         </CardContent>
       </Card>
     </div>

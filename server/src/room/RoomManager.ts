@@ -4,6 +4,7 @@ import {
   type AudioMime,
   type ChunkId,
   type ClipInfo,
+  type Phase,
   type PlayerId,
   type RoomCode,
   type S2C,
@@ -66,9 +67,18 @@ export interface RoomManagerDeps {
   rng?: () => number;
 }
 
+/** A live human room socket, as counted by presence (V07). */
+export interface HumanConnection {
+  code: RoomCode;
+  playerId: PlayerId;
+  userId: string | null;
+  phase: Phase;
+}
+
 /** Owns all rooms: codes, caps, socket routing and disposal. */
 export class RoomManager {
   private readonly rooms = new Map<RoomCode, Room>();
+  private readonly activity = new Set<() => void>();
   private readonly conns = new Map<RoomCode, Map<PlayerId, Connection>>();
   private readonly clock: Clock;
   private readonly scheduler: Scheduler;
@@ -133,7 +143,10 @@ export class RoomManager {
       code,
       clock: this.clock,
       scheduler: this.scheduler,
-      emit: (pid, msg) => this.conns.get(code)?.get(pid)?.send(msg),
+      emit: (pid, msg) => {
+        this.conns.get(code)?.get(pid)?.send(msg);
+        this.changed();
+      },
       clips: this.deps.clips,
       timings: config.timings,
       options: {
@@ -149,6 +162,7 @@ export class RoomManager {
         if (c) {
           this.conns.get(code)!.delete(pid);
           c.close(4001, 'removed');
+          this.changed();
         }
       },
       onBotAdded: (pid) => this.attach(code, pid, this.newBot(room, pid)),
@@ -177,12 +191,38 @@ export class RoomManager {
     });
   }
 
+  /**
+   * `fn` runs (synchronously, possibly many times per mutation) whenever sockets attach/detach
+   * or a room emits; listeners coalesce it themselves (presence throttles). Returns unsubscribe.
+   */
+  onActivity(fn: () => void): () => void {
+    this.activity.add(fn);
+    return () => void this.activity.delete(fn);
+  }
+
+  private changed(): void {
+    for (const fn of this.activity) fn();
+  }
+
+  /** Every live human room socket (bots excluded), for presence counts (V07). */
+  *humanConnections(): Generator<HumanConnection> {
+    for (const [code, map] of this.conns) {
+      const room = this.rooms.get(code);
+      if (!room) continue;
+      for (const [playerId, conn] of map) {
+        if (conn instanceof BotPlayer) continue;
+        yield { code, playerId, userId: room.userIdOf(playerId), phase: room.currentPhase };
+      }
+    }
+  }
+
   /** Registers `conn` as the player's socket, closing any previous one (token reconnect). */
   attach(code: RoomCode, playerId: PlayerId, conn: Connection): void {
     const map = this.conns.get(code);
     if (!map) return;
     const prev = map.get(playerId);
     map.set(playerId, conn);
+    this.changed();
     if (prev && prev !== conn) prev.close(4000, 'replaced by a new connection');
   }
 
@@ -191,6 +231,7 @@ export class RoomManager {
     const map = this.conns.get(code);
     if (map?.get(playerId) !== conn) return false;
     map.delete(playerId);
+    this.changed();
     return true;
   }
 
@@ -205,6 +246,7 @@ export class RoomManager {
     this.rooms.delete(code);
     const map = this.conns.get(code);
     this.conns.delete(code);
+    this.changed();
     for (const c of map?.values() ?? []) {
       c.send({ t: 'error', code: 'ROOM_NOT_FOUND', message: 'room closed', fatal: true });
       c.close(4004, 'room closed');

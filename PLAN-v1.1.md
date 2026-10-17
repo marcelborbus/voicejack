@@ -63,3 +63,4 @@ alternative (0 % on one-off donations, PayPal/Stripe). Owner must create the acc
 
 - [x] V03 DB + migrations + guest profiles (#26)
 - [x] V01 Bots / dev test mode (#24): `DEV_BOTS=1`, C2S `addBot`/`removeBot`, `PlayerPublic.isBot`, `you.canManageBots`; `isAdmin` hook in RoomManager for V05
+- [x] V07 Presence + counts (#30): `/ws/presence` (`PresenceC2S`/`PresenceS2C` in `shared/src/protocol/presence.ts`, throttled `counts` push), `GET /api/stats`; hooks for V08 `Presence.setLooking`, for V10 `Presence.isOnline`/`sendToUser`
