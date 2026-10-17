@@ -60,6 +60,13 @@ export interface Config {
   maxRooms: number;
   maxPlayers: number;
   logLevel: string;
+  /** V04 magic-link mail: `smtp` (prod default) or `log` (dev/tests: link to log + outbox). */
+  mailTransport: 'smtp' | 'log';
+  smtpHost: string;
+  smtpPort: number;
+  mailFrom: string;
+  /** Origin the emailed links point at, no trailing slash (e.g. https://voicejack.borbus.eu). */
+  publicUrl: string;
 }
 
 /** Repo root (server/src/config.ts → ../..). */
@@ -106,5 +113,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     maxRooms: env.MAX_ROOMS ? Number(env.MAX_ROOMS) : MAX_ROOMS,
     maxPlayers: MAX_PLAYERS,
     logLevel: env.LOG_LEVEL ?? 'info',
+    mailTransport:
+      (env.MAIL_TRANSPORT ?? (env.NODE_ENV === 'production' ? 'smtp' : 'log')) === 'smtp'
+        ? 'smtp'
+        : 'log',
+    smtpHost: env.SMTP_HOST ?? 'localhost',
+    smtpPort: env.SMTP_PORT ? Number(env.SMTP_PORT) : 25,
+    mailFrom: env.MAIL_FROM ?? 'Voicejack <noreply@borbus.eu>',
+    publicUrl: (env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
   };
 }

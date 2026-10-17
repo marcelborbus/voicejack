@@ -56,7 +56,7 @@ describe('GET /api/me', () => {
       publicGamesPlayed: 0,
     });
     expect(Object.keys(body.user).sort()).toEqual(
-      ['displayName', 'elo', 'id', 'kind', 'publicGamesPlayed'].sort(),
+      ['displayName', 'elo', 'email', 'id', 'kind', 'publicGamesPlayed'].sort(),
     );
     const c = setCookie(r)!;
     expect(c).toMatch(/^vj_session=[\w-]{43};/);

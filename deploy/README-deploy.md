@@ -104,6 +104,37 @@ guest/registered accounts and sessions, so unlike the rest of `./data` it **must
 - Never put it under `data/uploads` (wiped on start; the server refuses that `DB_PATH`).
 - Restoring: stop the container, replace the three files, start it.
 
+### Mail: magic-link sign-in (V04)
+
+Sign-in links are sent through the host's Postfix null client (ARCHITECTURE §7 "Reaching it
+from containers"). `compose.yaml` sets `MAIL_TRANSPORT=smtp`, `SMTP_HOST=host.docker.internal`,
+`SMTP_PORT=25`, `MAIL_FROM=Voicejack <noreply@borbus.eu>`, `PUBLIC_URL=https://voicejack.borbus.eu`,
+plus `extra_hosts: host.docker.internal:host-gateway`. All can be overridden in `.env`.
+
+- **No Postfix change is needed** (checked read-only 2026-10-17): `mynetworks = 127.0.0.0/8
+  [::1]/128 172.16.0.0/12`, `inet_interfaces = all`, `smtpd_relay_restrictions =
+  permit_mynetworks, reject_unauth_destination`, and ufw allows 25/tcp from `172.16.0.0/12`.
+  `voicejack_default` is `172.26.0.0/16` (gateway `172.26.0.1`), inside that range. If the
+  network were ever recreated outside 172.16/12, the change would be
+  `postconf -e 'mynetworks = 127.0.0.0/8 [::1]/128 172.16.0.0/12 <subnet>'` plus
+  `ufw allow from <subnet> to any port 25 proto tcp`, then `systemctl reload postfix`.
+- The app speaks plain SMTP without AUTH or STARTTLS (host-local hop; Postfix's TLS is on the
+  goneo leg). Postfix rewrites the envelope sender to `m@borbus.eu` and `smtp_header_checks`
+  replaces the whole `From:` with `noreply@borbus.eu`, so mails show that address without the
+  "Voicejack" display name. Optional, to keep the name: add
+  `/^From: Voicejack <noreply@borbus\.eu>$/ DUNNO` as the **first** line of
+  `/etc/postfix/header_checks` (first match wins, other senders unchanged), then
+  `postmap -q "From: Voicejack <noreply@borbus.eu>" regexp:/etc/postfix/header_checks` (expect
+  `DUNNO`) and `systemctl reload postfix`. Not applied.
+- goneo throttling: Postfix sends one mail per 10 s. The app caps requests at 3 per address per
+  15 min (counted in the DB), 10 per IP per hour and 300 per hour overall (in memory).
+- Smoke test after deploy: request a link for your own address in the UI, then
+  `docker logs voicejack 2>&1 | grep -i mail` (failures are logged as `login mail failed`) and
+  `journalctl -u postfix --since -5min` / `mailq` on the host.
+- Locally and in tests `MAIL_TRANSPORT=log` (default unless `NODE_ENV=production`) prints the
+  link to the server log instead of sending.
+- ARCHITECTURE §7 "What sends mail" gets a row: `| Voicejack | magic-link sign-in mails |`.
+
 **Why `./data/uploads` and not `./data`:** the server wipes `DATA_DIR` with `rm -r` at startup,
 which cannot remove a mount point, so the image sets `DATA_DIR=/app/data/uploads`.
 

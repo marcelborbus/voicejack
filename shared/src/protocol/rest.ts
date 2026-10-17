@@ -16,6 +16,9 @@ export const paths = {
   clip: (file: string) => `/clips/${encodeURIComponent(file)}`,
   health: () => '/api/health',
   me: () => '/api/me',
+  authRequest: () => '/api/auth/request',
+  authVerify: () => '/api/auth/verify',
+  authLogout: () => '/api/auth/logout',
 } as const;
 
 export const routes = {
@@ -26,6 +29,9 @@ export const routes = {
   clip: '/clips/:file',
   health: '/api/health',
   me: '/api/me',
+  authRequest: '/api/auth/request',
+  authVerify: '/api/auth/verify',
+  authLogout: '/api/auth/logout',
 } as const;
 
 /** Every REST error body. */
@@ -73,9 +79,28 @@ export interface MeUser {
   kind: 'guest' | 'registered';
   /** Last name played under; null until the first room join. */
   displayName: string | null;
+  /** Only the user's own email (registered users); null for guests. */
+  email: string | null;
   elo: number;
   publicGamesPlayed: number;
 }
 export interface MeResponse {
   user: MeUser;
 }
+
+// PATCH /api/me {displayName} → MeResponse. DELETE /api/me → MeResponse of a fresh guest
+// (the account is anonymized, every session ends; V04).
+export const UpdateMeBodySchema = z.object({ displayName: PlayerNameSchema });
+export type UpdateMeBody = z.infer<typeof UpdateMeBodySchema>;
+
+// POST /api/auth/request {email} → 202 (always, whether or not the account exists; 429 when
+// rate limited: 3 per address per 15 min, 10 per IP per hour). Mails a 15-min single-use link
+// to GET /api/auth/verify?t=…, a confirm page whose button POSTs the token (mail scanners
+// that prefetch the link don't burn it) and redirects to `/?login=ok` (or `/?login=invalid`).
+export const EMAIL_MAX_LENGTH = 254;
+export const AuthRequestBodySchema = z.object({
+  email: z.string().trim().toLowerCase().max(EMAIL_MAX_LENGTH).pipe(z.email()),
+});
+export type AuthRequestBody = z.infer<typeof AuthRequestBodySchema>;
+
+// POST /api/auth/logout → MeResponse of a fresh guest (new session cookie).

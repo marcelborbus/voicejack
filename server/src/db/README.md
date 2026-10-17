@@ -33,22 +33,36 @@ transaction together with its row in `schema_migrations (version, name, applied_
   `public_games_played`, `last_seen_at` (touched at most hourly), `deleted_at` (soft delete).
 - `sessions` — `id` = sha256(cookie token), `user_id` → users (cascade), 30-day `expires_at`,
   extended on use when < 15 days remain. Cookie `vj_session`: HttpOnly, SameSite=Lax, Secure in prod.
-- `login_tokens` — for V04 magic links (table only).
+- `login_tokens` — V04 magic links: `id` = sha256(emailed token), 15-min `expires_at`, single
+  use (`used_at`; consuming one burns every open token for that address). `guest_user_id` is the
+  guest whose cookie requested it. The per-address rate limit (3 / 15 min) counts rows by
+  `(email, created_at)`.
 
-Cleanup (hourly + at startup, `Accounts.cleanup`): expired sessions, guests idle > 180 days.
+Cleanup (hourly + at startup, `Accounts.cleanup`): expired sessions, login tokens expired for
+more than 15 min (kept that long so the rate limit still sees them), guests idle > 180 days.
+
+## Accounts (V04, `accounts/Accounts.ts`)
+
+- **Verify, no account for the address yet:** the requesting guest row becomes
+  `kind='registered'`, `email=…` (same id: Elo, games, name kept). If that guest is gone or
+  meanwhile registered under another address, a new registered row is created.
+- **Verify, the address already has an account (merge rule):** the browser is switched to the
+  existing account, which keeps its own `elo` / `public_games_played`, except when it has
+  `public_games_played = 0` and the guest has played: then it takes the guest's values
+  (nothing to lose, and the guest's rating is the only real one). An empty `display_name`
+  takes the guest's. The guest row stays a guest (purged by the 180-day cleanup). V09: game
+  history rows of that guest are **not** moved; reassign them there if it matters.
+- **Rotation:** verify deletes every session of the claimed guest and the browser's current
+  session, then issues a new one. So a link requested by someone else can't leave their
+  browser signed in to your address.
+- **Logout:** deletes the session row and issues a fresh guest + session.
+- **Delete account:** `DELETE sessions`, pending login tokens dropped, `email=NULL`,
+  `display_name=''`, `kind='guest'` (keeps the CHECK), `deleted_at=now`. The row stays (future
+  references don't dangle) but never resolves again; the address can register anew.
 
 ## Planned migrations (not built yet)
 
 ```sql
--- V04 auth: no new table needed. Request: INSERT login_tokens (id = sha256(token), email,
---   guest_user_id = current guest, expires_at = now + 15 min). Verify (single use, UPDATE … SET
---   used_at WHERE used_at IS NULL): if a registered user with that email exists, move the
---   session to it (merge guest stats as decided in V04); else turn the guest row into
---   kind='registered', email=… (Elo/history kept). Logout: DELETE the session row.
---   Delete account: DELETE sessions, set email=NULL, display_name='', kind='guest'
---   (keeps the CHECK), deleted_at=now (or hard DELETE if nothing references the row).
---   Rate-limit counts can use login_tokens_email (email, created_at).
-
 -- V05 clip libraries (admin):
 -- CREATE TABLE libraries (
 --   id TEXT PRIMARY KEY, name TEXT NOT NULL,

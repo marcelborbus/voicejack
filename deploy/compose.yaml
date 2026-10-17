@@ -21,6 +21,17 @@ services:
       # Dev test mode (V01): DEV_BOTS=1 in .env lets hosts add bots. Unset = off (prod default).
       DEV_BOTS: ${DEV_BOTS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Magic-link mail (V04) via the host's Postfix null client (ARCHITECTURE §7). It listens
+      # on all interfaces but only accepts mynetworks (172.16.0.0/12 covers docker bridges);
+      # plain SMTP, no auth. Postfix rewrites the envelope sender and the From: header.
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-host.docker.internal}
+      SMTP_PORT: ${SMTP_PORT:-25}
+      MAIL_FROM: ${MAIL_FROM:-Voicejack <noreply@borbus.eu>}
+      PUBLIC_URL: ${PUBLIC_URL:-https://voicejack.borbus.eu}
+    extra_hosts:
+      # Resolves to the bridge gateway, so it survives the network being recreated.
+      - 'host.docker.internal:host-gateway'
     volumes:
       # Clip library (manifest.json + mp4s), rsynced from the dev box; never in the image.
       - ./clips:/app/clips:ro

@@ -17,10 +17,12 @@ import type { RoomManager } from '../room/RoomManager.js';
 import type { ChunkStore } from '../uploads/ChunkStore.js';
 import type { Accounts } from '../accounts/Accounts.js';
 import type { GuestLimiter } from '../accounts/GuestLimiter.js';
+import type { Mailer } from '../mail/Mailer.js';
 import * as clipsRoutes from '../routes/clips.js';
 import * as roomsRoutes from '../routes/rooms.js';
 import * as chunksRoutes from '../routes/chunks.js';
 import * as meRoutes from '../routes/me.js';
+import * as authRoutes from '../routes/auth.js';
 import * as gateway from '../ws/gateway.js';
 import * as presenceGateway from '../ws/presenceGateway.js';
 import * as statsRoutes from '../routes/stats.js';
@@ -37,6 +39,10 @@ export interface AppDeps {
   /** Users + sessions (SQLite). Without it /api/me is absent and rooms never link users. */
   accounts?: Accounts;
   guestLimiter?: GuestLimiter;
+  /** V04 magic-link mail (default from config: SMTP or the log transport). */
+  mailer?: Mailer;
+  /** V04 per-IP limiter for POST /api/auth/request (default AUTH_IP_LIMITS). */
+  authLimiter?: GuestLimiter;
   /** Online/in-game counts + `/ws/presence` (V07). Without it the presence socket is absent. */
   presence?: Presence;
   /** Epoch ms the process started (health uptime). */
@@ -100,6 +106,7 @@ export async function buildApp(
     roomsRoutes.register,
     chunksRoutes.register,
     meRoutes.register,
+    authRoutes.register,
     gateway.register,
     presenceGateway.register,
     statsRoutes.register,
