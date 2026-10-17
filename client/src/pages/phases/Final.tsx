@@ -6,6 +6,7 @@ import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { BestDubReplay, useDubChunks } from '@/components/results/BestDubReplay';
 import { Confetti, CountUp } from '@/components/results/motion';
 import { SaveVideo } from '@/components/results/SaveVideo';
+import { SupportPrompt } from '@/components/support';
 import { PublicFinalActions } from '@/components/match';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -103,6 +104,7 @@ export function Final() {
           </Card>
         </div>
       </div>
+      <SupportPrompt />
     </div>
   );
 }

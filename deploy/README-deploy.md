@@ -194,6 +194,13 @@ upload a short clip on `/admin`, and watch `docker stats --no-stream voicejack`.
 library, both backed up), `/admin` is Authelia-gated (`admins`), `mem_limit 450m`; add the
 rule to the §3.1 access-control table and the new footprint to §5.
 
+### Support prompt numbers (V11)
+
+The "Chip in?" card after a game reads `/costs.json` (`{"monthlyEur": 5, "players": 100,
+"updated": "2026-10-17"}`). To change the numbers without a rebuild, put your own copy at
+`/opt/voicejack/data/costs.json` (`COSTS_PATH=/app/data/costs.json` in the image). It is read on
+every request; while it is missing or not valid JSON, the copy from `client/public/` is served.
+
 ## 4. nginx (host)
 
 ```sh

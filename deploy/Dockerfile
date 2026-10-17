@@ -62,6 +62,7 @@ ENV NODE_ENV=production \
     DATA_DIR=/app/data/uploads \
     DB_PATH=/app/data/db/voicejack.sqlite \
     LIBRARY_DIR=/app/data/library \
+    COSTS_PATH=/app/data/costs.json \
     CLIENT_DIST=/app/public \
     TRUST_PROXY=loopback,uniquelocal
 

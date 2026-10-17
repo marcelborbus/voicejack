@@ -87,6 +87,11 @@ export interface Config {
   mailFrom: string;
   /** Origin the emailed links point at, no trailing slash (e.g. https://voicejack.borbus.eu). */
   publicUrl: string;
+  /**
+   * V11: owner-editable `/costs.json` (support prompt numbers). When unset or missing, the copy
+   * shipped in `clientDist` (from client/public) is served. Prod: /app/data/costs.json.
+   */
+  costsPath: string | null;
 }
 
 /** Repo root (server/src/config.ts → ../..). */
@@ -143,5 +148,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     smtpPort: env.SMTP_PORT ? Number(env.SMTP_PORT) : 25,
     mailFrom: env.MAIL_FROM ?? 'Voicejack <noreply@borbus.eu>',
     publicUrl: (env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
+    costsPath: env.COSTS_PATH ? path.resolve(env.COSTS_PATH) : null,
   };
 }
