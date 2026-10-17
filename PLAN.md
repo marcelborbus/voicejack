@@ -418,7 +418,7 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
 - [ ] **T21: Cross-browser verification & polish** · verify · Deps: T18, T19 · Touches: small fixes anywhere (list them in the commit), `docs/manual-test.md`
   - Manual checklist on Chrome and Firefox (the ogg/opus path): Firefox-recorded chunks play back in Chrome and the other way round. Check echo with speakers vs headphones, the autoplay overlay after reload, a 2-player voice call over 2 networks (e.g. phone hotspot), mobile layout sanity, and attributions visible.
   - Accept: `pnpm typecheck && pnpm test && pnpm e2e`, with the checklist filled in.
-- [ ] **T23: Rebrand DubParty → Voicejack** · impl · Deps: T17, T19 · Touches: user-facing strings anywhere, `deploy/**`, README/SPEC/PLAN headings
+- [x] **T23: Rebrand DubParty → Voicejack** · impl · Deps: T17, T19 · Touches: user-facing strings anywhere, `deploy/**`, README/SPEC/PLAN headings
   - "Dub Party" exists on Steam, so the product is **Voicejack** (owner, 2026-10-17). Sweep titles, logo, copy, render watermark, download filename, meta/OG tags, Docker/compose name, vhost `voicejack.borbus.eu` (+ `dub.borbus.eu` 301). Internal identifiers (`@dub/shared`, `dub.*` storage keys, `src/dub/`) stay. Issue #37.
   - Accept: `grep -rniE 'dub ?party' --exclude-dir=node_modules --exclude-dir=.git .` only hits history notes; typecheck/test/build/e2e green.
 - [ ] **T22: Deploy to Hetzner** · verify · Deps: T20, T21, owner has added the DNS A record · Touches: `deploy/README-deploy.md` (notes only)
