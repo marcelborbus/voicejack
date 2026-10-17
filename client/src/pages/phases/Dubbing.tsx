@@ -2,6 +2,7 @@ import type { Limits } from '@dub/shared';
 import { AlertTriangle, CloudCheck, CloudUpload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAudioContext } from '@/audio/context';
+import { LoadingQuip } from '@/components/LoadingQuip';
 import { Spinner } from '@/components/ui/spinner';
 import { Editor } from '@/editor/Editor';
 import {
@@ -49,11 +50,7 @@ export function Dubbing() {
   const submissionId = useRoom((s) => s.snapshot?.you.submissionId ?? null);
 
   if (!clip || round < 0 || !code) {
-    return (
-      <div className="flex flex-1 items-center justify-center py-24 text-zinc-400">
-        <Spinner className="size-8" />
-      </div>
-    );
+    return <LoadingQuip title="Rolling the tape…" className="flex-1 py-24" />;
   }
   return (
     <DubbingRound

@@ -211,13 +211,21 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fuchsia-300/90">
-          {roundLabel} · Dub this clip
+        <p className="flex items-center gap-2">
+          <span className="tape">{roundLabel} · Dub this clip</span>
+          {recording && (
+            <span
+              data-testid="on-air"
+              className="inline-flex animate-fade-in items-center gap-1.5 rounded-md border-2 border-rose-400 px-2 py-px text-[11px] font-black uppercase tracking-[0.18em] text-rose-300 shadow-[0_0_16px_rgba(244,63,94,0.45)]"
+            >
+              <span className="size-1.5 animate-pulse rounded-full bg-rose-400" /> On air
+            </span>
+          )}
         </p>
-        <h2 className="truncate font-display text-3xl font-bold sm:text-4xl" data-testid="clip-title">
+        <h2 className="mt-2 truncate font-display text-3xl font-extrabold sm:text-4xl" data-testid="clip-title">
           {clip.title}
         </h2>
-        <p className="mt-0.5 truncate text-xs text-zinc-500">
+        <p className="mt-0.5 truncate text-xs text-zinc-400">
           {clip.attribution.author} · {clip.attribution.source} ·{' '}
           {clip.attribution.licenseUrl ? (
             <a href={clip.attribution.licenseUrl} target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-zinc-300 hover:underline">
@@ -244,7 +252,7 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount
       {done && (
         <div
           data-testid="done-banner"
-          className="flex w-full animate-fade-up items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] px-4 py-3 text-sm text-emerald-100"
+          className="flex w-full animate-fade-up items-center gap-3 rounded-2xl border-[1.5px] border-emerald-400/30 bg-emerald-400/[0.08] px-4 py-3 text-sm text-emerald-100 shadow-[0_4px_0_rgb(0_0_0/0.4)]"
         >
           <Hourglass className="size-4 shrink-0 animate-pulse text-emerald-300" />
           <span>
@@ -265,7 +273,7 @@ function VideoStage({ clip, videoRef }: { clip: ClipInfo; videoRef: React.RefObj
   return (
     <div
       className={cn(
-        'relative mx-auto w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/[0.06] transition-shadow duration-300',
+        'relative mx-auto w-full overflow-hidden rounded-2xl border-2 border-[#1a1027] bg-black transition-shadow duration-300',
         recording && recording.phase === 'recording' && 'shadow-[0_0_0_3px_rgba(244,63,94,0.85),0_0_40px_rgba(244,63,94,0.35)]',
       )}
       style={{ aspectRatio: aspect, maxHeight: 'min(46vh, 540px)', maxWidth: `calc(min(46vh, 540px) * ${aspect})` }}
@@ -289,7 +297,7 @@ function VideoStage({ clip, videoRef }: { clip: ClipInfo; videoRef: React.RefObj
           onClick={() => transport.play()}
           className="group absolute inset-0 flex items-center justify-center bg-black/10 transition-colors hover:bg-black/25"
         >
-          <span className="inline-flex size-16 animate-pop items-center justify-center rounded-full bg-white/15 shadow-2xl ring-1 ring-white/25 backdrop-blur-md transition-transform group-hover:scale-105">
+          <span className="inline-flex size-16 animate-pop items-center justify-center rounded-full border-2 border-[#1a1027] bg-brand shadow-[0_4px_0_rgb(0_0_0/0.5)] transition-transform group-hover:scale-105">
             <Play className="size-7 translate-x-0.5 text-white" fill="currentColor" />
           </span>
         </button>
