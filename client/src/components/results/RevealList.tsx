@@ -81,7 +81,7 @@ export function RevealList({
 
 function HiddenRow({ rank, dubNo }: { rank: number; dubNo: number | null }) {
   return (
-    <div className="flex items-center gap-4 rounded-3xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5">
+    <div className="flex items-center gap-3 rounded-3xl border border-white/[0.06] bg-white/[0.02] px-3 py-3.5 sm:gap-4 sm:px-4">
       <span className="w-6 text-center font-display text-lg font-bold text-zinc-600">{rank}</span>
       <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-zinc-800/80 text-zinc-500">
         <HelpCircle className="size-6" />
@@ -113,7 +113,7 @@ function RevealedRow({
   return (
     <div
       className={cn(
-        'dub-flip-in relative flex items-center gap-4 rounded-3xl border px-4 py-3.5',
+        'dub-flip-in relative flex items-center gap-3 rounded-3xl border px-3 py-3.5 sm:gap-4 sm:px-4',
         winner
           ? 'dub-glow border-amber-400/40 bg-gradient-to-r from-amber-400/[0.12] via-orange-400/[0.06] to-transparent'
           : 'border-white/[0.08] bg-white/[0.035]',
@@ -142,7 +142,7 @@ function RevealedRow({
             {entry.name}
           </span>
           {isYou && (
-            <span className="rounded-md bg-fuchsia-500/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wider text-fuchsia-200">
+            <span className="shrink-0 rounded-md bg-fuchsia-500/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wider text-fuchsia-200">
               you
             </span>
           )}
@@ -164,7 +164,7 @@ function RevealedRow({
       <div className="text-right">
         <p
           className={cn(
-            'font-display text-3xl font-extrabold leading-none',
+            'font-display text-2xl font-extrabold leading-none sm:text-3xl',
             winner ? 'text-brand' : 'text-zinc-100',
           )}
           data-testid="result-points"
