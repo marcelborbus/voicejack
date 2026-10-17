@@ -3,6 +3,7 @@ import { Check, Heart, Lock, Mic2, Star } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { play } from '@/lib/sfx';
 import { useRoom, useYou } from '@/state/room';
 import { send } from '@/state/session';
 import { useServerNow } from './useServerNow';
@@ -65,6 +66,7 @@ export function VotePanel({ item }: { item: ShowcaseItem }) {
 
   function change(score: number, immediate: boolean) {
     if (!canVote) return;
+    if (score !== draft) play('tick', score);
     setDraft(score);
     if (immediate) return flush(score);
     if (timer.current) clearTimeout(timer.current);
@@ -77,7 +79,7 @@ export function VotePanel({ item }: { item: ShowcaseItem }) {
         data-testid="own-item-notice"
         className="flex animate-pop flex-col items-center gap-3 rounded-3xl border border-fuchsia-400/25 bg-fuchsia-500/[0.07] px-5 py-8 text-center"
       >
-        <span className="inline-flex size-14 animate-float items-center justify-center rounded-3xl bg-brand shadow-lg shadow-fuchsia-500/30">
+        <span className="inline-flex size-14 animate-float items-center justify-center rounded-3xl border-2 border-[#1a1027] bg-brand shadow-[0_4px_0_rgb(0_0_0/0.5)]">
           <Mic2 className="size-7 text-white" />
         </span>
         <p className="font-display text-2xl font-bold">This one's yours!</p>
@@ -106,7 +108,7 @@ export function VotePanel({ item }: { item: ShowcaseItem }) {
             data-testid="vote-value"
             key={shown ?? 'none'}
             className={cn(
-              'block animate-pop font-display text-6xl font-extrabold tabular-nums leading-none',
+              'block animate-jiggle font-display text-6xl font-extrabold tabular-nums leading-none',
               shown === null ? 'text-zinc-600' : 'text-brand',
             )}
             style={shown === null ? undefined : { filter: `saturate(${0.6 + hue * 0.8})` }}
@@ -114,7 +116,7 @@ export function VotePanel({ item }: { item: ShowcaseItem }) {
             {shown ?? '–'}
           </span>
           {locked && confirmed !== null && (
-            <span className="absolute right-full top-2 mr-3 -rotate-12 animate-pop rounded-lg border-2 border-emerald-400 bg-zinc-950/90 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300 shadow-lg shadow-emerald-500/20">
+            <span className="absolute right-full top-2 mr-3 -rotate-12 animate-pop rounded-lg border-2 border-emerald-400 bg-ink-950/90 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300 shadow-lg shadow-emerald-500/20">
               Locked
             </span>
           )}
@@ -218,7 +220,10 @@ function VoteFooter({
   return (
     <p className="flex min-h-6 items-center gap-2 text-sm" data-testid="vote-ack">
       {confirmed !== null && !pending ? (
-        <span key={confirmed} className="flex animate-fade-in items-center gap-1.5 text-emerald-300">
+        <span
+          key={confirmed}
+          className="flex animate-fade-in items-center gap-1.5 text-emerald-300"
+        >
           <Check className="size-4" strokeWidth={3} /> Saved: {confirmed}. You can change it until
           the dub ends.
         </span>

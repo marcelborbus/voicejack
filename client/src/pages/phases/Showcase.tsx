@@ -6,6 +6,7 @@ import { recordShowcaseItem } from '@/components/showcase/showcaseHistory';
 import { useShowcasePlayback, type LoadState } from '@/components/showcase/useShowcasePlayback';
 import { useServerNow } from '@/components/showcase/useServerNow';
 import { VotePanel } from '@/components/showcase/VotePanel';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
@@ -38,7 +39,7 @@ export function Showcase() {
         <Card className="overflow-hidden">
           <CardContent className="flex flex-col gap-4 p-3 sm:p-4">
             <div
-              className="relative overflow-hidden rounded-[1.25rem] bg-black ring-1 ring-white/10"
+              className="relative overflow-hidden rounded-[1.25rem] border-2 border-[#1a1027] bg-black"
               style={{ aspectRatio: `${clip.width} / ${clip.height}` }}
             >
               <video
@@ -58,14 +59,19 @@ export function Showcase() {
                   {snap.you.isOwnItem ? (
                     <Badge className="shadow-lg">Your dub</Badge>
                   ) : (
-                    <Badge variant="secondary" className="bg-black/60 backdrop-blur">
-                      <VenetianMask /> Mystery dubber
-                    </Badge>
+                    <span className="inline-flex items-center gap-2 rounded-2xl border-2 border-[#1a1027] bg-ink-900/90 py-1 pl-1 pr-3 text-xs font-bold text-zinc-100 shadow-[0_3px_0_rgb(0_0_0/0.5)]">
+                      <PlayerAvatar name="?" mystery size="xs" className="border-0 shadow-none" />
+                      <VenetianMask className="size-3.5 text-sun" /> Mystery dubber
+                    </span>
                   )}
                 </div>
               )}
             </div>
-            <ClipProgress videoRef={videoRef} durationMs={clip.durationMs} active={item?.status === 'PLAYING'} />
+            <ClipProgress
+              videoRef={videoRef}
+              durationMs={clip.durationMs}
+              active={item?.status === 'PLAYING'}
+            />
             <ClipAttribution clip={clip} className="px-1" />
           </CardContent>
         </Card>
@@ -106,10 +112,11 @@ function ShowcaseHeader({ item, clip }: { item: ShowcaseItem | null; clip: ClipI
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-          <Clapperboard className="size-3.5" /> Showcase · {clip.title}
+        <p className="tape max-w-full">
+          <Clapperboard className="size-3.5 shrink-0" />{' '}
+          <span className="truncate">Showcase · {clip.title}</span>
         </p>
-        <h2 className="mt-1 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+        <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
           {item ? (
             <>
               Dub <span className="text-brand">{item.index + 1}</span>
@@ -185,7 +192,10 @@ function VideoOverlay({ item, load }: { item: ShowcaseItem; load: LoadState }) {
     content = (
       <>
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-300">Get ready</p>
-        <span key={countdown} className="animate-pop font-display text-7xl font-extrabold text-brand">
+        <span
+          key={countdown}
+          className="animate-pop font-display text-7xl font-extrabold text-brand"
+        >
           {countdown}
         </span>
       </>
@@ -245,7 +255,11 @@ function ClipProgress({
   return (
     <div className="flex items-center gap-3 px-1">
       <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-800">
-        <div ref={barRef} className="absolute inset-0 origin-left bg-brand" style={{ transform: 'scaleX(0)' }} />
+        <div
+          ref={barRef}
+          className="absolute inset-0 origin-left bg-brand"
+          style={{ transform: 'scaleX(0)' }}
+        />
       </div>
       <span className="font-mono text-xs tabular-nums text-zinc-500">
         {label} / {Math.floor(total / 60)}:{String(total % 60).padStart(2, '0')}
