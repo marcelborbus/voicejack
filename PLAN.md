@@ -422,7 +422,7 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
 - [x] **T23: Rebrand DubParty → Voicejack** · impl · Deps: T17, T19 · Touches: user-facing strings anywhere, `deploy/**`, README/SPEC/PLAN headings
   - "Dub Party" exists on Steam, so the product is **Voicejack** (owner, 2026-10-17). Sweep titles, logo, copy, render watermark, download filename, meta/OG tags, Docker/compose name, vhost `voicejack.borbus.eu` (+ `dub.borbus.eu` 301). Internal identifiers (`@dub/shared`, `dub.*` storage keys, `src/dub/`) stay. Issue #37.
   - Accept: `grep -rniE 'dub ?party' --exclude-dir=node_modules --exclude-dir=.git .` only hits history notes; typecheck/test/build/e2e green.
-- [ ] **T22: Deploy to Hetzner** · verify · Deps: T20, T21, owner has added the DNS A record · Touches: `deploy/README-deploy.md` (notes only)
+- [x] **T22: Deploy to Hetzner** · verify · Deps: T20, T21, owner has added the DNS A record · Touches: `deploy/README-deploy.md` (notes only)
   - On the host: `/opt/dubbing-game` gets compose, `.env` and clips (run `fetch-clips.mjs` locally, rsync the mp4s and manifest), then `docker compose up -d --build` (or load the image), nginx vhost, `nginx -t && systemctl reload nginx`, certbot.
   - Accept: `curl -sf https://dub.borbus.eu/api/health`. A WS upgrade works (`wscat` or a browser game with 2 devices). The container's memory stays under its limit.
 
@@ -455,4 +455,4 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
 - `/home/marcel/projects/dubbing-game/client/src/dub/DubPlayer.ts`: one playback/sync engine reused by the editor, showcase, final replay and render
 - `/home/marcel/projects/dubbing-game/client/src/editor/Editor.tsx` (with `recording.ts`, `uploadQueue.ts`): the core editor and its recording/upload path
 - `/home/marcel/projects/dubbing-game/server/src/http/app.ts`: route/WS registration, created in final form in T04 so later tasks only fill in their own files
-
+  > NOTE T22: deployed 2026-10-17 to https://voicejack.borbus.eu (`/opt/voicejack`, container `voicejack`, 127.0.0.1:3087, ~27 MB). Verified: health, SPA, 301 http→https, clip Range 206, room create, WS 101, headless 2-browser prod smoke (create/join/mic/voice connected, 0 page errors). ARCHITECTURE.md §1/§2/§3.9/§4/§5/§6/§10 updated on the host. `dub.borbus.eu` A record was removed by the owner (vhost still 301s if it returns). Owner manual checks: docs/manual-test.md. No Uptime Kuma check yet.
