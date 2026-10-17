@@ -1,0 +1,96 @@
+/* Results & final screen motion (T17). Global reduced-motion rules in index.css apply. */
+
+@keyframes dub-confetti-fall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 0px), 105vh, 0) rotate(var(--spin, 720deg));
+    opacity: 0.9;
+  }
+}
+
+.dub-confetti {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 40;
+}
+.dub-confetti > i {
+  position: absolute;
+  top: 0;
+  display: block;
+  border-radius: 2px;
+  animation: dub-confetti-fall var(--dur, 3.2s) cubic-bezier(0.25, 0.6, 0.45, 1) var(--delay, 0s)
+    both;
+}
+
+@keyframes dub-flip-in {
+  0% {
+    transform: perspective(700px) rotateX(-80deg) scale(0.96);
+    opacity: 0;
+  }
+  60% {
+    transform: perspective(700px) rotateX(10deg) scale(1.01);
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(700px) rotateX(0) scale(1);
+    opacity: 1;
+  }
+}
+.dub-flip-in {
+  animation: dub-flip-in 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: 50% 0%;
+}
+
+@keyframes dub-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgb(251 191 36 / 0.35),
+      0 10px 40px -10px rgb(251 191 36 / 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgb(251 191 36 / 0.6),
+      0 10px 60px -6px rgb(251 191 36 / 0.55);
+  }
+}
+.dub-glow {
+  animation: dub-glow 2.4s ease-in-out 3;
+}
+
+@keyframes dub-trophy-bounce {
+  0% {
+    transform: translateY(30px) scale(0.6) rotate(-12deg);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(-8px) scale(1.08) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+.dub-trophy {
+  animation: dub-trophy-bounce 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* While a video renders in real time, drop the most expensive page effects (big blurs,
+   glass) so the renderer gets every frame, even on machines without a fast GPU. */
+html[data-rendering] .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: var(--color-surface-strong);
+}
+html[data-rendering] [class*='blur-['] {
+  display: none;
+}
