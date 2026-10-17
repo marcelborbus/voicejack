@@ -33,7 +33,7 @@ export interface SocketDeps {
 export type ConnStatus = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed';
 
 export interface FatalError {
-  code: ErrorCode | 'KICKED';
+  code: ErrorCode | 'KICKED' | 'VOTE_KICKED' | 'REQUEUED';
   message: string;
 }
 
@@ -254,7 +254,13 @@ export class RoomSocket {
         break;
       case 'kicked':
         this.emit(msg);
-        this.stop({ code: 'KICKED', message: 'You were removed from the room by the host.' });
+        if (msg.by === 'vote')
+          this.stop({ code: 'VOTE_KICKED', message: 'The other players voted you out.' });
+        else this.stop({ code: 'KICKED', message: 'You were removed from the room by the host.' });
+        return;
+      case 'requeued': // V08: missed a public ready check; the queue lives on /ws/presence
+        this.emit(msg);
+        this.stop({ code: 'REQUEUED', message: 'Back in the queue.' });
         return;
       default:
         break;

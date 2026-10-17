@@ -255,7 +255,7 @@ export function Home() {
                 : 'Got a link instead? Just open it.'}
             </p>
           </form>
-          <RandomGameButton />
+          <RandomGameButton name={trimmed} />
         </CardContent>
       </Card>
       <FriendsPanel className="lg:col-span-2" />

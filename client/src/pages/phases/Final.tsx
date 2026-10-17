@@ -6,6 +6,7 @@ import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { BestDubReplay, useDubChunks } from '@/components/results/BestDubReplay';
 import { Confetti, CountUp } from '@/components/results/motion';
 import { SaveVideo } from '@/components/results/SaveVideo';
+import { PublicFinalActions } from '@/components/match';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { play } from '@/lib/sfx';
@@ -79,7 +80,9 @@ export function Final() {
           <Standings final={final} youId={youId} />
           <Card>
             <CardContent className="flex flex-col gap-3">
-              {isHost ? (
+              {snap.kind === 'public' ? (
+                <PublicFinalActions />
+              ) : isHost ? (
                 <Button
                   size="lg"
                   data-testid="back-to-lobby"

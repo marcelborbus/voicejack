@@ -1,7 +1,10 @@
 import type { ErrorCode } from '@dub/shared';
 
 /** Human copy for server error codes. */
-export const ERROR_TEXT: Record<ErrorCode | 'KICKED' | 'NETWORK', string> = {
+export const ERROR_TEXT: Record<
+  ErrorCode | 'KICKED' | 'VOTE_KICKED' | 'REQUEUED' | 'NETWORK',
+  string
+> = {
   ROOM_NOT_FOUND: "That room doesn't exist (or the party is over).",
   ROOM_FULL: 'That room is full.',
   GAME_IN_PROGRESS: 'That game has already started. Ask for the next round!',
@@ -15,6 +18,8 @@ export const ERROR_TEXT: Record<ErrorCode | 'KICKED' | 'NETWORK', string> = {
   SELF_VOTE: "You can't vote on your own dub.",
   LIMIT: 'Limit reached.',
   KICKED: 'The host removed you from the room.',
+  VOTE_KICKED: 'The other players voted you out of this game.',
+  REQUEUED: 'You missed the ready check and are back in the queue.',
   NETWORK: 'Could not reach the server. Check your connection.',
 };
 

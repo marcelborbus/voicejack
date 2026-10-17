@@ -7,6 +7,7 @@ import { PlayerCard } from '@/components/lobby/PlayerCard';
 import { ReadyPanel } from '@/components/lobby/ReadyPanel';
 import { SettingsPanel } from '@/components/lobby/SettingsPanel';
 import { StartPanel } from '@/components/lobby/StartPanel';
+import { PublicLobbyPanel } from '@/components/match';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { play } from '@/lib/sfx';
 import { useIsHost, useMe, useRoom, useSnapshot } from '@/state/room';
@@ -33,6 +34,8 @@ export function Lobby() {
   const { players, you } = snap;
   const host = players.find((p) => p.id === snap.hostId);
   const openSlots = Math.max(0, maxPlayers - players.length);
+  // V08: public rooms are server-hosted: ready countdown instead of invite/host controls.
+  const isPublic = snap.kind === 'public';
 
   return (
     <div
@@ -55,7 +58,7 @@ export function Lobby() {
                 </p>
               </div>
             </div>
-            <InviteCard code={snap.code} hostName={host?.name} />
+            {!isPublic && <InviteCard code={snap.code} hostName={host?.name} />}
           </CardHeader>
           <CardContent>
             <ul className="grid gap-3 sm:grid-cols-2" data-testid="player-list">
@@ -68,7 +71,7 @@ export function Lobby() {
                   index={i}
                 />
               ))}
-              {openSlots > 0 && (
+              {openSlots > 0 && !isPublic && (
                 <li className="relative flex items-center gap-3 rounded-3xl border-2 border-dashed border-white/12 p-3 text-zinc-400">
                   <span className="inline-flex size-12 -rotate-3 items-center justify-center rounded-2xl border-2 border-dashed border-white/20 bg-ink-850">
                     <UserPlus className="size-5" />
@@ -85,13 +88,17 @@ export function Lobby() {
         </Card>
 
         <div className="order-3 lg:order-none">
-          <StartPanel
-            isHost={isHost}
-            canStart={you.canStart}
-            blockers={you.startBlockers}
-            players={players}
-            hostName={host?.name ?? 'the host'}
-          />
+          {isPublic ? (
+            <PublicLobbyPanel />
+          ) : (
+            <StartPanel
+              isHost={isHost}
+              canStart={you.canStart}
+              blockers={you.startBlockers}
+              players={players}
+              hostName={host?.name ?? 'the host'}
+            />
+          )}
         </div>
       </div>
 
@@ -99,7 +106,7 @@ export function Lobby() {
         <div className="order-1 lg:order-none">
           <ReadyPanel me={me} />
         </div>
-        <div className="order-4 lg:order-none">
+        <div className={isPublic ? 'hidden' : 'order-4 lg:order-none'}>
           <SettingsPanel
             settings={snap.settings}
             availableTags={snap.availableTags}

@@ -27,6 +27,7 @@ import { Lobby } from './phases/Lobby';
 import { RoundResults } from './phases/RoundResults';
 import { Showcase } from './phases/Showcase';
 import { VoiceDock, VoiceProvider } from '@/voice/VoiceProvider';
+import { PublicRoomBar } from '@/components/match';
 
 const PHASES: Record<Phase, ComponentType> = {
   LOBBY: Lobby,
@@ -61,6 +62,7 @@ export function Room() {
 
   const fatal = useRoom((s) => (s.code === code ? s.fatal : null));
   const phase = useRoom((s) => (s.code === code ? (s.snapshot?.phase ?? null) : null));
+  const isPublic = useRoom((s) => s.code === code && s.snapshot?.kind === 'public');
 
   // UI sounds: a whoosh on each phase change; silent while dubbing (mics are hot).
   useEffect(() => {
@@ -83,6 +85,8 @@ export function Room() {
       />
     );
   }
+  // V08: missed the public ready check → home, where the queue overlay is open again.
+  if (fatal?.code === 'REQUEUED') return <Navigate to="/" replace />;
   if (fatal) return <FatalScreen code={fatal.code} message={fatal.message} />;
   if (!phase) return <Connecting />;
 
@@ -91,6 +95,7 @@ export function Room() {
     <div className="flex flex-col gap-6">
       <RoomHeader code={code} />
       <VoiceProvider />
+      {isPublic && <PublicRoomBar />}
       <SoundUnlockOverlay />
       <div key={phase} className="animate-fade-up">
         <PhaseView />
@@ -106,6 +111,7 @@ function RoomHeader({ code }: { code: string }) {
   const totalRounds = useRoom((s) => s.snapshot?.totalRounds ?? 0);
   const playerCount = useRoom((s) => s.snapshot?.players.length ?? 0);
   const phase = useRoom((s) => s.snapshot?.phase);
+  const isPublic = useRoom((s) => s.snapshot?.kind === 'public');
   const hostName = useRoom(
     (s) => s.snapshot?.players.find((p) => p.id === s.snapshot?.hostId)?.name,
   );
@@ -139,7 +145,7 @@ function RoomHeader({ code }: { code: string }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <VoiceDock />
-        <InviteButton code={code} hostName={hostName} />
+        {!isPublic && <InviteButton code={code} hostName={hostName} />}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -277,7 +283,7 @@ function FatalScreen({ code, message }: { code: string; message: string }) {
             <Ban className="size-7 text-rose-300" />
           </span>
           <h2 className="font-display text-2xl font-bold">
-            {code === 'KICKED'
+            {code === 'KICKED' || code === 'VOTE_KICKED'
               ? 'You were removed'
               : code === 'ROOM_NOT_FOUND'
                 ? 'This scene got cut'

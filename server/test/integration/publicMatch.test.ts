@@ -11,8 +11,7 @@ class QueueSocket {
   readonly ws: WebSocket;
   readonly got: PresenceS2C[] = [];
   readonly opened: Promise<void>;
-  private waiters: { pred: (m: PresenceS2C) => boolean; resolve: (m: PresenceS2C) => void }[] =
-    [];
+  private waiters: { pred: (m: PresenceS2C) => boolean; resolve: (m: PresenceS2C) => void }[] = [];
 
   constructor(base: string, cookie?: string) {
     this.ws = new WebSocket(base.replace(/^http/, 'ws') + '/ws/presence', {
@@ -44,7 +43,8 @@ class QueueSocket {
     if (hit) return Promise.resolve(hit as Extract<PresenceS2C, { t: T }>);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
-        () => reject(new Error(`timeout waiting for ${t}; got ${JSON.stringify(this.got.slice(-3))}`)),
+        () =>
+          reject(new Error(`timeout waiting for ${t}; got ${JSON.stringify(this.got.slice(-3))}`)),
         timeoutMs,
       );
       this.waiters.push({
@@ -145,7 +145,9 @@ describe('public matchmaking (V08)', () => {
     // Everyone ready before the deadline: starts at once.
     for (const p of players) ready(p);
     for (let round = 0; round < 3; round++) {
-      await Promise.all(players.map((p) => p.state((s) => s.phase === 'DUBBING' && s.round === round)));
+      await Promise.all(
+        players.map((p) => p.state((s) => s.phase === 'DUBBING' && s.round === round)),
+      );
       for (const p of players) p.send({ t: 'dubDone', round, done: true });
     }
     const fin = await players[0]!.state((s) => s.phase === 'FINAL', 15_000);
@@ -161,47 +163,60 @@ describe('public matchmaking (V08)', () => {
     expect(srv.matchmaker.size).toBe(0);
   });
 
-  it('a player who misses the ready check goes back to the front of the queue', { timeout: 20_000 }, async () => {
-    const { qs, players } = await matchOf(['Dee', 'Eli', 'Fay']);
-    const [dee, eli, fay] = players as [FakeClient, FakeClient, FakeClient];
-    const waitedBefore = qs[2]!.got.filter((m) => m.t === 'queue').at(-1)!;
-    ready(dee);
-    ready(eli);
-    fay.send({ t: 'micStatus', ok: true }); // never presses ready
-    await fay.wait((m) => m.t === 'requeued', 6000);
-    const q = await qs[2]!.wait('queue', (m) => m.position === 1, 3000, 0);
-    expect(q.waitedMs).toBeGreaterThan(waitedBefore.t === 'queue' ? waitedBefore.waitedMs : 0);
-    const s = await dee.state((x) => x.phase === 'DUBBING');
-    expect(s.players.map((p) => p.name).sort()).toEqual(['Dee', 'Eli']);
-    qs[2]!.send({ t: 'queueLeave' });
-    await qs[2]!.wait('queueLeft');
-  });
+  it(
+    'a player who misses the ready check goes back to the front of the queue',
+    { timeout: 20_000 },
+    async () => {
+      const { qs, players } = await matchOf(['Dee', 'Eli', 'Fay']);
+      const [dee, eli, fay] = players as [FakeClient, FakeClient, FakeClient];
+      const waitedBefore = qs[2]!.got.filter((m) => m.t === 'queue').at(-1)!;
+      ready(dee);
+      ready(eli);
+      fay.send({ t: 'micStatus', ok: true }); // never presses ready
+      await fay.wait((m) => m.t === 'requeued', 6000);
+      const q = await qs[2]!.wait('queue', (m) => m.position === 1, 3000, 0);
+      expect(q.waitedMs).toBeGreaterThan(waitedBefore.t === 'queue' ? waitedBefore.waitedMs : 0);
+      const s = await dee.state((x) => x.phase === 'DUBBING');
+      expect(s.players.map((p) => p.name).sort()).toEqual(['Dee', 'Eli']);
+      qs[2]!.send({ t: 'queueLeave' });
+      await qs[2]!.wait('queueLeft');
+    },
+  );
 
-  it('report is stored; a majority vote-kicks; the kicked player is blocked from queueing', { timeout: 20_000 }, async () => {
-    const { code, qs, players } = await matchOf(['Gil', 'Hal', 'Ivy']);
-    const [gil, hal, ivy] = players as [FakeClient, FakeClient, FakeClient];
-    for (const p of players) ready(p);
-    await gil.state((s) => s.phase === 'DUBBING');
+  it(
+    'report is stored; a majority vote-kicks; the kicked player is blocked from queueing',
+    { timeout: 20_000 },
+    async () => {
+      const { code, qs, players } = await matchOf(['Gil', 'Hal', 'Ivy']);
+      const [gil, hal, ivy] = players as [FakeClient, FakeClient, FakeClient];
+      for (const p of players) ready(p);
+      await gil.state((s) => s.phase === 'DUBBING');
 
-    gil.send({ t: 'report', playerId: ivy.playerId, reason: 'slurs on voice' });
-    await gil.state((s) => (s.public?.youReported ?? []).includes(ivy.playerId));
-    gil.send({ t: 'report', playerId: ivy.playerId, reason: 'again' });
-    await gil.wait((m) => m.t === 'error' && m.code === 'LIMIT');
-    const rows = srv.reports.list();
-    expect(rows[0]).toMatchObject({ roomCode: code, reporterName: 'Gil', reportedName: 'Ivy', reason: 'slurs on voice' });
-    expect(rows[0]!.reportedUserId).toBeTruthy();
+      gil.send({ t: 'report', playerId: ivy.playerId, reason: 'slurs on voice' });
+      await gil.state((s) => (s.public?.youReported ?? []).includes(ivy.playerId));
+      gil.send({ t: 'report', playerId: ivy.playerId, reason: 'again' });
+      await gil.wait((m) => m.t === 'error' && m.code === 'LIMIT');
+      const rows = srv.reports.list();
+      expect(rows[0]).toMatchObject({
+        roomCode: code,
+        reporterName: 'Gil',
+        reportedName: 'Ivy',
+        reason: 'slurs on voice',
+      });
+      expect(rows[0]!.reportedUserId).toBeTruthy();
 
-    gil.send({ t: 'voteKick', playerId: ivy.playerId, kick: true });
-    const mid: RoomSnapshot = await hal.state((s) => s.public?.kickVotes[ivy.playerId] === 1);
-    expect(mid.public?.kickNeeded).toBe(2);
-    hal.send({ t: 'voteKick', playerId: ivy.playerId, kick: true });
-    await ivy.wait((m) => m.t === 'kicked' && m.by === 'vote');
-    const after = await gil.state((s) => s.players.length === 2);
-    expect(after.phase).toBe('DUBBING'); // game goes on
+      gil.send({ t: 'voteKick', playerId: ivy.playerId, kick: true });
+      const mid: RoomSnapshot = await hal.state((s) => s.public?.kickVotes[ivy.playerId] === 1);
+      expect(mid.public?.kickNeeded).toBe(2);
+      hal.send({ t: 'voteKick', playerId: ivy.playerId, kick: true });
+      await ivy.wait((m) => m.t === 'kicked' && m.by === 'vote');
+      const after = await gil.state((s) => s.players.length === 2);
+      expect(after.phase).toBe('DUBBING'); // game goes on
 
-    qs[2]!.send({ t: 'queueJoin', name: 'Ivy' });
-    const e = await qs[2]!.wait('error');
-    expect(e.code).toBe('BLOCKED');
-    expect(srv.matchmaker.size).toBe(0);
-  });
+      qs[2]!.send({ t: 'queueJoin', name: 'Ivy' });
+      const e = await qs[2]!.wait('error');
+      expect(e.code).toBe('BLOCKED');
+      expect(srv.matchmaker.size).toBe(0);
+    },
+  );
 });
