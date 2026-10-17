@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Kbd } from '@/components/ui/kbd';
+import { Spinner } from '@/components/ui/spinner';
 import { DubPlayer, type DubChunk } from '@/dub/DubPlayer';
 import { cn } from '@/lib/utils';
 import {
@@ -31,8 +32,10 @@ export interface EditorProps {
   roundLabel: string;
   phaseEndsAt: number | null;
   done: boolean;
+  /** Done was clicked; finishing the take / uploads first. */
+  doneBusy?: boolean;
   doneCount: { done: number; total: number };
-  onDone: (done: boolean) => void;
+  onDone: (done: boolean) => void | Promise<void>;
   /** Recording hooks (T15). */
   onRecord?: () => void;
   onCancelRecord?: () => void;
@@ -203,7 +206,7 @@ export function Editor(props: EditorProps) {
 /** DEV: DubPlayer events, for checking resync rates from Playwright (`__dubEditor.dubLog`). */
 const dubLog: unknown[] = [];
 
-function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneCount, onDone, onDeadline }: EditorProps) {
+function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount, onDone, onDeadline }: EditorProps) {
   const recording = useEditor((s) => s.recording !== null);
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -232,8 +235,9 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneCount, onDone, 
             <Undo2 /> Keep editing
           </Button>
         ) : (
-          <Button variant="success" data-testid="done" disabled={recording} onClick={() => onDone(true)}>
-            <Check strokeWidth={3} /> I'm done
+          <Button variant="success" data-testid="done" disabled={recording || doneBusy} onClick={() => onDone(true)}>
+            {doneBusy ? <Spinner className="size-4" /> : <Check strokeWidth={3} />}
+            {doneBusy ? 'Saving…' : "I'm done"}
           </Button>
         )}
       </div>

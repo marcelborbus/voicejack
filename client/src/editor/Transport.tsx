@@ -91,6 +91,7 @@ export function Transport({ onRecord, onCancelRecord, canRecord = true, recordHi
       <TimeReadout durationMs={durationMs} />
 
       <div
+        hidden={rec}
         role="radiogroup"
         aria-label="Preview speed"
         className="flex items-center rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1"
