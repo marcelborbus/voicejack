@@ -94,11 +94,37 @@ function cachePut(url: string, p: Promise<DecodedAudio>) {
         cache.delete(oldest);
       }
     },
-    () => cache.delete(url),
+    () => {
+      if (cache.get(url) === entry) cache.delete(url);
+    },
   );
 }
 
-/** Download + decode (cached by URL). */
+/** Rejects with an AbortError when `signal` aborts; otherwise settles like `p`. */
+function withSignal<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return p;
+  if (signal.aborted) return Promise.reject(new DOMException('aborted', 'AbortError'));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    p.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(v);
+      },
+      (e: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(e);
+      },
+    );
+  });
+}
+
+/**
+ * Download + decode (cached by URL). The shared download itself is never aborted: the
+ * caller's `signal` only detaches that caller, so an aborted load can't leave a rejected
+ * promise in the cache for the next caller. Failed loads are dropped from the cache.
+ */
 export function loadChunkAudio(
   ctx: BaseAudioContext,
   url: string,
@@ -108,11 +134,13 @@ export function loadChunkAudio(
   if (hit) {
     cache.delete(url);
     cache.set(url, hit); // LRU touch
-    return hit.p;
+    return withSignal(hit.p, opts.signal);
   }
-  const p = fetchChunkBytes(url, opts).then((bytes) => decodeWithPeaks(ctx, bytes));
+  const p = fetchChunkBytes(url, { ...opts, signal: undefined }).then((bytes) =>
+    decodeWithPeaks(ctx, bytes),
+  );
   cachePut(url, p);
-  return p;
+  return withSignal(p, opts.signal);
 }
 
 /** Seed the cache with audio we already have (own recordings, so showcase needn't refetch). */
