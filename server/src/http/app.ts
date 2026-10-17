@@ -19,6 +19,7 @@ import type { Accounts } from '../accounts/Accounts.js';
 import type { GuestLimiter } from '../accounts/GuestLimiter.js';
 import type { Mailer } from '../mail/Mailer.js';
 import * as clipsRoutes from '../routes/clips.js';
+import * as adminRoutes from '../routes/admin.js';
 import * as roomsRoutes from '../routes/rooms.js';
 import * as chunksRoutes from '../routes/chunks.js';
 import * as meRoutes from '../routes/me.js';
@@ -103,6 +104,7 @@ export async function buildApp(
 
   const modules: RegisterFn[] = [
     clipsRoutes.register,
+    adminRoutes.register,
     roomsRoutes.register,
     chunksRoutes.register,
     meRoutes.register,
@@ -115,7 +117,11 @@ export async function buildApp(
 
   app.setNotFoundHandler((req, reply) => {
     const url = req.url.split('?')[0]!;
-    if (hasClient && req.method === 'GET' && (url === '/' || url.startsWith('/r/'))) {
+    if (
+      hasClient &&
+      req.method === 'GET' &&
+      (url === '/' || url.startsWith('/r/') || /^\/admin(\/|$)/.test(url))
+    ) {
       return reply.type('text/html').sendFile('index.html', config.clientDist);
     }
     return reply.status(404).send(sendError('INVALID', 'not found'));

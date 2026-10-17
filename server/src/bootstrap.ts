@@ -31,17 +31,21 @@ export async function startServer(
   config: Config,
   opts: { logger?: boolean | { level: string } } = {},
 ): Promise<RunningServer> {
-  const clips = ClipLibrary.load(config.clipsDir);
   const store = new ChunkStore(config.dataDir);
   await store.init();
   const dataDir = path.resolve(config.dataDir) + path.sep;
   if (config.dbPath !== ':memory:' && path.resolve(config.dbPath).startsWith(dataDir)) {
     throw new Error(`DB_PATH (${config.dbPath}) must not be inside DATA_DIR, which is wiped`);
   }
+  if ((path.resolve(config.libraryDir) + path.sep).startsWith(dataDir)) {
+    throw new Error(`LIBRARY_DIR (${config.libraryDir}) must not be inside DATA_DIR, which is wiped`);
+  }
   const db = openDb(config.dbPath);
   const mig = migrate(db);
+  const clips = ClipLibrary.open(db, { clipsDir: config.clipsDir, libraryDir: config.libraryDir });
   const accounts = new Accounts(db);
-  const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo), store });
+  const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo), store, library: clips });
+  clips.onChange(() => rooms.libraryChanged());
   const presence = new Presence({ rooms });
   const app = await buildApp({ config, clips, rooms, store, accounts, presence }, opts);
   const cleanup = () => {

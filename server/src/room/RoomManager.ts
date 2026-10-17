@@ -15,7 +15,7 @@ import { BotPlayer, type BotSound } from '../bots/BotPlayer.js';
 import { loadBotSounds } from '../bots/sounds.js';
 import { Room, type JoinResult } from './Room.js';
 import { realScheduler } from './timers.js';
-import type { Clock, RoomError, Scheduler } from './types.js';
+import type { Clock, RoomError, RoomLibrary, Scheduler } from './types.js';
 
 /** Upload storage as seen by rooms (implemented by ChunkStore). */
 export interface RoomStore {
@@ -59,6 +59,8 @@ export interface BotEnv {
 export interface RoomManagerDeps {
   config: Config;
   clips: readonly ClipInfo[];
+  /** V05 clip libraries (DB-backed); without it every room plays `clips`. */
+  library?: RoomLibrary;
   store?: RoomStore;
   /** Bot environment; by default built from `store.put` + `loadBotSounds(clipsDir)`. */
   bots?: BotEnv;
@@ -126,6 +128,11 @@ export class RoomManager {
     return [...this.rooms.keys()];
   }
 
+  /** Libraries changed (admin edit): lobbies re-send their clip counts / tags. */
+  libraryChanged(): void {
+    for (const r of this.rooms.values()) r.libraryChanged();
+  }
+
   get(code: RoomCode): Room | undefined {
     return this.rooms.get(code);
   }
@@ -148,6 +155,7 @@ export class RoomManager {
         this.changed();
       },
       clips: this.deps.clips,
+      library: this.deps.library,
       timings: config.timings,
       options: {
         allowSolo: config.allowSolo,

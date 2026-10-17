@@ -60,29 +60,21 @@ more than 15 min (kept that long so the rate limit still sees them), guests idle
   `display_name=''`, `kind='guest'` (keeps the CHECK), `deleted_at=now`. The row stays (future
   references don't dangle) but never resolves again; the address can register anew.
 
+`002_libraries.sql` (V05):
+
+- `libraries` — `owner_user_id` NULL = official (V06 sets it for private ones), `visibility`
+  official|private, `is_default` (at most one, official only), `description`.
+- `clips` — `library_id` (cascade), `file`/`poster` plain names, `duration_ms`, `width`, `height`,
+  `bytes`, `tags`/`attribution` JSON, `enabled`, `origin` manifest|upload (manifest = files in
+  read-only CLIPS_DIR, URL `/clips/<file>`; upload = `LIBRARY_DIR/<library>/`, URL
+  `/clips/<library>/<file>`), `status` processing|ready|failed + `error`, `uploaded_by` (V06
+  quotas). `ClipLibrary.open` imports `clips/manifest.json` as library `classics` at every start
+  (upsert by clip id: technical fields follow the manifest, admin edits are kept) and marks
+  clips left `processing` by a restart as failed. Built-in clips can only be disabled.
+
 ## Planned migrations (not built yet)
 
 ```sql
--- V05 clip libraries (admin):
--- CREATE TABLE libraries (
---   id TEXT PRIMARY KEY, name TEXT NOT NULL,
---   owner_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,   -- NULL = admin/public (V06 sets it)
---   visibility TEXT NOT NULL CHECK (visibility IN ('public','private')),
---   is_default INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1,
---   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
--- CREATE UNIQUE INDEX libraries_one_default ON libraries (is_default) WHERE is_default = 1;
--- CREATE TABLE clips (
---   id TEXT PRIMARY KEY, library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
---   title TEXT NOT NULL, file TEXT NOT NULL,              -- relative to /app/data/clips/<libraryId>/
---   duration_ms INTEGER, width INTEGER, height INTEGER, bytes INTEGER,
---   tags TEXT NOT NULL DEFAULT '[]',                       -- JSON array
---   attribution TEXT NOT NULL DEFAULT '{}',                -- JSON {author, source, license}
---   status TEXT NOT NULL CHECK (status IN ('processing','ready','failed','disabled','removed')),
---   uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
---   created_at INTEGER NOT NULL);
--- CREATE INDEX clips_library ON clips (library_id, status);
--- (Seed: import clips/manifest.json as the default public library.)
-
 -- V09 Elo: users.elo / public_games_played exist already. Add a history for audits:
 -- CREATE TABLE games (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('public','ranked','private')),
 --   started_at INTEGER NOT NULL, ended_at INTEGER, player_count INTEGER NOT NULL);

@@ -7,6 +7,8 @@ import { Home } from '@/pages/Home';
 import { NotFound } from '@/pages/NotFound';
 import { Room } from '@/pages/Room';
 
+// Admin (V05): own chunk, only fetched on /admin.
+const AdminPage = lazy(() => import('@/admin/AdminPage'));
 // Dev-only pages (dead code in production builds).
 const DevPlayerPage = import.meta.env.DEV ? lazy(() => import('@/dub/DevPlayerPage')) : null;
 
@@ -18,6 +20,14 @@ export function App() {
           <Route element={<Shell />}>
             <Route index element={<Home />} />
             <Route path="r/:code" element={<Room />} />
+            <Route
+              path="admin/*"
+              element={
+                <Suspense>
+                  <AdminPage />
+                </Suspense>
+              }
+            />
             {DevPlayerPage && (
               <Route
                 path="dev/player"

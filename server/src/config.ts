@@ -42,6 +42,10 @@ export interface Config {
   host: string;
   clipsDir: string;
   dataDir: string;
+  /** V05: writable clip uploads (`<libraryDir>/<libraryId>/`). Must live outside dataDir. */
+  libraryDir: string;
+  /** V05: ADMIN_DEV=1 lets loopback use /api/admin without Authelia (ignored in production). */
+  adminDev: boolean;
   /** SQLite file (`:memory:` in tests). Must live outside dataDir, which is wiped. */
   dbPath: string;
   /** `Secure` attribute on the session cookie (default: NODE_ENV=production). */
@@ -97,6 +101,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     host: env.HOST ?? '0.0.0.0',
     clipsDir: path.resolve(env.CLIPS_DIR ?? path.join(REPO_ROOT, 'clips')),
     dataDir: path.resolve(env.DATA_DIR ?? path.join(REPO_ROOT, '.cache/data')),
+    libraryDir: path.resolve(env.LIBRARY_DIR ?? path.join(REPO_ROOT, '.cache/library')),
+    adminDev: bool(env.ADMIN_DEV) && env.NODE_ENV !== 'production',
     dbPath:
       env.DB_PATH === ':memory:'
         ? ':memory:'

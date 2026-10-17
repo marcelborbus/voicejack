@@ -41,6 +41,8 @@ export interface GameSettings {
   rounds: number; // normal: 3 (forced) | extended: 1..10
   dubbingSeconds: number; // normal: 210 (forced) | extended: 60..360, step 15
   tags: string[]; // extended only; [] = all clips
+  /** Clip library (V05). Absent = the server's default library. Kept across mode switches. */
+  libraryId?: string;
 }
 
 /**
@@ -52,6 +54,10 @@ export const GameSettingsSchema = z.object({
   rounds: z.number().int().min(ROUNDS_RANGE.min).max(ROUNDS_RANGE.max),
   dubbingSeconds: z.number().int().min(SHORT_DUBBING_MIN_SECONDS).max(DUBBING_SECONDS_RANGE.max),
   tags: z.array(z.string().min(1).max(MAX_TAG_LENGTH)).max(MAX_TAGS),
+  libraryId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,64}$/)
+    .optional(),
 }) satisfies z.ZodType<GameSettings>;
 
 // ---------- clips ----------

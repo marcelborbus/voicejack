@@ -33,8 +33,9 @@ RUN pnpm -r --if-present build \
 # ---------- runtime ----------
 FROM node:24-alpine
 # tini as PID 1 (signal forwarding, zombie reaping). The app is one bundled file, so the
-# image is the base (~167 MB) plus ~5 MB.
-RUN apk add --no-cache tini \
+# image is the base (~167 MB) plus ~5 MB, plus ffmpeg for admin clip uploads (V05, see
+# README-deploy "Clip libraries" for the measured size).
+RUN apk add --no-cache tini ffmpeg \
  && mkdir -p /app/clips /app/data \
  && chown node:node /app/data
 WORKDIR /app
@@ -49,7 +50,9 @@ COPY --from=build --chown=root:root /out/public /app/public
 # DATA_DIR is a subdirectory of the /app/data volume on purpose: the server wipes DATA_DIR
 # with rm -r on startup, which cannot remove a mount point itself.
 # DB_PATH (SQLite, V03) is a sibling of DATA_DIR in the same volume, so it survives the wipe;
-# the server creates /app/data/db itself. node:sqlite needs no flag on Node 24; we only
+# the server creates /app/data/db itself. LIBRARY_DIR (V05 admin clip uploads, normalized by
+# ffmpeg) is another sibling that survives the wipe; upload temp files go to LIBRARY_DIR/.tmp
+# (the /tmp tmpfs is only 16 MB). node:sqlite needs no flag on Node 24; we only
 # silence its ExperimentalWarning.
 ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=192 --disable-warning=ExperimentalWarning" \
@@ -58,6 +61,7 @@ ENV NODE_ENV=production \
     CLIPS_DIR=/app/clips \
     DATA_DIR=/app/data/uploads \
     DB_PATH=/app/data/db/voicejack.sqlite \
+    LIBRARY_DIR=/app/data/library \
     CLIENT_DIST=/app/public \
     TRUST_PROXY=loopback,uniquelocal
 

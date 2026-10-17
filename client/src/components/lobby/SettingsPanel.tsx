@@ -8,6 +8,7 @@ import {
 } from '@dub/shared';
 import { Clapperboard, Clock3, Repeat, Settings2, Tags } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { LibraryPicker } from '@/components/lobby/LibraryPicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -64,6 +65,7 @@ export function SettingsPanel({
         )}
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
+        <LibraryPicker libraryId={settings.libraryId} isHost={isHost} clipCount={clipCount} />
         <div className="grid grid-cols-3 gap-2">
           <Stat
             icon={Repeat}

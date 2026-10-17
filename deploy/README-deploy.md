@@ -10,10 +10,10 @@ include `snippets/acme.conf`, and keep an eye on the ~1 GB of free RAM.
 | Public URL      | `https://voicejack.borbus.eu` (**public, no Authelia**, see below)                           |
 | Compose project | `/opt/voicejack` (project name `voicejack`, container `voicejack`)                |
 | Port            | `127.0.0.1:3087` → container `3000` (check it is still free: `ss -ltn \| grep 3087`)   |
-| Image           | `voicejack:latest`, ~170 MB (node:24-alpine + one bundled `server.mjs` + `client/dist`) |
-| Memory          | `mem_limit 320m` (no swap), `NODE_OPTIONS=--max-old-space-size=192`; ~26 MB idle       |
+| Image           | `voicejack:latest`, ~300 MB (node:24-alpine + ffmpeg + one bundled `server.mjs` + `client/dist`) |
+| Memory          | `mem_limit 450m` (no swap; 320m before V05), `NODE_OPTIONS=--max-old-space-size=192`; ~30 MB idle, ~290 MB while ffmpeg normalizes an upload |
 | CPU             | `cpus: 1.0`                                                                            |
-| State           | **`./data/db/voicejack.sqlite`** (SQLite + WAL: guest/registered accounts, sessions) — **back it up**. `./clips` (read-only), `./data/uploads` (wiped on every start) |
+| State           | **`./data/db/voicejack.sqlite`** (SQLite + WAL: guest/registered accounts, sessions) — **back it up**. **`./data/library`** (admin-uploaded clips, V05) — **back it up**. `./clips` (read-only), `./data/uploads` (wiped on every start) |
 | Secrets         | none                                                                                   |
 
 **Why public:** guests join through an invite link (`/r/<CODE>`) and have no borbus account.
@@ -138,6 +138,62 @@ plus `extra_hosts: host.docker.internal:host-gateway`. All can be overridden in 
 **Why `./data/uploads` and not `./data`:** the server wipes `DATA_DIR` with `rm -r` at startup,
 which cannot remove a mount point, so the image sets `DATA_DIR=/app/data/uploads`.
 
+### Clip libraries + admin (V05)
+
+Libraries and clips live in the SQLite DB (migration `002_libraries.sql`). At every start the
+server imports `clips/manifest.json` (idempotently) as the official default library **Classics**;
+those files stay in the read-only `./clips` mount and keep their v1 URLs (`/clips/<file>`).
+Clips uploaded on **https://voicejack.borbus.eu/admin** are normalized in the container by
+ffmpeg (H.264/AAC mp4 ≤720p, faststart, ≤60 s, poster jpg; one job at a time under `nice`) and
+stored in `./data/library/<libraryId>/` (`LIBRARY_DIR=/app/data/library`), served at
+`/clips/<libraryId>/<file>`. Upload temp files sit in `./data/library/.tmp` (the 16 MB `/tmp`
+tmpfs is too small) and are deleted after each job.
+
+Host steps (not applied yet):
+
+1. **RAM:** `mem_limit`/`memswap_limit` are now **450m** in `compose.yaml` (was 320m). Measured:
+   ~290 MiB peak while normalizing a 20 s 1080p upload, ~30 MiB idle. Check `free -h` first
+   (2026-10-17: 2.4 GiB available).
+2. **Image:** ffmpeg (alpine package) adds ~130 MB: 169 MB → 301 MB. `docker save | gzip` ships
+   correspondingly more.
+3. **Directory:** `install -d -o 1000 -g 1000 /opt/voicejack/data/library` (the server would
+   create it if `data` is writable) and **add `/opt/voicejack/data/library` to the backups**
+   next to `data/db` (the DB rows and the files belong together).
+4. **Authelia rule** in `/opt/authelia/config/configuration.yml`, `access_control.rules` (next to
+   the portfolio rule), then `docker compose restart authelia`:
+
+   ```yaml
+       # --- Voicejack clip-library admin — admins only. The game itself is public
+       # and needs no rule (nginx serves it without auth_request).
+       - domain: 'voicejack.borbus.eu'
+         resources:
+           - '^/(admin|api/admin)([/?].*)?$'
+         subject:
+           - 'group:admins'
+         policy: 'one_factor'
+   ```
+
+5. **nginx:** deploy the updated vhost (section 4). It now includes
+   `snippets/authelia-location.conf` once and `snippets/authelia-authrequest.conf` in
+   `location /admin` and `location /api/admin/` (body limit 210m there only, request buffering
+   off, 300 s timeouts). All other locations blank `Remote-User`/`Remote-Groups`.
+
+**Trust model:** the app accepts `/api/admin/*` only if the TCP peer is in `TRUST_PROXY`
+(`loopback,uniquelocal`: nginx via the docker bridge) **and** `Remote-Groups` contains `admins`
+(plus a same-origin check on writes); otherwise 403. Same pattern as marcel.borbus.eu, and it
+is safe only while the port stays loopback-bound. `ADMIN_DEV=1` (dev only, ignored with
+`NODE_ENV=production`) lets loopback in without headers.
+
+Verify after deploy: `curl -s -o /dev/null -w "%{http_code}\n" https://voicejack.borbus.eu/admin`
+→ 302 to auth.borbus.eu; `curl -s -H 'Remote-Groups: admins' -H 'Remote-User: x'
+https://voicejack.borbus.eu/api/me` must not grant anything (headers are blanked);
+`curl -s https://voicejack.borbus.eu/api/libraries` lists Classics. Then sign in as `marcel`,
+upload a short clip on `/admin`, and watch `docker stats --no-stream voicejack`.
+
+**ARCHITECTURE.md §3.9** needs updating: Voicejack is no longer "nothing persistent" (DB +
+library, both backed up), `/admin` is Authelia-gated (`admins`), `mem_limit 450m`; add the
+rule to the §3.1 access-control table and the new footprint to §5.
+
 ## 4. nginx (host)
 
 ```sh
@@ -166,7 +222,7 @@ curl -sf https://voicejack.borbus.eu/api/health
 curl -s -o /dev/null -w "%{http_code}\n" https://voicejack.borbus.eu/r/ABCDEF          # 200 (SPA)
 curl -s -o /dev/null -w "%{http_code}\n" http://voicejack.borbus.eu/                   # 301
 curl -s -o /dev/null -D - -H 'Range: bytes=0-99' https://voicejack.borbus.eu/clips/<file>.mp4 | head -1   # 206
-docker stats --no-stream voicejack                                                # well under 320 MiB
+docker stats --no-stream voicejack                                                # well under 450 MiB
 ```
 
 Then a real game with two devices (WS upgrade + voice). Voice uses public STUN only, so peers

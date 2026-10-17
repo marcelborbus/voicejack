@@ -30,13 +30,25 @@ export interface RoomOptions {
   devBots?: boolean;
 }
 
+/** Clip libraries as a Room sees them (implemented by ClipLibrary, V05). */
+export interface RoomLibrary {
+  defaultId(): string | null;
+  /** Playable clips of the library, or null if it does not exist. */
+  clipsOf(libraryId: string): readonly ClipInfo[] | null;
+  /** May a host with account `userId` play this library? (official: everyone; V06 private: owner) */
+  canUse(libraryId: string, userId: string | undefined): boolean;
+}
+
 export interface RoomDeps {
   code: RoomCode;
   clock: Clock;
   scheduler: Scheduler;
   /** Delivers a message to one player's socket (no-op if not connected). */
   emit(playerId: PlayerId, msg: S2C): void;
+  /** Fallback clip set (no `library`, or its default library is gone). */
   clips: readonly ClipInfo[];
+  /** V05: clip libraries; `settings.libraryId` picks one (default: `library.defaultId()`). */
+  library?: RoomLibrary;
   timings: Timings;
   options: RoomOptions;
   /** Upload index (ChunkStore). Defaults to "nothing uploaded". */

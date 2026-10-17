@@ -120,6 +120,30 @@ export class Room {
     this.newToken = deps.newToken ?? (() => randomBytes(32).toString('base64url'));
     this.createdAt = deps.clock.now();
     this.emptySinceAt = this.createdAt;
+    const lib = deps.library?.defaultId();
+    if (lib) this.settings = { ...this.settings, libraryId: lib };
+  }
+
+  /** Clips of a library (V05), falling back to the default library, then `deps.clips`. */
+  private clipsFor(libraryId: string | undefined): readonly ClipInfo[] {
+    const lib = this.deps.library;
+    if (lib) {
+      const own = libraryId ? lib.clipsOf(libraryId) : null;
+      if (own) return own;
+      const d = lib.defaultId();
+      const dflt = d ? lib.clipsOf(d) : null;
+      if (dflt) return dflt;
+    }
+    return this.deps.clips;
+  }
+
+  private get clips(): readonly ClipInfo[] {
+    return this.clipsFor(this.settings.libraryId);
+  }
+
+  /** Library contents changed (admin): lobbies get fresh clip counts and tags. */
+  libraryChanged(): void {
+    if (this.phase === 'LOBBY') this.changed();
   }
 
   // ---------------------------------------------------------------- queries
@@ -369,6 +393,13 @@ export class Room {
     if (p.id !== this.hostId) return err('NOT_HOST', 'only the host can change settings');
     if (this.phase !== 'LOBBY') return err('BAD_PHASE', 'not in lobby');
     const merged: GameSettings = { ...this.settings, ...patch };
+    const libraryId = merged.libraryId;
+    if (patch.libraryId !== undefined && patch.libraryId !== this.settings.libraryId) {
+      const lib = this.deps.library;
+      if (!lib?.clipsOf(patch.libraryId) || !lib.canUse(patch.libraryId, p.userId)) {
+        return err('INVALID', 'unknown library');
+      }
+    }
     let next: GameSettings;
     if (merged.mode === 'normal') {
       next = { ...NORMAL_SETTINGS, tags: [] };
@@ -380,11 +411,14 @@ export class Room {
       if (!this.validDubbingSeconds(dubbingSeconds)) {
         return err('INVALID', 'dubbing time out of range');
       }
-      const known = new Set(collectTags(this.deps.clips));
-      const tags = [...new Set(merged.tags)];
-      if (tags.some((t) => !known.has(t))) return err('INVALID', 'unknown tag');
+      const known = new Set(collectTags(this.clipsFor(libraryId)));
+      let tags = [...new Set(merged.tags)];
+      // Tags carried over from another library are dropped; explicitly sent unknown ones fail.
+      if (patch.tags && tags.some((t) => !known.has(t))) return err('INVALID', 'unknown tag');
+      tags = tags.filter((t) => known.has(t));
       next = { mode: 'extended', rounds, dubbingSeconds, tags };
     }
+    if (libraryId !== undefined) next.libraryId = libraryId;
     this.settings = next;
     for (const q of this.players.values()) q.ready = false;
     this.changed();
@@ -477,7 +511,7 @@ export class Room {
   }
 
   private availableClips(): number {
-    return availableClipCount(this.deps.clips, this.settings.tags, this.usedClipIds);
+    return availableClipCount(this.clips, this.settings.tags, this.usedClipIds);
   }
 
   private startGame(p: PlayerState): Outcome {
@@ -499,7 +533,7 @@ export class Room {
   // ---------------------------------------------------------------- dubbing
 
   private startRound(r: number): void {
-    const clip = pickClip(this.deps.clips, this.settings.tags, this.usedClipIds, this.rng);
+    const clip = pickClip(this.clips, this.settings.tags, this.usedClipIds, this.rng);
     if (!clip) {
       this.enterFinal();
       return;
@@ -892,7 +926,7 @@ export class Room {
       phase: this.phase,
       hostId: this.hostId,
       settings: { ...this.settings, tags: [...this.settings.tags] },
-      availableTags: collectTags(this.deps.clips),
+      availableTags: collectTags(this.clips),
       clipCount: this.availableClips(),
       players: this.publicPlayers(),
       round: this.round,

@@ -38,9 +38,12 @@ services:
       # Uploads live in ./data/uploads and are wiped on every start. The SQLite DB (accounts,
       # V03) lives in ./data/db (DB_PATH=/app/data/db/voicejack.sqlite) and is kept: back up
       # /opt/voicejack/data/db. ./data and ./data/db must be writable by uid 1000 (`node`).
+      # Admin-uploaded clips (V05) live in ./data/library (LIBRARY_DIR=/app/data/library): kept,
+      # back it up too (normalized mp4s, <=60 s each).
       - ./data:/app/data
-    mem_limit: 320m
-    memswap_limit: 320m
+    # 450m since V05: one ffmpeg normalization job (720p x264, 2 threads) runs next to the app.
+    mem_limit: 450m
+    memswap_limit: 450m
     cpus: 1.0
     pids_limit: 128
     read_only: true
