@@ -11,6 +11,14 @@ export interface Timings {
   roundResultsMs: number;
   lobbyDropMs: number;
   hostMigrateMs: number;
+  /** V08 public rooms: time to pass the mic check and press ready after a match. */
+  readyCheckMs: number;
+  /** V08 matchmaking: 3+ players start once the oldest waited this long (6 start at once). */
+  matchFullWaitMs: number;
+  /** V08 matchmaking: 2 players start once the oldest waited this long. */
+  matchPairWaitMs: number;
+  /** V08 matchmaking tick (queue updates + matching). */
+  matchTickMs: number;
 }
 
 export const TIMINGS_PRESETS = {
@@ -23,6 +31,10 @@ export const TIMINGS_PRESETS = {
     roundResultsMs: 15000,
     lobbyDropMs: 60000,
     hostMigrateMs: 30000,
+    readyCheckMs: 20000,
+    matchFullWaitMs: 20000,
+    matchPairWaitMs: 60000,
+    matchTickMs: 1000,
   },
   fast: {
     uploadGraceMs: 500,
@@ -33,6 +45,10 @@ export const TIMINGS_PRESETS = {
     roundResultsMs: 1000,
     lobbyDropMs: 60000,
     hostMigrateMs: 30000,
+    readyCheckMs: 2000,
+    matchFullWaitMs: 400,
+    matchPairWaitMs: 4000,
+    matchTickMs: 100,
   },
 } as const satisfies Record<string, Timings>;
 export type TimingsName = keyof typeof TIMINGS_PRESETS;

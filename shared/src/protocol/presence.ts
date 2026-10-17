@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NAME_MAX_LENGTH, NAME_MIN_LENGTH, ROOM_CODE_REGEX } from '../constants.js';
 
 /**
  * Global presence socket (V07). Every page opens one; the room socket (`/ws`) stays as is.
@@ -19,7 +20,7 @@ export interface PresenceCounts {
   online: number;
   /** Humans connected to rooms whose phase is not LOBBY. */
   inGame: number;
-  /** Users in the public matchmaking queue (0 until V08). */
+  /** Users in the public matchmaking queue (V08). */
   lookingForGame: number;
 }
 
@@ -34,12 +35,24 @@ const count = z.number().int().min(0);
 
 export const PresencePingSchema = z.object({ t: z.literal('ping'), c: z.number() });
 
-// TODO(V08): z.object({ t: z.literal('queueJoin') }) — enter the public matchmaking queue.
-// TODO(V08): z.object({ t: z.literal('queueLeave') }).
+/**
+ * V08: enter the public matchmaking queue under `name` (the room player name once matched).
+ * Re-sending while queued only updates the name. Anonymous sockets queue per socket.
+ */
+export const PresenceQueueJoinSchema = z.object({
+  t: z.literal('queueJoin'),
+  name: z.string().trim().min(NAME_MIN_LENGTH).max(NAME_MAX_LENGTH),
+});
+/** V08: leave the queue (also implied by closing the presence socket). */
+export const PresenceQueueLeaveSchema = z.object({ t: z.literal('queueLeave') });
 // TODO(V10): z.object({ t: z.literal('dm'), to: UserId, body: z.string().min(1).max(500) }).
 // TODO(V10): z.object({ t: z.literal('invite'), to: UserId, code: RoomCodeSchema }).
 
-export const PresenceC2SSchema = z.discriminatedUnion('t', [PresencePingSchema]);
+export const PresenceC2SSchema = z.discriminatedUnion('t', [
+  PresencePingSchema,
+  PresenceQueueJoinSchema,
+  PresenceQueueLeaveSchema,
+]);
 export type PresenceC2S = z.infer<typeof PresenceC2SSchema>;
 export type PresenceC2SType = PresenceC2S['t'];
 export type PresenceC2SOf<T extends PresenceC2SType> = Extract<PresenceC2S, { t: T }>;
@@ -54,12 +67,32 @@ export const PresenceCountsMsgSchema = z.object({
 export const PresencePongSchema = z.object({ t: z.literal('pong'), c: z.number(), s: z.number() });
 export const PresenceErrorSchema = z.object({
   t: z.literal('error'),
-  code: z.enum(['INVALID', 'RATE_LIMITED']),
+  /** `BLOCKED` (V08): vote-kicked from a public game, cannot queue for a few minutes. */
+  code: z.enum(['INVALID', 'RATE_LIMITED', 'BLOCKED']),
   message: z.string(),
 });
 
-// TODO(V08): z.object({ t: z.literal('queue'), position: count, size: count, waitedMs: count }).
-// TODO(V08): z.object({ t: z.literal('matchFound'), code: RoomCodeSchema }).
+/**
+ * V08: you are in the matchmaking queue (sent on join and every tick). `position` is 1-based,
+ * `size` is everyone queued, `waitedMs` counts from your first join (kept across a requeue).
+ */
+export const PresenceQueueSchema = z.object({
+  t: z.literal('queue'),
+  position: count.optional(),
+  size: count,
+  waitedMs: count,
+});
+/** V08: you are no longer queued (left, matched elsewhere, or blocked). */
+export const PresenceQueueLeftSchema = z.object({ t: z.literal('queueLeft') });
+/**
+ * V08: a public room was made for you. Store `token` as the room token
+ * (`dub.token.<code>`) and open `/r/<code>`: the room socket joins with it.
+ */
+export const PresenceMatchFoundSchema = z.object({
+  t: z.literal('matchFound'),
+  code: z.string().regex(ROOM_CODE_REGEX),
+  token: z.string().min(1).max(128),
+});
 // TODO(V10): z.object({ t: z.literal('friendStatus'), userId, status: z.enum(['offline','online','inGame']) }).
 // TODO(V10): z.object({ t: z.literal('dm'), from: UserId, body: z.string(), at: z.number() }).
 // TODO(V10): z.object({ t: z.literal('invite'), from: UserId, fromName: z.string(), code: RoomCodeSchema }).
@@ -68,6 +101,9 @@ export const PresenceS2CSchema = z.discriminatedUnion('t', [
   PresenceCountsMsgSchema,
   PresencePongSchema,
   PresenceErrorSchema,
+  PresenceQueueSchema,
+  PresenceQueueLeftSchema,
+  PresenceMatchFoundSchema,
 ]);
 export type PresenceS2C = z.infer<typeof PresenceS2CSchema>;
 export type PresenceS2CType = PresenceS2C['t'];

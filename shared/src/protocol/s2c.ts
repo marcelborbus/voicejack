@@ -52,7 +52,9 @@ export type S2C =
   | { t: 'rtc'; from: PlayerId; data: RtcSignal }
   | { t: 'voteAck'; submissionId: SubmissionId; score: number }
   | { t: 'error'; code: ErrorCode; message: string; fatal?: boolean } // fatal → client stops reconnecting
-  | { t: 'kicked' };
+  | { t: 'kicked'; by?: 'host' | 'vote' }
+  /** V08: public ready check missed; you are back in the matchmaking queue (see /ws/presence). */
+  | { t: 'requeued' };
 
 export type S2CType = S2C['t'];
 export type S2COf<T extends S2CType> = Extract<S2C, { t: T }>;

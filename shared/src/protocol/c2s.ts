@@ -82,6 +82,20 @@ export const RemoveBotSchema = z.object({
   playerId: PlayerIdSchema.optional(),
 }); // host, LOBBY
 
+/** V08, public rooms: vote to kick (or take back the vote); a majority of the others kicks. */
+export const VoteKickSchema = z.object({
+  t: z.literal('voteKick'),
+  playerId: PlayerIdSchema,
+  kick: z.boolean(),
+});
+export const REPORT_TEXT_MAX_LENGTH = 500;
+/** V08, public rooms: report a player to the moderators (stored server-side, once per target). */
+export const ReportSchema = z.object({
+  t: z.literal('report'),
+  playerId: PlayerIdSchema,
+  reason: z.string().trim().min(1).max(REPORT_TEXT_MAX_LENGTH),
+});
+
 export const C2SSchema = z.discriminatedUnion('t', [
   HelloSchema,
   PingSchema,
@@ -101,6 +115,8 @@ export const C2SSchema = z.discriminatedUnion('t', [
   LeaveSchema,
   AddBotSchema,
   RemoveBotSchema,
+  VoteKickSchema,
+  ReportSchema,
 ]);
 export type C2S = z.infer<typeof C2SSchema>;
 export type C2SType = C2S['t'];

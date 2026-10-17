@@ -8,6 +8,7 @@ import {
 } from '@dub/shared';
 import type { AppDeps } from '../http/app.js';
 import type { Presence, PresenceClient } from '../presence/Presence.js';
+import type { Matchmaker } from '../match/Matchmaker.js';
 import { TokenBucket, WS_RATE } from '../security/rateLimit.js';
 import { HEARTBEAT_MS, originAllowed } from './gateway.js';
 
@@ -27,12 +28,16 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
     },
     (socket, req) => {
       const userId = deps.accounts?.userIdFromCookie(req.headers.cookie) ?? null;
-      new PresenceSession(socket, presence, req.log, userId);
+      new PresenceSession(socket, presence, req.log, userId, deps.matchmaker ?? null, req.ip);
     },
   );
 }
 
+let socketSeq = 0;
+
 class PresenceSession implements PresenceClient {
+  /** Queue identity for anonymous sockets (V08). */
+  private readonly socketKey = `p${++socketSeq}`;
   private readonly bucket = new TokenBucket(WS_RATE.perSec, WS_RATE.burst);
   private readonly heartbeat: ReturnType<typeof setInterval>;
   private readonly remove: () => void;
@@ -44,6 +49,8 @@ class PresenceSession implements PresenceClient {
     presence: Presence,
     private readonly log: FastifyInstance['log'],
     readonly userId: string | null,
+    private readonly matchmaker: Matchmaker | null = null,
+    private readonly ip: string | null = null,
   ) {
     this.heartbeat = setInterval(() => {
       if (!this.alive) {
@@ -58,6 +65,7 @@ class PresenceSession implements PresenceClient {
     ws.on('close', () => this.onClose());
     ws.on('error', (e) => this.log.debug({ err: e }, 'presence ws error'));
     this.remove = presence.add(this, userId);
+    matchmaker?.connect(this);
   }
 
   send(msg: PresenceS2C): void {
@@ -90,7 +98,23 @@ class PresenceSession implements PresenceClient {
       case 'ping':
         this.send({ t: 'pong', c: msg.c, s: Date.now() });
         return;
-      // TODO(V08): queueJoin / queueLeave → matchmaker + presence.setLooking(...)
+      case 'queueJoin': {
+        if (!this.matchmaker) {
+          this.send({ t: 'error', code: 'INVALID', message: 'matchmaking is off' });
+          return;
+        }
+        const r = this.matchmaker.join(this, {
+          userId: this.userId,
+          socketKey: this.socketKey,
+          ip: this.ip,
+          name: msg.name,
+        });
+        if (!r.ok) this.send({ t: 'error', code: r.code, message: r.message });
+        return;
+      }
+      case 'queueLeave':
+        this.matchmaker?.leave(this);
+        return;
       // TODO(V10): dm / invite → presence.sendToUser(...)
     }
   }
@@ -98,6 +122,7 @@ class PresenceSession implements PresenceClient {
   private onClose(): void {
     this.closed = true;
     clearInterval(this.heartbeat);
+    this.matchmaker?.disconnect(this);
     this.remove();
   }
 }

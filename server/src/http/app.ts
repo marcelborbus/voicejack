@@ -28,6 +28,7 @@ import * as gateway from '../ws/gateway.js';
 import * as presenceGateway from '../ws/presenceGateway.js';
 import * as statsRoutes from '../routes/stats.js';
 import type { Presence } from '../presence/Presence.js';
+import type { Matchmaker } from '../match/Matchmaker.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
 export const BODY_LIMIT = Math.floor(2.5 * 1024 * 1024);
@@ -46,6 +47,8 @@ export interface AppDeps {
   authLimiter?: GuestLimiter;
   /** Online/in-game counts + `/ws/presence` (V07). Without it the presence socket is absent. */
   presence?: Presence;
+  /** V08 public matchmaking over `/ws/presence` (queueJoin / queueLeave). */
+  matchmaker?: Matchmaker;
   /** Epoch ms the process started (health uptime). */
   startedAt?: number;
 }

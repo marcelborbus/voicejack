@@ -23,6 +23,8 @@ import {
   type Phase,
   type PlayerId,
   type PlayerPublic,
+  type PublicRoomState,
+  type RoomKind,
   type RoomCode,
   type RoomInfoResponse,
   type RoomSnapshot,
@@ -32,7 +34,10 @@ import {
 } from '@dub/shared';
 import { pickBotName } from '../bots/names.js';
 import { Timers } from './timers.js';
-import type { Outcome, RoomDeps, RoomError, Submission } from './types.js';
+import type { Outcome, RemoveReason, RoomDeps, RoomError, Submission } from './types.js';
+
+/** V08: a public game starts once at least this many matched players are ready. */
+export const PUBLIC_MIN_READY = 2;
 
 interface PlayerState {
   id: PlayerId;
@@ -110,10 +115,20 @@ export class Room {
   /** Last time the room had no connected players (null while someone is connected). */
   private emptySinceAt: number;
   private disposed = false;
+  /** V08: `public` rooms are matchmade and hosted by the server (no human host). */
+  readonly kind: RoomKind;
+  /** V08 public LOBBY: ready-check deadline (null before it starts and once it ended). */
+  private readyEndsAt: number | null = null;
+  private readyCheckStarted = false;
+  /** V08: kick target → voters. */
+  private readonly kickVotes = new Map<PlayerId, Set<PlayerId>>();
+  /** V08: `reporter>target` pairs already reported in this room. */
+  private readonly reported = new Set<string>();
 
   constructor(deps: RoomDeps) {
     this.deps = deps;
     this.code = deps.code;
+    this.kind = deps.kind ?? 'private';
     this.timers = new Timers(deps.scheduler);
     this.rng = deps.rng ?? Math.random;
     this.newId = deps.newId ?? (() => nanoid(12));
@@ -208,7 +223,10 @@ export class Room {
       phase: this.phase,
       playerCount: this.players.size,
       maxPlayers: this.deps.options.maxPlayers,
-      joinable: this.phase === 'LOBBY' && this.players.size < this.deps.options.maxPlayers,
+      joinable:
+        this.kind === 'private' &&
+        this.phase === 'LOBBY' &&
+        this.players.size < this.deps.options.maxPlayers,
     };
   }
 
@@ -243,6 +261,22 @@ export class Room {
 
   /** New player (LOBBY only). The first player becomes host. Starts disconnected. */
   join(rawName: string): JoinResult | RoomError {
+    if (this.kind === 'public') {
+      return err('GAME_IN_PROGRESS', 'public games are joined through matchmaking');
+    }
+    return this.addPlayer(rawName);
+  }
+
+  /** V08: the matchmaker seats matched players (public rooms, before the ready check). */
+  seat(rawName: string, userId?: string): JoinResult | RoomError {
+    if (this.kind !== 'public') return err('INVALID', 'not a public room');
+    if (this.readyCheckStarted) return err('GAME_IN_PROGRESS', 'match already sealed');
+    const r = this.addPlayer(rawName);
+    if (!('code' in r) && userId) this.players.get(r.playerId)!.userId = userId;
+    return r;
+  }
+
+  private addPlayer(rawName: string): JoinResult | RoomError {
     if (this.disposed) return err('ROOM_NOT_FOUND', 'room closed');
     if (this.phase !== 'LOBBY') return err('GAME_IN_PROGRESS', 'game already running');
     if (this.players.size >= this.deps.options.maxPlayers) return err('ROOM_FULL', 'room is full');
@@ -262,7 +296,7 @@ export class Room {
     };
     this.players.set(p.id, p);
     this.tokens.set(p.token, p.id);
-    if (!this.hostId) this.hostId = p.id;
+    if (!this.hostId && this.kind === 'private') this.hostId = p.id;
     // A created-but-never-connected player is dropped like a disconnected one.
     this.timers.set(`drop:${p.id}`, this.deps.timings.lobbyDropMs, () => this.dropIfGone(p.id));
     this.changed();
@@ -343,6 +377,10 @@ export class Room {
         return this.addBot(p);
       case 'removeBot':
         return this.removeBot(p, msg.playerId);
+      case 'voteKick':
+        return this.voteKick(p, msg.playerId, msg.kick);
+      case 'report':
+        return this.report(p, msg.playerId, msg.reason);
       case 'hello':
       case 'ping':
       case 'rtc':
@@ -377,7 +415,7 @@ export class Room {
   private micStatus(p: PlayerState, ok: boolean): Outcome {
     p.micOk = ok;
     if (!ok) p.ready = false;
-    this.changed();
+    if (!this.maybeStartPublic()) this.changed();
     return null;
   }
 
@@ -385,7 +423,7 @@ export class Room {
     if (this.phase !== 'LOBBY') return err('BAD_PHASE', 'not in lobby');
     if (ready && !p.micOk) return err('INVALID', 'mic check required before ready');
     p.ready = ready;
-    this.changed();
+    if (!this.maybeStartPublic()) this.changed();
     return null;
   }
 
@@ -445,6 +483,7 @@ export class Room {
 
   /** Bots are a dev test mode: `DEV_BOTS=1` on the server, or (V05) an admin host. */
   private botsAllowed(id: PlayerId): boolean {
+    if (this.kind === 'public') return false;
     return (this.deps.options.devBots ?? false) || (this.deps.isAdmin?.(id) ?? false);
   }
 
@@ -519,6 +558,11 @@ export class Room {
     if (this.phase !== 'LOBBY') return err('BAD_PHASE', 'not in lobby');
     const blockers = this.startBlockers();
     if (blockers.length > 0) return err('START_BLOCKED', blockers.join('; '));
+    this.beginGame();
+    return null;
+  }
+
+  private beginGame(): void {
     for (const q of this.players.values()) {
       q.totalScore = 0;
       this.timers.clear(`drop:${q.id}`);
@@ -527,7 +571,6 @@ export class Room {
     this.results = [];
     this.final = null;
     this.startRound(0);
-    return null;
   }
 
   // ---------------------------------------------------------------- dubbing
@@ -776,6 +819,130 @@ export class Room {
     return null;
   }
 
+  // ---------------------------------------------------------------- public rooms (V08)
+
+  /** Matchmaker: every matched player is seated; the ready check starts now. */
+  beginReadyCheck(): void {
+    if (this.kind !== 'public' || this.readyCheckStarted || this.phase !== 'LOBBY') return;
+    this.readyCheckStarted = true;
+    const ms = this.deps.timings.readyCheckMs;
+    this.readyEndsAt = this.deps.clock.now() + ms;
+    this.timers.set('readyCheck', ms, () => this.endReadyCheck());
+    if (!this.maybeStartPublic()) this.changed();
+  }
+
+  private isReadyHuman(q: PlayerState): boolean {
+    return !q.isBot && q.connected && q.micOk && q.ready;
+  }
+
+  /** Public ready check running and everyone is ready: start early. True if it started. */
+  private maybeStartPublic(): boolean {
+    if (this.kind !== 'public' || this.readyEndsAt === null || this.phase !== 'LOBBY') return false;
+    const list = [...this.players.values()];
+    if (list.length < PUBLIC_MIN_READY || !list.every((q) => this.isReadyHuman(q))) return false;
+    this.timers.clear('readyCheck');
+    this.readyEndsAt = null;
+    this.beginGame();
+    return true;
+  }
+
+  /** Deadline: the unready go back to the queue (front); with < 2 ready everyone does. */
+  private endReadyCheck(): void {
+    if (this.phase !== 'LOBBY' || this.readyEndsAt === null) return;
+    this.readyEndsAt = null;
+    const all = [...this.players.values()].sort((a, b) => a.seq - b.seq);
+    const ready = all.filter((q) => this.isReadyHuman(q));
+    const enough = ready.length >= PUBLIC_MIN_READY;
+    for (const q of enough ? all.filter((x) => !this.isReadyHuman(x)) : all) {
+      const userId = q.userId ?? null;
+      this.deps.emit(q.id, { t: 'requeued' });
+      this.remove(q.id, 'requeue');
+      this.deps.onRequeue?.(q.id, userId);
+    }
+    if (this.disposed) return;
+    if (enough) this.beginGame();
+    else this.changed();
+  }
+
+  /** Votes needed to kick a connected player: majority of the other connected humans. */
+  private kickNeeded(): number {
+    return Math.floor(Math.max(0, this.connectedCount - 1) / 2) + 1;
+  }
+
+  private voteKick(p: PlayerState, target: PlayerId, kick: boolean): Outcome {
+    if (this.kind !== 'public') return err('INVALID', 'vote-kick is only for public games');
+    const t = this.players.get(target);
+    if (!t || t.id === p.id || t.isBot) return err('INVALID', 'cannot vote on that player');
+    let voters = this.kickVotes.get(target);
+    if (kick) {
+      if (!voters) this.kickVotes.set(target, (voters = new Set()));
+      voters.add(p.id);
+    } else if (voters) {
+      voters.delete(p.id);
+      if (voters.size === 0) this.kickVotes.delete(target);
+    }
+    if (voters && voters.size >= this.kickNeeded()) {
+      const userId = t.userId ?? null;
+      this.deps.emit(target, { t: 'kicked', by: 'vote' });
+      this.remove(target, 'votekick');
+      this.deps.onVoteKicked?.(target, userId);
+      this.checkProgress();
+      return null;
+    }
+    this.changed();
+    return null;
+  }
+
+  private report(p: PlayerState, target: PlayerId, reason: string): Outcome {
+    if (this.kind !== 'public') return err('INVALID', 'reports are only for public games');
+    const t = this.players.get(target);
+    if (!t || t.id === p.id || t.isBot) return err('INVALID', 'cannot report that player');
+    const key = `${p.id}>${t.id}`;
+    if (this.reported.has(key)) return err('LIMIT', 'you already reported that player');
+    this.reported.add(key);
+    this.deps.onReport?.({
+      code: this.code,
+      reporterId: p.id,
+      reporterName: p.name,
+      reporterUserId: p.userId ?? null,
+      reportedId: t.id,
+      reportedName: t.name,
+      reportedUserId: t.userId ?? null,
+      reason: reason.trim(),
+    });
+    this.changedFor(p.id);
+    return null;
+  }
+
+  private forgetVotes(id: PlayerId): void {
+    this.kickVotes.delete(id);
+    for (const [target, voters] of this.kickVotes) {
+      voters.delete(id);
+      if (voters.size === 0) this.kickVotes.delete(target);
+    }
+  }
+
+  private publicState(id: PlayerId): PublicRoomState | null {
+    if (this.kind !== 'public') return null;
+    const kickVotes: Record<PlayerId, number> = {};
+    const youKickVoted: PlayerId[] = [];
+    for (const [target, voters] of this.kickVotes) {
+      kickVotes[target] = voters.size;
+      if (voters.has(id)) youKickVoted.push(target);
+    }
+    const prefix = `${id}>`;
+    const youReported = [...this.reported]
+      .filter((k) => k.startsWith(prefix))
+      .map((k) => k.slice(prefix.length));
+    return {
+      readyEndsAt: this.readyEndsAt,
+      kickVotes,
+      kickNeeded: this.kickNeeded(),
+      youKickVoted,
+      youReported,
+    };
+  }
+
   // ---------------------------------------------------------------- internals
 
   /** Early phase transitions that depend on who is connected. */
@@ -801,12 +968,13 @@ export class Room {
     this.remove(id, 'drop');
   }
 
-  private remove(id: PlayerId, reason: 'kick' | 'drop' | 'leave'): void {
+  private remove(id: PlayerId, reason: RemoveReason): void {
     const p = this.players.get(id);
     if (!p) return;
     this.players.delete(id);
     this.tokens.delete(p.token);
     this.timers.clear(`drop:${id}`);
+    this.forgetVotes(id);
     if (this.connectedCount === 0 && p.connected) this.emptySinceAt = this.deps.clock.now();
     if (id === this.hostId) {
       const next =
@@ -820,6 +988,7 @@ export class Room {
       for (const q of [...this.players.values()]) this.remove(q.id, 'leave');
       return;
     }
+    if (this.maybeStartPublic()) return;
     this.changed();
   }
 
@@ -924,6 +1093,8 @@ export class Room {
       rev: this.rev,
       code: this.code,
       phase: this.phase,
+      kind: this.kind,
+      public: this.publicState(id),
       hostId: this.hostId,
       settings: { ...this.settings, tags: [...this.settings.tags] },
       availableTags: collectTags(this.clips),

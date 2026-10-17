@@ -7,6 +7,7 @@ import {
   type Phase,
   type PlayerId,
   type RoomCode,
+  type RoomKind,
   type S2C,
   type SubmissionId,
 } from '@dub/shared';
@@ -15,7 +16,7 @@ import { BotPlayer, type BotSound } from '../bots/BotPlayer.js';
 import { loadBotSounds } from '../bots/sounds.js';
 import { Room, type JoinResult } from './Room.js';
 import { realScheduler } from './timers.js';
-import type { Clock, RoomError, RoomLibrary, Scheduler } from './types.js';
+import type { Clock, PlayerReport, RoomError, RoomLibrary, Scheduler } from './types.js';
 
 /** Upload storage as seen by rooms (implemented by ChunkStore). */
 export interface RoomStore {
@@ -69,6 +70,13 @@ export interface RoomManagerDeps {
   rng?: () => number;
 }
 
+/** V08: public-room events, routed to the matchmaker. */
+export interface PublicRoomHooks {
+  onRequeue(code: RoomCode, playerId: PlayerId, userId: string | null): void;
+  onVoteKicked(code: RoomCode, playerId: PlayerId, userId: string | null): void;
+  onReport(report: PlayerReport): void;
+}
+
 /** A live human room socket, as counted by presence (V07). */
 export interface HumanConnection {
   code: RoomCode;
@@ -85,6 +93,7 @@ export class RoomManager {
   private readonly clock: Clock;
   private readonly scheduler: Scheduler;
   private sweepHandle: ReturnType<typeof setInterval> | null = null;
+  private publicHooks: PublicRoomHooks | null = null;
   private readonly bots: BotEnv | null;
   /** Resolves once the bot sound pool is loaded (immediately without DEV_BOTS). */
   readonly botsReady: Promise<void>;
@@ -139,6 +148,33 @@ export class RoomManager {
 
   /** New room with `name` as host. Fails with ROOM_FULL at `MAX_ROOMS`. */
   create(name: string): { room: Room; join: JoinResult } | RoomError {
+    const room = this.newRoom('private');
+    if (!(room instanceof Room)) return room;
+    const join = room.join(name);
+    if ('code' in join) return join;
+    this.register(room);
+    return { room, join };
+  }
+
+  /** V08: an empty, server-hosted public room; the matchmaker seats the players. */
+  createPublic(): Room | RoomError {
+    const room = this.newRoom('public');
+    if (!(room instanceof Room)) return room;
+    this.register(room);
+    return room;
+  }
+
+  /** V08: where public rooms report requeues, vote-kicks and reports (the matchmaker). */
+  setPublicHooks(hooks: PublicRoomHooks | null): void {
+    this.publicHooks = hooks;
+  }
+
+  private register(room: Room): void {
+    this.rooms.set(room.code, room);
+    this.conns.set(room.code, new Map());
+  }
+
+  private newRoom(kind: RoomKind): Room | RoomError {
     if (this.rooms.size >= this.deps.config.maxRooms) {
       return { code: 'ROOM_FULL', message: 'server is full, try again later' };
     }
@@ -148,6 +184,7 @@ export class RoomManager {
     const { config, store } = this.deps;
     const room = new Room({
       code,
+      kind,
       clock: this.clock,
       scheduler: this.scheduler,
       emit: (pid, msg) => {
@@ -174,14 +211,13 @@ export class RoomManager {
         }
       },
       onBotAdded: (pid) => this.attach(code, pid, this.newBot(room, pid)),
+      onRequeue: (pid, uid) => this.publicHooks?.onRequeue(code, pid, uid),
+      onVoteKicked: (pid, uid) => this.publicHooks?.onVoteKicked(code, pid, uid),
+      onReport: (r) => this.publicHooks?.onReport(r),
       isAdmin: () => false, // V05: admin users may add bots without DEV_BOTS
       rng: this.deps.rng,
     });
-    const join = room.join(name);
-    if ('code' in join) return join;
-    this.rooms.set(code, room);
-    this.conns.set(code, new Map());
-    return { room, join };
+    return room;
   }
 
   private newBot(room: Room, playerId: PlayerId): BotPlayer {

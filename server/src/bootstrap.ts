@@ -9,6 +9,8 @@ import { openDb, type Db } from './db/index.js';
 import { migrate } from './db/migrate.js';
 import { Accounts } from './accounts/Accounts.js';
 import { Presence } from './presence/Presence.js';
+import { Matchmaker } from './match/Matchmaker.js';
+import { Reports } from './match/Reports.js';
 
 /** Expired sessions / idle guests are purged this often (and once at startup). */
 export const DB_CLEANUP_MS = 3600_000;
@@ -20,6 +22,8 @@ export interface RunningServer {
   db: Db;
   accounts: Accounts;
   presence: Presence;
+  matchmaker: Matchmaker;
+  reports: Reports;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -47,7 +51,9 @@ export async function startServer(
   const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo), store, library: clips });
   clips.onChange(() => rooms.libraryChanged());
   const presence = new Presence({ rooms });
-  const app = await buildApp({ config, clips, rooms, store, accounts, presence }, opts);
+  const reports = new Reports(db);
+  const matchmaker = new Matchmaker({ rooms, presence, reports, timings: config.timings });
+  const app = await buildApp({ config, clips, rooms, store, accounts, presence, matchmaker }, opts);
   const cleanup = () => {
     try {
       const n = accounts.cleanup();
@@ -58,8 +64,10 @@ export async function startServer(
   };
   const cleanupTimer = setInterval(cleanup, DB_CLEANUP_MS);
   cleanupTimer.unref();
+  matchmaker.setLog(app.log);
   app.addHook('onClose', async () => {
     clearInterval(cleanupTimer);
+    matchmaker.dispose();
     presence.dispose();
     await rooms.stop();
     db.close();
@@ -82,6 +90,8 @@ export async function startServer(
     db,
     accounts,
     presence,
+    matchmaker,
+    reports,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),

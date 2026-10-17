@@ -227,10 +227,30 @@ export interface YouState {
   canManageBots: boolean;
 }
 
+/** V08: `private` rooms have a human host; `public` (matchmade) rooms are hosted by the server. */
+export type RoomKind = 'private' | 'public';
+
+/** V08: what only public rooms have (ready check + moderation). */
+export interface PublicRoomState {
+  /** LOBBY: the ready-check deadline; whoever is not ready then goes back to the queue. */
+  readyEndsAt: ServerTime | null;
+  /** Kick votes against each player (only players with at least one vote are listed). */
+  kickVotes: Record<PlayerId, number>;
+  /** Votes needed to kick a connected player right now (majority of the other humans). */
+  kickNeeded: number;
+  /** Players you voted to kick. */
+  youKickVoted: PlayerId[];
+  /** Players you already reported in this room. */
+  youReported: PlayerId[];
+}
+
 export interface RoomSnapshot {
   rev: number;
   code: RoomCode;
   phase: Phase;
+  kind: RoomKind;
+  /** Only for `kind: 'public'`. */
+  public: PublicRoomState | null;
   hostId: PlayerId;
   settings: GameSettings;
   availableTags: string[];

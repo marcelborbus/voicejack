@@ -6,6 +6,7 @@ import type {
   Limits,
   PlayerId,
   RoomCode,
+  RoomKind,
   S2C,
   SubmissionId,
 } from '@dub/shared';
@@ -39,8 +40,25 @@ export interface RoomLibrary {
   canUse(libraryId: string, userId: string | undefined): boolean;
 }
 
+/** Why a player left the room's roster (V08 adds vote-kicks and missed ready checks). */
+export type RemoveReason = 'kick' | 'drop' | 'leave' | 'votekick' | 'requeue';
+
+/** V08: a report filed in a public room (stored in the `reports` table). */
+export interface PlayerReport {
+  code: RoomCode;
+  reporterId: PlayerId;
+  reporterName: string;
+  reporterUserId: string | null;
+  reportedId: PlayerId;
+  reportedName: string;
+  reportedUserId: string | null;
+  reason: string;
+}
+
 export interface RoomDeps {
   code: RoomCode;
+  /** V08: `public` = matchmade, server-hosted (default `private`). */
+  kind?: RoomKind;
   clock: Clock;
   scheduler: Scheduler;
   /** Delivers a message to one player's socket (no-op if not connected). */
@@ -54,12 +72,18 @@ export interface RoomDeps {
   /** Upload index (ChunkStore). Defaults to "nothing uploaded". */
   isUploaded?(submissionId: SubmissionId, chunkId: ChunkId): boolean;
   /** Called after a player is removed from the room (kick, lobby drop, leave). */
-  onPlayerRemoved?(playerId: PlayerId, reason: 'kick' | 'drop' | 'leave'): void;
+  onPlayerRemoved?(playerId: PlayerId, reason: RemoveReason): void;
+  /** V08 public: the player missed the ready check and was removed; put them back in the queue. */
+  onRequeue?(playerId: PlayerId, userId: string | null): void;
+  /** V08 public: the player was vote-kicked (the matchmaker blocks them for a while). */
+  onVoteKicked?(playerId: PlayerId, userId: string | null): void;
+  /** V08 public: a player reported another one. */
+  onReport?(report: PlayerReport): void;
   /** A bot player was created (connected) by the room; attach its BotPlayer connection here. */
   onBotAdded?(playerId: PlayerId): void;
   /**
    * V05 hook: admins may add bots without DEV_BOTS. Always false until accounts exist.
-   * TODO(V08): bots stay limited to private rooms once public rooms exist.
+   * Bots are private-room only: public rooms never allow them (V08).
    */
   isAdmin?(playerId: PlayerId): boolean;
   rng?: () => number;
