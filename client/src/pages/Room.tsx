@@ -23,7 +23,7 @@ import { Final } from './phases/Final';
 import { Lobby } from './phases/Lobby';
 import { RoundResults } from './phases/RoundResults';
 import { Showcase } from './phases/Showcase';
-import { VoiceProvider } from '@/voice/VoiceProvider';
+import { VoiceDock, VoiceProvider } from '@/voice/VoiceProvider';
 
 const PHASES: Record<Phase, ComponentType> = {
   LOBBY: Lobby,
@@ -124,7 +124,8 @@ function RoomHeader({ code }: { code: string }) {
           </Badge>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <VoiceDock />
         <InviteButton code={code} />
         <Tooltip>
           <TooltipTrigger asChild>

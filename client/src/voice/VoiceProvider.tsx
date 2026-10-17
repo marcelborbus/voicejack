@@ -8,8 +8,9 @@ import { VoiceMesh } from './VoiceMesh';
 import { toggleSelfMute, useVoice } from './voiceStore';
 
 /**
- * Runs the voice mesh while mounted (inside the room) and shows a small floating voice dock
- * with the self-mute button. Remote <audio> elements live in a hidden container.
+ * Runs the voice mesh while mounted (inside the room). Remote <audio> elements live in a
+ * hidden container. The self-mute control is `VoiceDock`, rendered inline in the room header
+ * (a fixed floating dock covered the vote and save panels on phones).
  */
 export function VoiceProvider() {
   const ref = useRef<HTMLDivElement>(null);
@@ -21,12 +22,12 @@ export function VoiceProvider() {
   return (
     <>
       <div ref={ref} hidden aria-hidden data-testid="voice-audio" />
-      <VoiceDock />
     </>
   );
 }
 
-function VoiceDock() {
+/** Inline voice pill: self-mute + status. Lives in the room header. */
+export function VoiceDock() {
   const phase = usePhase();
   const allowed = useVoice((s) => s.allowed);
   const selfMuted = useVoice((s) => s.selfMuted);
@@ -36,7 +37,7 @@ function VoiceDock() {
 
   return (
     <div
-      className="fixed bottom-4 left-4 z-40 flex animate-fade-up items-center gap-2 rounded-2xl border border-white/10 bg-zinc-900/90 p-1.5 pr-3 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      className="flex animate-fade-in items-center gap-2 rounded-2xl border border-white/10 bg-zinc-900/80 p-0.5 pr-3"
       data-testid="voice-dock"
       data-allowed={allowed}
     >
@@ -44,7 +45,7 @@ function VoiceDock() {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              size="icon"
+              size="icon-sm"
               variant={selfMuted ? 'destructive' : 'secondary'}
               aria-pressed={selfMuted}
               aria-label={selfMuted ? 'Unmute yourself' : 'Mute yourself'}
@@ -58,18 +59,23 @@ function VoiceDock() {
           <TooltipContent>{selfMuted ? 'Unmute' : 'Mute'} your voice chat</TooltipContent>
         </Tooltip>
       ) : (
-        <span className="inline-flex size-10 items-center justify-center rounded-xl bg-zinc-800 text-zinc-500">
-          <VolumeOff className="size-[18px]" />
+        <span className="inline-flex size-8 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400">
+          <VolumeOff className="size-4" />
         </span>
       )}
-      <span className="text-xs font-semibold text-zinc-300">
+      <span className="whitespace-nowrap text-xs font-semibold text-zinc-300">
         {allowed ? (
           <span className="flex items-center gap-1.5">
             <Volume2 className="size-3.5 text-emerald-300" />
-            Voice on{peerCount > 0 && <span className="text-zinc-500">· {peerCount} connected</span>}
+            Voice on
+            {peerCount > 0 && (
+              <span className="hidden text-zinc-400 sm:inline">· {peerCount} connected</span>
+            )}
           </span>
         ) : (
-          <span className="text-zinc-400">Voice off while you dub</span>
+          <span className="text-zinc-400">
+            Voice off<span className="hidden sm:inline"> while you dub</span>
+          </span>
         )}
       </span>
     </div>
