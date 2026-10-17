@@ -39,11 +39,12 @@ export function PlayerCard({
       data-mic-ok={player.micOk}
       style={{ animationDelay: `${index * 40}ms` }}
       className={cn(
-        'group relative flex animate-pop items-center gap-3 rounded-3xl border p-3 pr-4 transition-colors duration-300',
+        'group relative flex animate-pop items-center gap-3 rounded-3xl border-[1.5px] p-3 pr-4 transition-colors duration-300',
+        'shadow-[0_4px_0_rgb(0_0_0/0.4)]',
         player.ready
-          ? 'border-emerald-400/30 bg-emerald-400/[0.06]'
-          : 'border-white/[0.07] bg-white/[0.025] hover:border-white/15',
-        isSelf && !player.ready && 'border-fuchsia-400/30',
+          ? 'border-emerald-400/35 bg-emerald-400/[0.07]'
+          : 'border-white/10 bg-ink-850 hover:border-white/20',
+        isSelf && !player.ready && 'border-fuchsia-400/40',
       )}
     >
       <div className="relative">
@@ -51,14 +52,14 @@ export function PlayerCard({
         {player.isHost && (
           <span
             title="Host"
-            className="absolute -left-1.5 -top-2 inline-flex size-6 rotate-[-14deg] items-center justify-center rounded-full bg-amber-400 shadow-md shadow-amber-500/40 ring-2 ring-zinc-900"
+            className="absolute -left-2 -top-2.5 z-10 inline-flex size-6 rotate-[-14deg] items-center justify-center rounded-full border-2 border-[#1a1027] bg-sun"
           >
             <Crown className="size-3.5 text-amber-950" strokeWidth={2.5} />
           </span>
         )}
         {player.ready && (
-          <span className="absolute -bottom-1 -right-1 inline-flex size-5 animate-pop items-center justify-center rounded-full bg-emerald-400 ring-2 ring-zinc-900">
-            <Check className="size-3 text-emerald-950" strokeWidth={3.5} />
+          <span className="absolute -bottom-1.5 -right-1.5 inline-flex size-6 animate-stamp items-center justify-center rounded-full border-2 border-[#1a1027] bg-lime">
+            <Check className="size-3.5 text-[#1a1027]" strokeWidth={3.5} />
           </span>
         )}
       </div>
@@ -72,7 +73,7 @@ export function PlayerCard({
             {player.name}
           </span>
           {isSelf && (
-            <span className="rounded-md bg-fuchsia-500/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wider text-fuchsia-200">
+            <span className="-rotate-6 rounded-md bg-sun px-1.5 py-px text-[10px] font-extrabold uppercase tracking-wider text-[#1a1027]">
               you
             </span>
           )}

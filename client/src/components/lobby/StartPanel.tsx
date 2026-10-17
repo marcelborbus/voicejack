@@ -27,7 +27,7 @@ export function StartPanel({
   if (!isHost) {
     return (
       <div
-        className="flex items-center justify-center gap-3 rounded-3xl border border-dashed border-white/10 px-5 py-5 text-zinc-400"
+        className="flex items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-white/12 bg-ink-900/60 px-5 py-5 text-zinc-300"
         data-testid="waiting-for-host"
       >
         <Hourglass className="size-5 animate-[spin_3s_linear_infinite] text-orange-300" />

@@ -106,6 +106,9 @@ function RoomHeader({ code }: { code: string }) {
   const totalRounds = useRoom((s) => s.snapshot?.totalRounds ?? 0);
   const playerCount = useRoom((s) => s.snapshot?.players.length ?? 0);
   const phase = useRoom((s) => s.snapshot?.phase);
+  const hostName = useRoom(
+    (s) => s.snapshot?.players.find((p) => p.id === s.snapshot?.hostId)?.name,
+  );
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -136,7 +139,7 @@ function RoomHeader({ code }: { code: string }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <VoiceDock />
-        <InviteButton code={code} />
+        <InviteButton code={code} hostName={hostName} />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

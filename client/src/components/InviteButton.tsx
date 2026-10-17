@@ -1,70 +1,76 @@
-import { Check, Copy, Link2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Check, Copy, Link2, QrCode, Share2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { renderSVG } from 'uqr';
 import { Button, type ButtonProps } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { play } from '@/lib/sfx';
+import { canNativeShare, copyText, inviteMessage, inviteUrl } from '@/lib/share';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
-export function inviteUrl(code: string): string {
-  return `${location.origin}/r/${code}`;
+export { inviteUrl };
+
+function useFlag(ms = 2000): [boolean, () => void] {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    const t = setTimeout(() => setOn(false), ms);
+    return () => clearTimeout(t);
+  }, [on, ms]);
+  return [on, () => setOn(true)];
 }
 
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // Fallback for insecure contexts (plain http on a LAN IP).
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    ta.remove();
-    return ok;
-  }
-}
-
-/** Copies the invite link `/r/CODE`. */
+/**
+ * Copies an invite: the fun message (with the link) when `hostName` is given, otherwise the
+ * bare link `/r/CODE`.
+ */
 export function InviteButton({
   code,
+  hostName,
   className,
   variant = 'secondary',
   size = 'sm',
-  label = 'Copy invite link',
+  label = 'Copy invite',
   testId = 'invite-copy',
+  linkOnly = false,
 }: {
   code: string;
+  hostName?: string;
   className?: string;
   variant?: ButtonProps['variant'];
   size?: ButtonProps['size'];
   label?: string;
   testId?: string;
+  linkOnly?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(t);
-  }, [copied]);
+  const [copied, flag] = useFlag();
+  const url = inviteUrl(code);
   return (
     <Button
       variant={variant}
       size={size}
       className={cn('min-w-0', className)}
       data-testid={testId}
-      data-invite-url={inviteUrl(code)}
+      data-invite-url={url}
       onClick={async () => {
-        if (await copyText(inviteUrl(code))) {
-          setCopied(true);
-          toast('Invite link copied', {
+        const text = linkOnly ? url : inviteMessage(hostName, url);
+        if (await copyText(text)) {
+          flag();
+          play('pop');
+          toast(linkOnly ? 'Invite link copied' : 'Invite copied', {
             variant: 'success',
-            description: 'Send it to your friends.',
+            description: 'Paste it in the group chat.',
             durationMs: 2500,
           });
         } else {
-          toast('Could not copy', { variant: 'warning', description: inviteUrl(code) });
+          toast('Could not copy', { variant: 'warning', description: url });
         }
       }}
     >
@@ -74,23 +80,106 @@ export function InviteButton({
   );
 }
 
-/** Read-only invite link field with a copy button. */
+/** Read-only invite link field with a copy-link button. */
 export function InviteLinkField({ code, className }: { code: string; className?: string }) {
   return (
-    <div
-      className={cn(
-        'flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-zinc-950/60 p-1.5 pl-3',
-        className,
-      )}
-    >
-      <Link2 className="size-4 shrink-0 text-fuchsia-300" />
+    <div className={cn('well flex min-w-0 items-center gap-2 rounded-2xl p-1.5 pl-3', className)}>
+      <Link2 className="size-4 shrink-0 text-jack" />
       <span
         data-testid="invite-link"
         className="min-w-0 flex-1 truncate font-mono text-sm text-zinc-300"
       >
         {inviteUrl(code).replace(/^https?:\/\//, '')}
       </span>
-      <InviteButton code={code} label="Copy" variant="default" testId="invite-field-copy" />
+      <InviteButton
+        code={code}
+        label="Copy"
+        variant="default"
+        testId="invite-field-copy"
+        linkOnly
+      />
+    </div>
+  );
+}
+
+/** QR code for phones on the same couch (rendered locally by `uqr`, no network). */
+export function InviteQr({ code }: { code: string }) {
+  const url = inviteUrl(code);
+  const svg = useMemo(
+    () => renderSVG(url, { border: 2, whiteColor: '#ffffff', blackColor: '#170f28' }),
+    [url],
+  );
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="secondary" size="sm" data-testid="invite-qr" aria-label="Show QR code">
+          <QrCode /> QR
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm" data-testid="invite-qr-dialog">
+        <DialogHeader>
+          <DialogTitle>Scan to join</DialogTitle>
+          <DialogDescription>
+            Point a phone camera at the code to jump into room {code}.
+          </DialogDescription>
+        </DialogHeader>
+        <div
+          role="img"
+          aria-label={`QR code for ${url}`}
+          className="mx-auto mb-1 w-full max-w-64 overflow-hidden rounded-2xl border-2 border-[#1a1027] bg-white p-2 shadow-[0_5px_0_rgb(0_0_0/0.45)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+        <p className="truncate text-center font-mono text-sm text-zinc-300">
+          {url.replace(/^https?:\/\//, '')}
+        </p>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Lobby invite block: preview of the message, the link, Copy invite / Share / QR. */
+export function InviteCard({ code, hostName }: { code: string; hostName?: string }) {
+  const url = inviteUrl(code);
+  const message = inviteMessage(hostName, url);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative ml-1 mr-6 self-start">
+        <p
+          data-testid="invite-message"
+          className="rounded-2xl rounded-bl-md border-[1.5px] border-white/10 bg-ink-800 px-3.5 py-2.5 text-sm text-zinc-200 shadow-[0_3px_0_rgb(0_0_0/0.4)]"
+        >
+          {message.replace(url, '')}
+          <span className="break-all text-jack">{url.replace(/^https?:\/\//, '')}</span>
+        </p>
+        <span className="absolute -top-6 right-0 translate-x-3 font-scribble text-lg text-zinc-400">
+          what your friends get
+        </span>
+      </div>
+      <InviteLinkField code={code} />
+      <div className="flex flex-wrap gap-2">
+        <InviteButton
+          code={code}
+          hostName={hostName}
+          variant="default"
+          testId="invite-message-copy"
+          label="Copy invite"
+        />
+        {canNativeShare() && (
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="invite-share"
+            onClick={() => {
+              navigator
+                .share({ title: 'Voicejack', text: message.replace(url, '').trim(), url })
+                .catch(() => {});
+            }}
+          >
+            <Share2 /> Share
+          </Button>
+        )}
+        <InviteQr code={code} />
+      </div>
     </div>
   );
 }
