@@ -6,6 +6,9 @@ import { unlockAudio } from '@/audio/context';
 import { releaseMic } from '@/audio/mic';
 import { SoundUnlockOverlay } from '@/audio/SoundUnlockOverlay';
 import { InviteButton } from '@/components/InviteButton';
+import { LoadingQuip } from '@/components/LoadingQuip';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { play, setSfxSuppressed } from '@/lib/sfx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -59,6 +62,13 @@ export function Room() {
   const fatal = useRoom((s) => (s.code === code ? s.fatal : null));
   const phase = useRoom((s) => (s.code === code ? (s.snapshot?.phase ?? null) : null));
 
+  // UI sounds: a whoosh on each phase change; silent while dubbing (mics are hot).
+  useEffect(() => {
+    setSfxSuppressed(phase === 'DUBBING');
+    if (phase && phase !== 'DUBBING') play('whoosh');
+    return () => setSfxSuppressed(false);
+  }, [phase]);
+
   if (!code) return <Navigate to="/" replace />;
 
   if (fatal?.code === 'BAD_TOKEN' || (!canConnect && !fatal)) {
@@ -99,8 +109,8 @@ function RoomHeader({ code }: { code: string }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex items-baseline gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+        <div className="flex items-baseline gap-2 rounded-2xl border-[1.5px] border-white/10 bg-ink-900 px-3.5 py-2 shadow-[0_4px_0_rgb(0_0_0/0.45)]">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
             Room
           </span>
           <span
@@ -191,12 +201,12 @@ function NamePrompt({
       <Card className="w-full max-w-md animate-fade-up">
         <CardContent className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-3 text-center">
-            <span className="inline-flex size-14 items-center justify-center rounded-3xl bg-brand shadow-lg shadow-fuchsia-500/30">
+            <span className="inline-flex size-14 -rotate-6 items-center justify-center rounded-3xl border-2 border-[#1a1027] bg-brand shadow-[0_4px_0_rgb(0_0_0/0.5)]">
               <DoorOpen className="size-7 text-white" />
             </span>
-            <div>
-              <p className="text-sm text-zinc-400">You're invited to room</p>
-              <p className="font-mono text-3xl font-bold tracking-[0.25em]">{code}</p>
+            <div className="flex flex-col items-center gap-2">
+              <p className="font-scribble text-2xl text-zinc-300">psst, you're invited to</p>
+              <p className="tape px-4 py-1 font-mono text-2xl tracking-[0.25em]">{code}</p>
             </div>
             {info && (
               <Badge variant={blocked ? 'danger' : 'secondary'}>
@@ -225,16 +235,19 @@ function NamePrompt({
             <form onSubmit={submit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="room-name">Your name</Label>
-                <Input
-                  id="room-name"
-                  data-testid="room-name-input"
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Morgan Freeman"
-                  maxLength={NAME_MAX_LENGTH}
-                  autoComplete="nickname"
-                />
+                <div className="flex items-center gap-3">
+                  <PlayerAvatar name={trimmed} mystery={!trimmed} />
+                  <Input
+                    id="room-name"
+                    data-testid="room-name-input"
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Morgan Freeman"
+                    maxLength={NAME_MAX_LENGTH}
+                    autoComplete="nickname"
+                  />
+                </div>
               </div>
               <Button type="submit" size="xl" data-testid="room-join" disabled={!trimmed || !info}>
                 {!info ? <Spinner className="text-white" /> : null}
@@ -257,14 +270,14 @@ function FatalScreen({ code, message }: { code: string; message: string }) {
     >
       <Card className="w-full max-w-md animate-fade-up">
         <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-          <span className="inline-flex size-14 items-center justify-center rounded-3xl bg-rose-500/15 ring-1 ring-rose-500/30">
+          <span className="inline-flex size-14 -rotate-6 items-center justify-center rounded-3xl bg-rose-500/15 ring-2 ring-rose-500/40">
             <Ban className="size-7 text-rose-300" />
           </span>
           <h2 className="font-display text-2xl font-bold">
             {code === 'KICKED'
               ? 'You were removed'
               : code === 'ROOM_NOT_FOUND'
-                ? 'Room not found'
+                ? 'This scene got cut'
                 : "Can't join"}
           </h2>
           <p className="text-zinc-400">{errorText(code, message)}</p>
@@ -286,13 +299,5 @@ function FatalScreen({ code, message }: { code: string; message: string }) {
 }
 
 function Connecting() {
-  return (
-    <div
-      className="flex flex-1 animate-fade-in flex-col items-center justify-center gap-4 text-zinc-400"
-      data-testid="connecting"
-    >
-      <Spinner className="size-8" />
-      <p>Joining the party…</p>
-    </div>
-  );
+  return <LoadingQuip testId="connecting" title="Joining the party…" className="flex-1 py-16" />;
 }
