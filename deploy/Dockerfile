@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# DubParty production image (PLAN T20). Build from the repo root:
-#   docker build -f deploy/Dockerfile -t dubparty .
+# Voicejack production image (PLAN T20). Build from the repo root:
+#   docker build -f deploy/Dockerfile -t voicejack .
 # Clips are NOT baked in: mount them read-only at /app/clips (see compose.yaml).
 
 # ---------- build ----------

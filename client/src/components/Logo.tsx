@@ -27,7 +27,7 @@ export function Logo({ className }: { className?: string }) {
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <LogoMark />
       <span className="font-display text-2xl font-extrabold tracking-tight">
-        Dub<span className="text-brand">Party</span>
+        Voice<span className="text-brand">jack</span>
       </span>
     </span>
   );

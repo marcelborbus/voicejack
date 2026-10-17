@@ -1,4 +1,4 @@
-# DubParty: Architecture & Implementation Plan
+# Voicejack (formerly DubParty): Architecture & Implementation Plan
 
 > Source of truth for the build. Product spec: `SPEC.md`. Tasks are listed in the **Checklist** below. Each task is one commit and leaves the repo green (`pnpm typecheck && pnpm test`).
 > Environment I checked on the dev box: Node 24.14, pnpm 11, ffmpeg 8.1, Docker 29, Playwright browsers already in `~/.cache/ms-playwright`. The repo has no commits yet; only `SPEC.md` exists.

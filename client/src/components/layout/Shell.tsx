@@ -12,7 +12,7 @@ export function Shell() {
         <Link
           to="/"
           className="rounded-2xl transition-opacity hover:opacity-90"
-          aria-label="DubParty home"
+          aria-label="Voicejack home"
         >
           <Logo />
         </Link>

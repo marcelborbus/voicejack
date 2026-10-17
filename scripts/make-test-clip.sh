@@ -37,7 +37,7 @@ entry() { # id title tags-json
       "poster": "test-$1.jpg",
       "tags": $3,
       "attribution": {
-        "author": "DubParty test fixture (ffmpeg testsrc2)",
+        "author": "Voicejack test fixture (ffmpeg testsrc2)",
         "source": "scripts/make-test-clip.sh",
         "license": "CC0 1.0",
         "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"

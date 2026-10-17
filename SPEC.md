@@ -1,4 +1,4 @@
-# DubParty — product spec
+# Voicejack — product spec (formerly "DubParty"; renamed 2026-10-17 because "Dub Party" exists on Steam)
 
 Source: the owner's voice brief (2026-10-16), tidied up. Where the brief left a gap, the
 decision taken is marked **(decision)**.

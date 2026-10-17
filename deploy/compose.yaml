@@ -1,19 +1,19 @@
-# DubParty on hetzner: Compose project in /opt/dubbing-game (see README-deploy.md).
-# Public access only through host nginx (dub.borbus.eu); the port is loopback-only.
-name: dubbing-game
+# Voicejack on hetzner: Compose project in /opt/voicejack (see README-deploy.md).
+# Public access only through host nginx (voicejack.borbus.eu); the port is loopback-only.
+name: voicejack
 
 services:
-  dubparty:
-    image: dubparty:latest
+  voicejack:
+    image: voicejack:latest
     build:
       # Works both from the repo (deploy/compose.yaml → context ..) and on the host, where
       # src/ is a checkout of the repo: set DUB_SRC=./src in .env.
       context: ${DUB_SRC:-..}
       dockerfile: deploy/Dockerfile
-    container_name: dubparty
+    container_name: voicejack
     restart: unless-stopped
     ports:
-      # Loopback only — host nginx terminates TLS for dub.borbus.eu.
+      # Loopback only — host nginx terminates TLS for voicejack.borbus.eu.
       - '127.0.0.1:${PORT:-3087}:3000'
     environment:
       # Optional: JSON array of ICE servers (e.g. a TURN server later), sent to clients.

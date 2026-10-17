@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* DubParty theme: always dark. zinc-950 base, fuchsia → orange accent. */
+/* Voicejack theme: always dark. zinc-950 base, fuchsia → orange accent. */
 @theme {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display:

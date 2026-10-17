@@ -204,7 +204,7 @@ export function makeFixtureClips(n = 3, durationMs = 1000): string {
       width: 320,
       height: 180,
       tags: ['test'],
-      attribution: { author: 'DubParty tests', source: 'ffmpeg lavfi', license: 'CC0' },
+      attribution: { author: 'Voicejack tests', source: 'ffmpeg lavfi', license: 'CC0' },
     };
   });
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ clips }, null, 2));

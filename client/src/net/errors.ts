@@ -6,7 +6,7 @@ export const ERROR_TEXT: Record<ErrorCode | 'KICKED' | 'NETWORK', string> = {
   ROOM_FULL: 'That room is full.',
   GAME_IN_PROGRESS: 'That game has already started. Ask for the next round!',
   BAD_TOKEN: 'Your seat in this room expired. Join again with your name.',
-  VERSION: 'DubParty was updated. Reload the page to continue.',
+  VERSION: 'Voicejack was updated. Reload the page to continue.',
   NOT_HOST: 'Only the host can do that.',
   BAD_PHASE: "That's not possible right now.",
   INVALID: 'The server did not accept that.',

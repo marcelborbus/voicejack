@@ -1,4 +1,4 @@
-# DubParty v1.1 — plan
+# Voicejack (formerly DubParty) v1.1 — plan
 
 Source: owner's Issue Inbox (#23), 2026-10-17. Owner decisions: login = **email magic link only**;
 voice with strangers in public games = **opt-in, muted by default**; custom libraries = **hosts
