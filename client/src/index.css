@@ -7,6 +7,10 @@
     'Bricolage Grotesque Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, monospace;
 
+  /* Lighter than stock zinc-500 (#71717b, 3.7:1 on cards): the small secondary text that
+     uses it reaches WCAG AA (≈5.2:1 on zinc-900, 5.8:1 on zinc-950). */
+  --color-zinc-500: #8a8a93;
+
   --color-background: var(--color-zinc-950);
   --color-surface: rgb(24 24 27 / 0.72); /* zinc-900 glass */
   --color-surface-strong: var(--color-zinc-900);

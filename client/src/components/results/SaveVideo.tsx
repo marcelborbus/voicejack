@@ -130,7 +130,7 @@ export function SaveVideo({
         </div>
       )}
       <ClipAttribution clip={clip} />
-      <p className="-mt-1 pl-[22px] text-[11px] text-zinc-600">
+      <p className="-mt-1 pl-[22px] text-[11px] text-zinc-500">
         The credit line is burnt into the video. Please keep it when you share.
       </p>
     </div>
