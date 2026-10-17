@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- Template for scripts/make-og.mjs. {{FONTS}} and {{MUG_n}} are filled in by the script. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face { font-family: 'Bricolage'; src: url('{{FONTS}}/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2'); font-weight: 200 800; }
+      @font-face { font-family: 'Inter'; src: url('{{FONTS}}/inter/files/inter-latin-wght-normal.woff2'); font-weight: 100 900; }
+      @font-face { font-family: 'Caveat'; src: url('{{FONTS}}/caveat/files/caveat-latin-wght-normal.woff2'); font-weight: 400 700; }
+      * { box-sizing: border-box; margin: 0; }
+      body { width: 1200px; height: 630px; overflow: hidden; background: #0d0818; color: #fafafa; font-family: Inter; position: relative; }
+      .glow { position: absolute; border-radius: 50%; filter: blur(110px); }
+      .brand { background: linear-gradient(110deg, #e879f9, #f472b6 45%, #fb923c); -webkit-background-clip: text; color: transparent; }
+      .logo { position: absolute; left: 72px; top: 60px; display: flex; align-items: center; gap: 18px; font: 800 44px Bricolage; letter-spacing: -0.02em; }
+      .tile { width: 68px; height: 68px; border-radius: 20px; background: linear-gradient(120deg, #d946ef, #ec4899, #f97316); border: 4px solid #1a1027; box-shadow: 0 6px 0 rgba(0,0,0,.5); transform: rotate(-6deg); display: grid; place-items: center; }
+      h1 { position: absolute; left: 72px; top: 176px; width: 700px; font: 800 66px/1 Bricolage; letter-spacing: -0.03em; }
+      .squiggle { position: absolute; left: 72px; top: 312px; width: 600px; height: 22px; }
+      .tag { position: absolute; left: 72px; top: 362px; font: 500 28px Inter; color: #d4d4d8; width: 560px; line-height: 1.35; }
+      .tape { position: absolute; left: 72px; bottom: 54px; background: #ffd23f; color: #0d0818; font: 800 22px Inter; letter-spacing: .14em; padding: 8px 18px; transform: rotate(-2deg); clip-path: polygon(2% 0, 98% 6%, 100% 50%, 97% 100%, 1% 94%, 0 45%); }
+      .url { position: absolute; left: 592px; bottom: 54px; font: 700 34px Caveat; color: #2de2e6; }
+      .mug { position: absolute; width: 170px; height: 170px; border-radius: 52px; overflow: hidden; border: 5px solid #1a1027; box-shadow: 0 10px 0 rgba(0,0,0,.5); }
+      .mug svg { display: block; width: 100%; height: 100%; }
+      .bubble { position: absolute; right: 70px; top: 70px; background: #2a1e45; border: 3px solid rgba(255,255,255,.12); border-radius: 26px 26px 26px 8px; padding: 14px 22px; font: 700 34px Caveat; color: #fafafa; transform: rotate(3deg); box-shadow: 0 6px 0 rgba(0,0,0,.45); }
+      svg.spark { position: absolute; }
+    </style>
+  </head>
+  <body>
+    <div class="glow" style="left:-120px;top:-160px;width:560px;height:560px;background:rgba(192,38,211,.45)"></div>
+    <div class="glow" style="right:-160px;top:220px;width:520px;height:520px;background:rgba(249,115,22,.28)"></div>
+    <div class="glow" style="left:380px;bottom:-300px;width:520px;height:520px;background:rgba(124,58,237,.4)"></div>
+
+    <div class="logo">
+      <span class="tile">
+        <svg viewBox="0 0 24 24" width="44" height="44" fill="none">
+          <rect x="8" y="2" width="7" height="11.5" rx="3.5" fill="#fff" />
+          <path d="M4.8 10.6a6.7 6.7 0 0 0 13.4 0" stroke="#fff" stroke-width="2" stroke-linecap="round" />
+          <path d="M11.5 17.4v1.1c0 2.6 3.3 3.2 5.2 1.7" stroke="#fff" stroke-width="1.8" stroke-linecap="round" />
+          <path d="M16.6 20.3l2.3-1.7" stroke="#fff" stroke-width="2.8" stroke-linecap="round" />
+          <path d="M19.9 17.9l1.5-1.1" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </span>
+      <span>Voice<span class="brand">jack</span></span>
+    </div>
+
+    <h1>Hijack the voices of <span class="brand">famous movie clips.</span></h1>
+    <svg class="squiggle" viewBox="0 0 200 16" preserveAspectRatio="none"><path d="M3 10 C 22 3, 34 14, 52 8 S 84 3, 102 9 S 136 14, 152 7 S 184 4, 197 9" fill="none" stroke="#fb923c" stroke-width="5" stroke-linecap="round" /></svg>
+    <p class="tag">Everyone dubs the same scene with their own voice. Then the room votes on the funniest.</p>
+    <span class="tape">A PARTY GAME FOR 2–8 FRIENDS</span>
+    <span class="url">voicejack.borbus.eu</span>
+
+    <div class="bubble">“I am your… uh… landlord?”</div>
+    <div class="mug" style="left:760px;top:190px;transform:rotate(-8deg)">{{MUG_0}}</div>
+    <div class="mug" style="left:960px;top:240px;transform:rotate(6deg)">{{MUG_1}}</div>
+    <div class="mug" style="left:820px;top:400px;width:140px;height:140px;border-radius:44px;transform:rotate(4deg)">{{MUG_2}}</div>
+    <div class="mug" style="left:1000px;top:430px;width:130px;height:130px;border-radius:40px;transform:rotate(-5deg)">{{MUG_3}}</div>
+    <svg class="spark" style="left:720px;top:140px" width="44" height="44" viewBox="0 0 24 24"><path d="M12 2.5c.6 4.6 2.6 6.9 7.5 9.5-4.9 2.4-6.9 4.6-7.5 9.5-.8-4.9-2.7-7.1-7.5-9.5 4.8-2.6 6.8-4.9 7.5-9.5Z" fill="none" stroke="#ffd23f" stroke-width="2" stroke-linejoin="round" /></svg>
+    <svg class="spark" style="left:1130px;top:200px" width="30" height="30" viewBox="0 0 24 24"><path d="M12 2.5c.6 4.6 2.6 6.9 7.5 9.5-4.9 2.4-6.9 4.6-7.5 9.5-.8-4.9-2.7-7.1-7.5-9.5 4.8-2.6 6.8-4.9 7.5-9.5Z" fill="none" stroke="#2de2e6" stroke-width="2.2" stroke-linejoin="round" /></svg>
+  </body>
+</html>
