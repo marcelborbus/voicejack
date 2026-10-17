@@ -12,7 +12,7 @@
 3. `git status`. Uncommitted changes are a half-finished task from an interrupted session. Find their task from the file paths. Finish it, or `git stash` them if you can't tell what they are. Never commit somebody else's paths.
 4. Before starting, run `pnpm install && pnpm typecheck && pnpm test`. It must be green. If it is red, fix that first in a separate `fix:` commit.
 
-**GitHub issues** (github.com/marcelborbus/dubparty): T01=#1, T02=#2, T03=#3, T04=#4, T05=#6, T06=#7, T07=#8, T08=#9, T09=#5, T10=#10, T11=#11, T12=#12, T13=#13, T14=#14, T15=#15, T16=#16, T17=#17, T18=#18, T19=#19, T20=#20, T21=#21, T22=#22. Put `Closes #N` in the task's commit body; the orchestrator pushes.
+**GitHub issues** (github.com/marcelborbus/voicejack): T01=#1, T02=#2, T03=#3, T04=#4, T05=#6, T06=#7, T07=#8, T08=#9, T09=#5, T10=#10, T11=#11, T12=#12, T13=#13, T14=#14, T15=#15, T16=#16, T17=#17, T18=#18, T19=#19, T20=#20, T21=#21, T22=#22, T23=#37. Put `Closes #N` in the task's commit body; the orchestrator pushes.
 
 **Conventions**
 - **One commit per task.** Commit only your own paths: `git commit -m "T07: …" -- <paths> PLAN.md`. Check the task's box in PLAN.md **in that same commit**. Commit message trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
@@ -416,6 +416,9 @@ Legend: **Deps** = tasks that must be checked first. **‖** = groups that can r
 - [ ] **T21: Cross-browser verification & polish** · verify · Deps: T18, T19 · Touches: small fixes anywhere (list them in the commit), `docs/manual-test.md`
   - Manual checklist on Chrome and Firefox (the ogg/opus path): Firefox-recorded chunks play back in Chrome and the other way round. Check echo with speakers vs headphones, the autoplay overlay after reload, a 2-player voice call over 2 networks (e.g. phone hotspot), mobile layout sanity, and attributions visible.
   - Accept: `pnpm typecheck && pnpm test && pnpm e2e`, with the checklist filled in.
+- [ ] **T23: Rebrand DubParty → Voicejack** · impl · Deps: T17, T19 · Touches: user-facing strings anywhere, `deploy/**`, README/SPEC/PLAN headings
+  - "Dub Party" exists on Steam, so the product is **Voicejack** (owner, 2026-10-17). Sweep titles, logo, copy, render watermark, download filename, meta/OG tags, Docker/compose name, vhost `voicejack.borbus.eu` (+ `dub.borbus.eu` 301). Internal identifiers (`@dub/shared`, `dub.*` storage keys, `src/dub/`) stay. Issue #37.
+  - Accept: `grep -rniE 'dub ?party' --exclude-dir=node_modules --exclude-dir=.git .` only hits history notes; typecheck/test/build/e2e green.
 - [ ] **T22: Deploy to Hetzner** · verify · Deps: T20, T21, owner has added the DNS A record · Touches: `deploy/README-deploy.md` (notes only)
   - On the host: `/opt/dubbing-game` gets compose, `.env` and clips (run `fetch-clips.mjs` locally, rsync the mp4s and manifest), then `docker compose up -d --build` (or load the image), nginx vhost, `nginx -t && systemctl reload nginx`, certbot.
   - Accept: `curl -sf https://dub.borbus.eu/api/health`. A WS upgrade works (`wscat` or a browser game with 2 devices). The container's memory stays under its limit.
