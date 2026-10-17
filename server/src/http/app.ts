@@ -28,6 +28,8 @@ import * as gateway from '../ws/gateway.js';
 import * as presenceGateway from '../ws/presenceGateway.js';
 import * as statsRoutes from '../routes/stats.js';
 import type { Presence } from '../presence/Presence.js';
+import type { Friends } from '../friends/Friends.js';
+import * as friendsRoutes from '../routes/friends.js';
 import type { Matchmaker } from '../match/Matchmaker.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
@@ -47,6 +49,8 @@ export interface AppDeps {
   authLimiter?: GuestLimiter;
   /** Online/in-game counts + `/ws/presence` (V07). Without it the presence socket is absent. */
   presence?: Presence;
+  /** V10 friends, DMs, invites (`/api/friends/*`). Needs `accounts`. */
+  friends?: Friends;
   /** V08 public matchmaking over `/ws/presence` (queueJoin / queueLeave). */
   matchmaker?: Matchmaker;
   /** Epoch ms the process started (health uptime). */
@@ -115,6 +119,7 @@ export async function buildApp(
     gateway.register,
     presenceGateway.register,
     statsRoutes.register,
+    friendsRoutes.register,
   ];
   for (const register of modules) await register(app, deps);
 

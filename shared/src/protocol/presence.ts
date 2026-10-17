@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { NAME_MAX_LENGTH, NAME_MIN_LENGTH, ROOM_CODE_REGEX } from '../constants.js';
+import { RoomCodeSchema } from './common.js';
+import { DirectMessageSchema, FriendStatusSchema } from './friends.js';
 
 /**
  * Global presence socket (V07). Every page opens one; the room socket (`/ws`) stays as is.
@@ -7,7 +9,8 @@ import { NAME_MAX_LENGTH, NAME_MIN_LENGTH, ROOM_CODE_REGEX } from '../constants.
  *
  * Both directions are `t`-discriminated unions so later tasks only add members:
  * - V08 matchmaking: C2S `queueJoin` / `queueLeave`, S2C `queue` / `matchFound`.
- * - V10 friends + DMs: C2S `dm` / `invite` (+ friend requests), S2C `friendStatus` / `dm` / `invite`.
+ * - V10 friends + DMs: S2C `friendStatus` / `friends` / `dm` / `invite` (actions go over REST,
+ *   `shared/src/protocol/friends.ts`, so each one gets a status code).
  */
 export const PRESENCE_WS_PATH = '/ws/presence';
 /** Count pushes are throttled to at most one per this interval. */
@@ -45,8 +48,6 @@ export const PresenceQueueJoinSchema = z.object({
 });
 /** V08: leave the queue (also implied by closing the presence socket). */
 export const PresenceQueueLeaveSchema = z.object({ t: z.literal('queueLeave') });
-// TODO(V10): z.object({ t: z.literal('dm'), to: UserId, body: z.string().min(1).max(500) }).
-// TODO(V10): z.object({ t: z.literal('invite'), to: UserId, code: RoomCodeSchema }).
 
 export const PresenceC2SSchema = z.discriminatedUnion('t', [
   PresencePingSchema,
@@ -93,9 +94,23 @@ export const PresenceMatchFoundSchema = z.object({
   code: z.string().regex(ROOM_CODE_REGEX),
   token: z.string().min(1).max(128),
 });
-// TODO(V10): z.object({ t: z.literal('friendStatus'), userId, status: z.enum(['offline','online','inGame']) }).
-// TODO(V10): z.object({ t: z.literal('dm'), from: UserId, body: z.string(), at: z.number() }).
-// TODO(V10): z.object({ t: z.literal('invite'), from: UserId, fromName: z.string(), code: RoomCodeSchema }).
+/** V10: a friend went online / offline / into a game (sent to their online friends). */
+export const PresenceFriendStatusSchema = z.object({
+  t: z.literal('friendStatus'),
+  userId: z.string(),
+  status: FriendStatusSchema,
+});
+/** V10: friend lists changed (request received/accepted, friend removed): refetch `/api/friends`. */
+export const PresenceFriendsSchema = z.object({ t: z.literal('friends') });
+/** V10: a DM to or from you (sent to every tab of both sides). */
+export const PresenceDmSchema = z.object({ t: z.literal('dm'), message: DirectMessageSchema });
+/** V10: a friend invites you to their private lobby. */
+export const PresenceInviteSchema = z.object({
+  t: z.literal('invite'),
+  from: z.string(),
+  fromName: z.string(),
+  code: RoomCodeSchema,
+});
 
 export const PresenceS2CSchema = z.discriminatedUnion('t', [
   PresenceCountsMsgSchema,
@@ -104,6 +119,10 @@ export const PresenceS2CSchema = z.discriminatedUnion('t', [
   PresenceQueueSchema,
   PresenceQueueLeftSchema,
   PresenceMatchFoundSchema,
+  PresenceFriendStatusSchema,
+  PresenceFriendsSchema,
+  PresenceDmSchema,
+  PresenceInviteSchema,
 ]);
 export type PresenceS2C = z.infer<typeof PresenceS2CSchema>;
 export type PresenceS2CType = PresenceS2C['t'];

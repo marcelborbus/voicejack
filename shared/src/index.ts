@@ -5,4 +5,5 @@ export * from './protocol/s2c.js';
 export * from './protocol/rest.js';
 export * from './protocol/libraries.js';
 export * from './protocol/presence.js';
+export * from './protocol/friends.js';
 export * from './helpers/index.js';

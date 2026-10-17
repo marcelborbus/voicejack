@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { unlockAudio } from '@/audio/context';
 import { CurlyArrow, Sparkle, Squiggle } from '@/components/doodles';
+import { FriendsPanel } from '@/components/friends';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { OnlineCount, RandomGameButton } from '@/components/presence';
 import { Button } from '@/components/ui/button';
@@ -257,6 +258,7 @@ export function Home() {
           <RandomGameButton />
         </CardContent>
       </Card>
+      <FriendsPanel className="lg:col-span-2" />
     </div>
   );
 }

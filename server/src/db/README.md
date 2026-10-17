@@ -72,6 +72,24 @@ more than 15 min (kept that long so the rate limit still sees them), guests idle
   (upsert by clip id: technical fields follow the manifest, admin edits are kept) and marks
   clips left `processing` by a restart as failed. Built-in clips can only be disabled.
 
+## Friends + DMs (V10, `004_friends.sql`, `friends/Friends.ts`)
+
+Registered users only. `friendships` holds one row per pair (`user_a < user_b`), `pending` until
+the other side accepts; declining, cancelling, removing and blocking delete it. `blocks` is
+directional; a block in either direction stops requests, DMs and invites. `messages` are plain
+text, at most 500 characters, with control/bidi characters stripped, and are deleted after
+90 days by `Accounts.cleanup`. Account deletion removes the user's friendships, blocks (both
+ways) and DMs (sent and received). DM reports go into V08's `reports` table with
+`context='dm'`, quoting the reported message, so the quote survives the 90-day purge and the
+sender's account deletion. Rate limits are kept in memory: 30 friend requests a day, 20 DMs a
+minute, 10 invites a minute, 10 reports an hour.
+
+Pending requests and blocks are addressed by `ref` = sha256 of the ordered pair, so the other
+side's id is not revealed until both sides accept. A room player is only ever addressed by
+`playerId`, which the server resolves through `room.userIdOf`.
+
+The SQL below was the V10 plan; `004_friends.sql` is what shipped.
+
 ## Planned migrations (not built yet)
 
 ```sql

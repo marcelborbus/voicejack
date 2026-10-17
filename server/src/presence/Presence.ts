@@ -1,4 +1,9 @@
-import { PRESENCE_THROTTLE_MS, type PresenceCounts, type PresenceS2C } from '@dub/shared';
+import {
+  PRESENCE_THROTTLE_MS,
+  type FriendStatus,
+  type PresenceCounts,
+  type PresenceS2C,
+} from '@dub/shared';
 import type { RoomManager } from '../room/RoomManager.js';
 import { realScheduler } from '../room/timers.js';
 import type { Clock, Scheduler } from '../room/types.js';
@@ -38,6 +43,9 @@ export class Presence {
   private lastSent: PresenceCounts | null = null;
   private readonly unsubscribe: (() => void) | null;
   private disposed = false;
+  /** V10: per-user status as of the last flush (offline users absent). */
+  private statuses = new Map<string, FriendStatus>();
+  private readonly statusListeners = new Set<(changes: Map<string, FriendStatus>) => void>();
 
   constructor(private readonly deps: PresenceDeps = {}) {
     this.clock = deps.clock ?? { now: () => Date.now() };
@@ -86,6 +94,43 @@ export class Presence {
     return n;
   }
 
+  /** Live status of `userId`: inGame (a room socket past LOBBY) > online (any socket) > offline. */
+  statusOf(userId: string): FriendStatus {
+    return this.userStatuses().get(userId) ?? 'offline';
+  }
+
+  /**
+   * V10: `fn` gets the users whose status changed since the previous flush (same throttle as
+   * the counts; offline = left every socket). Returns unsubscribe.
+   */
+  onStatusChange(fn: (changes: Map<string, FriendStatus>) => void): () => void {
+    if (this.statusListeners.size === 0) this.statuses = this.userStatuses();
+    this.statusListeners.add(fn);
+    return () => void this.statusListeners.delete(fn);
+  }
+
+  private userStatuses(): Map<string, FriendStatus> {
+    const m = new Map<string, FriendStatus>();
+    for (const uid of this.clients.values()) if (uid) m.set(uid, 'online');
+    for (const c of this.deps.rooms?.humanConnections() ?? []) {
+      if (!c.userId) continue;
+      if (c.phase !== 'LOBBY') m.set(c.userId, 'inGame');
+      else if (!m.has(c.userId)) m.set(c.userId, 'online');
+    }
+    return m;
+  }
+
+  private flushStatuses(): void {
+    if (this.statusListeners.size === 0) return;
+    const next = this.userStatuses();
+    const changes = new Map<string, FriendStatus>();
+    for (const [uid, st] of next) if (this.statuses.get(uid) !== st) changes.set(uid, st);
+    for (const uid of this.statuses.keys()) if (!next.has(uid)) changes.set(uid, 'offline');
+    this.statuses = next;
+    if (changes.size === 0) return;
+    for (const fn of [...this.statusListeners]) fn(changes);
+  }
+
   get socketCount(): number {
     return this.clients.size;
   }
@@ -118,6 +163,7 @@ export class Presence {
 
   private flush(): void {
     if (this.disposed) return;
+    this.flushStatuses();
     const c = this.counts();
     const prev = this.lastSent;
     if (

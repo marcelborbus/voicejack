@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router';
 import { AccountMenu } from '@/components/account';
+import { FriendsOverlay } from '@/components/friends';
 import { Logo } from '@/components/Logo';
 import { SoundToggle } from '@/components/SoundToggle';
 import { Backdrop } from './Backdrop';
@@ -28,6 +29,7 @@ export function Shell() {
         <span>Made for friends who can't do voices. Do them anyway.</span>
         <CreditsDialog />
       </footer>
+      <FriendsOverlay />
     </div>
   );
 }

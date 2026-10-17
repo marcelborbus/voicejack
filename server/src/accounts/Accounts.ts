@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { nanoid } from 'nanoid';
+import { DM_RETENTION_DAYS } from '@dub/shared';
 import { tx, type Db } from '../db/index.js';
 import { readCookie, SESSION_COOKIE } from './cookies.js';
 
@@ -12,6 +13,8 @@ export const GUEST_RETENTION_MS = 180 * 24 * 3600_000;
 export const LOGIN_TOKEN_TTL_MS = 15 * 60_000;
 /** `last_seen_at` is written at most this often per user. */
 const TOUCH_EVERY_MS = 3600_000;
+/** V10 direct messages are deleted after this long. */
+export const DM_RETENTION_MS = DM_RETENTION_DAYS * 24 * 3600_000;
 
 export type UserKind = 'guest' | 'registered';
 
@@ -242,6 +245,7 @@ export class Accounts {
    * Account deletion: anonymizes the row (email and name cleared, kind guest, deleted_at set),
    * ends every session and drops pending login tokens for the address. The row itself stays
    * so future references (V09 game history) don't dangle; it no longer resolves anywhere.
+   * V10: friendships, blocks (both directions) and DMs (sent and received) are deleted.
    */
   deleteAccount(userId: string): void {
     tx(this.db, () => {
@@ -250,6 +254,9 @@ export class Accounts {
       if (u.email) this.db.prepare('DELETE FROM login_tokens WHERE email = ?').run(u.email);
       this.db.prepare('DELETE FROM login_tokens WHERE guest_user_id = ?').run(userId);
       this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+      this.db.prepare('DELETE FROM friendships WHERE user_a = ? OR user_b = ?').run(userId, userId);
+      this.db.prepare('DELETE FROM blocks WHERE blocker = ? OR blocked = ?').run(userId, userId);
+      this.db.prepare('DELETE FROM messages WHERE sender = ? OR recipient = ?').run(userId, userId);
       this.db
         .prepare(
           "UPDATE users SET email = NULL, display_name = '', kind = 'guest', deleted_at = ? WHERE id = ?",
@@ -258,8 +265,8 @@ export class Accounts {
     });
   }
 
-  /** Deletes expired sessions and login tokens and long-idle guests. Returns the counts. */
-  cleanup(): { sessions: number; guests: number; loginTokens: number } {
+  /** Deletes expired sessions and login tokens, long-idle guests and 90-day-old DMs. */
+  cleanup(): { sessions: number; guests: number; loginTokens: number; messages: number } {
     const t = this.now();
     const s = this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(t);
     // Kept one window past expiry so the per-address rate limit still counts them.
@@ -269,6 +276,12 @@ export class Accounts {
     const g = this.db
       .prepare("DELETE FROM users WHERE kind = 'guest' AND last_seen_at < ?")
       .run(t - GUEST_RETENTION_MS);
-    return { sessions: Number(s.changes), guests: Number(g.changes), loginTokens: Number(l.changes) };
+    const m = this.db.prepare('DELETE FROM messages WHERE created_at < ?').run(t - DM_RETENTION_MS);
+    return {
+      sessions: Number(s.changes),
+      guests: Number(g.changes),
+      loginTokens: Number(l.changes),
+      messages: Number(m.changes),
+    };
   }
 }

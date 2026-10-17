@@ -11,6 +11,7 @@ import { Accounts } from './accounts/Accounts.js';
 import { Presence } from './presence/Presence.js';
 import { Matchmaker } from './match/Matchmaker.js';
 import { Reports } from './match/Reports.js';
+import { Friends } from './friends/Friends.js';
 
 /** Expired sessions / idle guests are purged this often (and once at startup). */
 export const DB_CLEANUP_MS = 3600_000;
@@ -24,6 +25,7 @@ export interface RunningServer {
   presence: Presence;
   matchmaker: Matchmaker;
   reports: Reports;
+  friends: Friends;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -53,7 +55,8 @@ export async function startServer(
   const presence = new Presence({ rooms });
   const reports = new Reports(db);
   const matchmaker = new Matchmaker({ rooms, presence, reports, timings: config.timings });
-  const app = await buildApp({ config, clips, rooms, store, accounts, presence, matchmaker }, opts);
+  const friends = new Friends({ db, presence, rooms });
+  const app = await buildApp({ config, clips, rooms, store, accounts, presence, matchmaker, friends }, opts);
   const cleanup = () => {
     try {
       const n = accounts.cleanup();
@@ -67,6 +70,7 @@ export async function startServer(
   matchmaker.setLog(app.log);
   app.addHook('onClose', async () => {
     clearInterval(cleanupTimer);
+    friends.dispose();
     matchmaker.dispose();
     presence.dispose();
     await rooms.stop();
@@ -92,6 +96,7 @@ export async function startServer(
     presence,
     matchmaker,
     reports,
+    friends,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),

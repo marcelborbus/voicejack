@@ -1,5 +1,6 @@
 import type { PlayerPublic, RoundResultEntry } from '@dub/shared';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { AddFriendButton } from '@/components/friends';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { cn } from '@/lib/utils';
 import { CountUp } from './motion';
@@ -65,6 +66,7 @@ export function Leaderboard({
             <span className="w-5 text-center font-display font-bold text-zinc-400">{r.rank}</span>
             <PlayerAvatar name={r.name} seed={r.playerId} size="sm" />
             <span className="min-w-0 flex-1 truncate font-semibold">{r.name}</span>
+            {r.playerId !== youId && <AddFriendButton playerId={r.playerId} />}
             <span
               title={moved > 0 ? `Up ${moved}` : moved < 0 ? `Down ${-moved}` : 'No change'}
               className={cn(

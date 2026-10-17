@@ -1,6 +1,7 @@
 import { Crown, Medal, MicOff, RotateCcw, Share2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Sparkle } from '@/components/doodles';
+import { AddFriendButton } from '@/components/friends';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { BestDubReplay, useDubChunks } from '@/components/results/BestDubReplay';
 import { Confetti, CountUp } from '@/components/results/motion';
@@ -230,6 +231,7 @@ function Standings({ final, youId }: { final: FinalResult; youId: string }) {
                     {s.roundWins} round win{s.roundWins === 1 ? '' : 's'}
                   </span>
                 </span>
+                {s.playerId !== youId && <AddFriendButton playerId={s.playerId} />}
                 <span className="font-display text-xl font-extrabold">
                   <CountUp to={s.total} ms={1400} />
                 </span>
