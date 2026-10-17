@@ -26,9 +26,11 @@ export function isPolite(selfId: PlayerId, peerId: PlayerId): boolean {
   return selfId < peerId;
 }
 
-/** Which peers we want: every other connected player. */
+/** Which peers we want: every other connected player (server-side bots never do voice). */
 export function desiredPeers(players: readonly PlayerPublic[], selfId: PlayerId): Set<PlayerId> {
-  return new Set(players.filter((p) => p.id !== selfId && p.connected).map((p) => p.id));
+  return new Set(
+    players.filter((p) => p.id !== selfId && p.connected && !p.isBot).map((p) => p.id),
+  );
 }
 
 /** Roster diff: which peer connections to open and which to close. */

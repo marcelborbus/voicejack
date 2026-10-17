@@ -75,6 +75,12 @@ export const RtcC2SSchema = z.object({
   data: RtcSignalSchema,
 }); // relayed, ≤16 KB
 export const LeaveSchema = z.object({ t: z.literal('leave') });
+/** Dev test mode (V01): host adds a server-side bot / removes one (default: the last added). */
+export const AddBotSchema = z.object({ t: z.literal('addBot') }); // host, LOBBY
+export const RemoveBotSchema = z.object({
+  t: z.literal('removeBot'),
+  playerId: PlayerIdSchema.optional(),
+}); // host, LOBBY
 
 export const C2SSchema = z.discriminatedUnion('t', [
   HelloSchema,
@@ -93,6 +99,8 @@ export const C2SSchema = z.discriminatedUnion('t', [
   BackToLobbySchema,
   RtcC2SSchema,
   LeaveSchema,
+  AddBotSchema,
+  RemoveBotSchema,
 ]);
 export type C2S = z.infer<typeof C2SSchema>;
 export type C2SType = C2S['t'];

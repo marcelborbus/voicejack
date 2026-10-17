@@ -62,3 +62,4 @@ alternative (0 % on one-off donations, PayPal/Stripe). Owner must create the acc
 ## Status
 
 - [x] V03 DB + migrations + guest profiles (#26)
+- [x] V01 Bots / dev test mode (#24): `DEV_BOTS=1`, C2S `addBot`/`removeBot`, `PlayerPublic.isBot`, `you.canManageBots`; `isAdmin` hook in RoomManager for V05

@@ -1,6 +1,7 @@
 import { MAX_PLAYERS } from '@dub/shared';
 import { Film, UserPlus, Users } from 'lucide-react';
 import { InviteLinkField } from '@/components/InviteButton';
+import { BotControls } from '@/components/lobby/BotControls';
 import { PlayerCard } from '@/components/lobby/PlayerCard';
 import { ReadyPanel } from '@/components/lobby/ReadyPanel';
 import { SettingsPanel } from '@/components/lobby/SettingsPanel';
@@ -88,6 +89,11 @@ export function Lobby() {
             isHost={isHost}
           />
         </div>
+        {you.canManageBots && (
+          <div className="order-4 lg:order-none">
+            <BotControls players={players} maxPlayers={maxPlayers} />
+          </div>
+        )}
         <p className="order-5 flex items-start gap-2 px-2 lg:order-none text-xs text-zinc-500">
           <Film className="mt-0.5 size-3.5 shrink-0" />
           All clips are Creative Commons or public domain. Each clip's author and license are shown

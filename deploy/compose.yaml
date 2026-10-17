@@ -18,6 +18,8 @@ services:
     environment:
       # Optional: JSON array of ICE servers (e.g. a TURN server later), sent to clients.
       ICE_SERVERS: ${ICE_SERVERS:-}
+      # Dev test mode (V01): DEV_BOTS=1 in .env lets hosts add bots. Unset = off (prod default).
+      DEV_BOTS: ${DEV_BOTS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       # Clip library (manifest.json + mp4s), rsynced from the dev box; never in the image.

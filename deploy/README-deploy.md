@@ -76,6 +76,15 @@ curl -sf http://127.0.0.1:3087/api/health
 Optional `.env` next to `compose.yaml`: `PORT=3087` (host port), `ICE_SERVERS='[...]'` (JSON;
 add a TURN server here later, no client change needed), `LOG_LEVEL=info`.
 
+**Test bots (V01, off by default).** With `DEV_BOTS=1` the host of a room gets "Add bot" /
+"Remove bot" (1–7 server-side bots that ready up, dub with clip snippets and vote randomly; no
+voice). To enable on the box: add `DEV_BOTS=1` to `/opt/voicejack/.env`, then
+`docker compose up -d` (recreates the container; rooms in progress are lost). Remove the line and
+run it again to turn bots off. Bot audio comes from `clips/bot-sounds/` — build it on the dev box
+with `node scripts/make-bot-sounds.mjs` and rsync it along with the clips
+(`rsync -av --delete clips/bot-sounds hetzner:/opt/voicejack/clips/`). Without it (and without
+ffmpeg in the image) bots submit empty dubs.
+
 To build on the host instead of shipping the image: clone the repo to `/opt/voicejack/src`,
 put `DUB_SRC=./src` in `.env`, and `docker compose up -d --build` (watch the RAM).
 

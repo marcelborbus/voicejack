@@ -2,6 +2,7 @@ import type { PlayerPublic } from '@dub/shared';
 import { Check, Crown, Mic, MicOff, UserX, WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { BotBadge } from '@/components/lobby/BotControls';
 import { VoiceStatus } from '@/components/VoiceStatus';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -75,7 +76,7 @@ export function PlayerCard({
               you
             </span>
           )}
-          <VoiceStatus playerId={player.id} isSelf={isSelf} />
+          {player.isBot ? <BotBadge /> : <VoiceStatus playerId={player.id} isSelf={isSelf} />}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {offline ? (

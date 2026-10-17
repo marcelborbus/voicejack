@@ -2,6 +2,7 @@ node_modules
 dist
 clips/*.mp4
 clips/*.jpg
+clips/bot-sounds/
 .cache
 e2e/fixtures/clips/
 test-results

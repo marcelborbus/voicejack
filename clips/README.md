@@ -16,6 +16,13 @@ live in `scripts/clips.sources.json`.
 Encoding: H.264 CRF 26 + AAC 96k, fit inside 1280x720 (never upscaled), `+faststart`, every clip at most 60 s.
 The poster is a JPEG of at most 640x360.
 
+## Bot sounds (dev test mode, V01)
+
+`node scripts/make-bot-sounds.mjs` cuts 4 random 0.5–3 s pieces from each clip's audio (near-silent
+pieces skipped) into `clips/bot-sounds/*.webm` + `manifest.json` (gitignored, ~0.5 MB). Bots
+(`DEV_BOTS=1`) "record" these. Without the pool the server synthesizes a few tones with ffmpeg at
+startup, or bots submit empty dubs if ffmpeg is missing.
+
 ## Licences
 
 Only redistributable material goes in: Blender open movies (CC BY) and public-domain films on

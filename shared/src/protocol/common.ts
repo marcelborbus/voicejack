@@ -125,6 +125,8 @@ export interface PlayerPublic {
   ready: boolean;
   dubDone: boolean; // only meaningful in DUBBING
   totalScore: number;
+  /** Server-side bot (V01, dev test mode): never in voice, excluded from Elo. Absent = false. */
+  isBot?: boolean;
 }
 
 // ---------- chunks ----------
@@ -215,6 +217,8 @@ export interface YouState {
   isOwnItem: boolean; // current showcase item is mine → slider disabled
   canStart: boolean;
   startBlockers: string[]; // host UI
+  /** Host may add/remove bots now (LOBBY, server runs with DEV_BOTS=1 or host is admin). */
+  canManageBots: boolean;
 }
 
 export interface RoomSnapshot {

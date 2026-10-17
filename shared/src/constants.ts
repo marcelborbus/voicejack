@@ -6,6 +6,8 @@ export const ROOM_CODE_REGEX = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
 
 export const MAX_ROOMS = 30;
 export const MAX_PLAYERS = 8;
+/** Dev/test bots per room (V01); a room still holds at most MAX_PLAYERS players in total. */
+export const MAX_BOTS = MAX_PLAYERS - 1;
 
 export const NAME_MIN_LENGTH = 1;
 export const NAME_MAX_LENGTH = 20;

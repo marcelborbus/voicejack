@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import {
   DUBBING_SECONDS_RANGE,
+  MAX_BOTS,
   NORMAL_SETTINGS,
   ROUNDS_RANGE,
   SHORT_DUBBING_MIN_SECONDS,
@@ -29,6 +30,7 @@ import {
   type ShowcaseItem,
   type SubmissionId,
 } from '@dub/shared';
+import { pickBotName } from '../bots/names.js';
 import { Timers } from './timers.js';
 import type { Outcome, RoomDeps, RoomError, Submission } from './types.js';
 
@@ -45,6 +47,8 @@ interface PlayerState {
   ready: boolean;
   dubDone: boolean;
   totalScore: number;
+  /** Server-side bot (V01): driven by a BotPlayer, never host, excluded from Elo. */
+  isBot: boolean;
 }
 
 interface RoundState {
@@ -132,12 +136,18 @@ export class Room {
   get playerCount(): number {
     return this.players.size;
   }
+  /** Connected humans (bots are always connected and do not keep a room alive). */
   get connectedCount(): number {
     let n = 0;
-    for (const p of this.players.values()) if (p.connected) n++;
+    for (const p of this.players.values()) if (p.connected && !p.isBot) n++;
     return n;
   }
-  /** Epoch ms since the room has had no connected player, or null. */
+  get botCount(): number {
+    let n = 0;
+    for (const p of this.players.values()) if (p.isBot) n++;
+    return n;
+  }
+  /** Epoch ms since the room has had no connected human player, or null. */
   get emptySince(): number | null {
     return this.connectedCount === 0 ? this.emptySinceAt : null;
   }
@@ -224,6 +234,7 @@ export class Room {
       ready: false,
       dubDone: false,
       totalScore: 0,
+      isBot: false,
     };
     this.players.set(p.id, p);
     this.tokens.set(p.token, p.id);
@@ -304,6 +315,10 @@ export class Room {
       case 'leave':
         this.leave(p.id);
         return null;
+      case 'addBot':
+        return this.addBot(p);
+      case 'removeBot':
+        return this.removeBot(p, msg.playerId);
       case 'hello':
       case 'ping':
       case 'rtc':
@@ -389,6 +404,56 @@ export class Room {
     if (target === p.id || !this.players.has(target)) return err('INVALID', 'cannot kick');
     this.deps.emit(target, { t: 'kicked' });
     this.remove(target, 'kick');
+    return null;
+  }
+
+  // ---------------------------------------------------------------- bots (V01)
+
+  /** Bots are a dev test mode: `DEV_BOTS=1` on the server, or (V05) an admin host. */
+  private botsAllowed(id: PlayerId): boolean {
+    return (this.deps.options.devBots ?? false) || (this.deps.isAdmin?.(id) ?? false);
+  }
+
+  private canManageBots(id: PlayerId): boolean {
+    return this.phase === 'LOBBY' && id === this.hostId && this.botsAllowed(id);
+  }
+
+  private addBot(p: PlayerState): Outcome {
+    if (p.id !== this.hostId) return err('NOT_HOST', 'only the host can add bots');
+    if (this.phase !== 'LOBBY') return err('BAD_PHASE', 'not in lobby');
+    if (!this.botsAllowed(p.id)) return err('INVALID', 'bots are disabled on this server');
+    if (this.botCount >= MAX_BOTS) return err('LIMIT', `at most ${MAX_BOTS} bots`);
+    if (this.players.size >= this.deps.options.maxPlayers) return err('ROOM_FULL', 'room is full');
+    const taken = new Set([...this.players.values()].map((q) => q.name));
+    const bot: PlayerState = {
+      id: this.newId(),
+      name: this.uniqueName(pickBotName(taken, this.rng)),
+      token: this.newToken(),
+      seq: this.seq++,
+      connected: true,
+      disconnectedAt: null,
+      micOk: false,
+      ready: false,
+      dubDone: false,
+      totalScore: 0,
+      isBot: true,
+    };
+    this.players.set(bot.id, bot);
+    this.tokens.set(bot.token, bot.id);
+    this.deps.onBotAdded?.(bot.id);
+    this.changed();
+    return null;
+  }
+
+  /** Removes `target` (must be a bot) or, without a target, the most recently added bot. */
+  private removeBot(p: PlayerState, target: PlayerId | undefined): Outcome {
+    if (p.id !== this.hostId) return err('NOT_HOST', 'only the host can remove bots');
+    if (this.phase !== 'LOBBY') return err('BAD_PHASE', 'not in lobby');
+    let bot: PlayerState | undefined;
+    if (target !== undefined) bot = this.players.get(target);
+    else for (const q of this.players.values()) if (q.isBot && (!bot || q.seq > bot.seq)) bot = q;
+    if (!bot?.isBot) return err('INVALID', 'no such bot');
+    this.remove(bot.id, 'kick');
     return null;
   }
 
@@ -710,11 +775,17 @@ export class Room {
     this.timers.clear(`drop:${id}`);
     if (this.connectedCount === 0 && p.connected) this.emptySinceAt = this.deps.clock.now();
     if (id === this.hostId) {
-      const next = this.earliest((q) => q.connected) ?? this.earliest(() => true);
+      const next =
+        this.earliest((q) => q.connected && !q.isBot) ?? this.earliest((q) => !q.isBot);
       this.hostId = next?.id ?? '';
       this.timers.clear('hostMigrate');
     }
     this.deps.onPlayerRemoved?.(id, reason);
+    // Bots never outlive the last human (otherwise they would keep an empty room alive).
+    if (!p.isBot && ![...this.players.values()].some((q) => !q.isBot)) {
+      for (const q of [...this.players.values()]) this.remove(q.id, 'leave');
+      return;
+    }
     this.changed();
   }
 
@@ -729,7 +800,7 @@ export class Room {
     const host = this.players.get(this.hostId);
     if (!host || host.connected || host.disconnectedAt === null) return;
     if (this.deps.clock.now() - host.disconnectedAt < this.deps.timings.hostMigrateMs) return;
-    const next = this.earliest((q) => q.connected);
+    const next = this.earliest((q) => q.connected && !q.isBot);
     if (next) {
       this.hostId = next.id;
       this.timers.clear('hostMigrate');
@@ -782,6 +853,7 @@ export class Room {
         ready: q.ready,
         dubDone: q.dubDone,
         totalScore: q.totalScore,
+        isBot: q.isBot,
       }));
   }
 
@@ -842,6 +914,7 @@ export class Room {
         isOwnItem: item ? item.playerId === id : false,
         canStart: id === this.hostId && blockers.length === 0,
         startBlockers: blockers,
+        canManageBots: this.canManageBots(id),
       },
     };
   }

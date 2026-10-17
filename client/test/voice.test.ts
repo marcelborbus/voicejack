@@ -48,6 +48,13 @@ describe('desiredPeers / diffPeers', () => {
     expect([...desiredPeers(roster, 'a')].sort()).toEqual(['b', 'd']);
   });
 
+  it('never wants a server-side bot', () => {
+    expect([...desiredPeers([...roster, { ...player('e'), isBot: true }], 'a')].sort()).toEqual([
+      'b',
+      'd',
+    ]);
+  });
+
   it('opens all peers from empty', () => {
     expect(diffPeers([], roster, 'a')).toEqual({ open: ['b', 'd'], close: [] });
   });

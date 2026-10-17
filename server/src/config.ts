@@ -51,6 +51,8 @@ export interface Config {
   timings: Timings;
   /** Lets a single player start a game. */
   allowSolo: boolean;
+  /** V01 dev test mode: hosts may add server-side bots (env DEV_BOTS=1; off in prod). */
+  devBots: boolean;
   /** dubbingSeconds may go down to SHORT_DUBBING_MIN_SECONDS (on by default with TIMINGS=fast). */
   allowShortDubbing: boolean;
   trustProxy: string | boolean;
@@ -97,6 +99,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timingsName,
     timings: { ...TIMINGS_PRESETS[timingsName] },
     allowSolo: bool(env.ALLOW_SOLO),
+    devBots: bool(env.DEV_BOTS),
     allowShortDubbing: bool(env.ALLOW_SHORT_DUBBING, timingsName === 'fast'),
     trustProxy: trust === 'true' ? true : trust === 'false' || trust === '' ? false : trust,
     iceServers,

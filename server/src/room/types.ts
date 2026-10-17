@@ -26,6 +26,8 @@ export interface RoomOptions {
   allowShortDubbing: boolean;
   maxPlayers: number;
   limits: Limits;
+  /** V01 dev test mode: the host may add server-side bots (env DEV_BOTS=1). */
+  devBots?: boolean;
 }
 
 export interface RoomDeps {
@@ -41,6 +43,13 @@ export interface RoomDeps {
   isUploaded?(submissionId: SubmissionId, chunkId: ChunkId): boolean;
   /** Called after a player is removed from the room (kick, lobby drop, leave). */
   onPlayerRemoved?(playerId: PlayerId, reason: 'kick' | 'drop' | 'leave'): void;
+  /** A bot player was created (connected) by the room; attach its BotPlayer connection here. */
+  onBotAdded?(playerId: PlayerId): void;
+  /**
+   * V05 hook: admins may add bots without DEV_BOTS. Always false until accounts exist.
+   * TODO(V08): bots stay limited to private rooms once public rooms exist.
+   */
+  isAdmin?(playerId: PlayerId): boolean;
   rng?: () => number;
   /** nanoid(12) by default (player and submission ids). */
   newId?: () => string;
