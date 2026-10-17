@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router';
 import { Logo } from '@/components/Logo';
+import { SoundToggle } from '@/components/SoundToggle';
 import { Backdrop } from './Backdrop';
 import { CreditsDialog } from './CreditsDialog';
 
@@ -16,6 +17,7 @@ export function Shell() {
         >
           <Logo />
         </Link>
+        <SoundToggle />
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8">
         <Outlet />

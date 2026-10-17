@@ -6,9 +6,9 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
     <div
       ref={ref}
       className={cn(
-        'glass relative rounded-[var(--radius-card)] border border-white/[0.08] shadow-2xl shadow-black/40',
+        'sticker relative rounded-[var(--radius-card)]',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit]',
-        'before:bg-gradient-to-b before:from-white/[0.05] before:to-transparent before:content-[""]',
+        'before:bg-gradient-to-b before:from-white/[0.04] before:to-transparent before:to-40% before:content-[""]',
         className,
       )}
       {...props}

@@ -33,7 +33,7 @@ export function Toaster() {
             data-variant={t.variant}
             className={cn(
               'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-2xl border p-4 pr-10',
-              'border-white/10 bg-zinc-900/95 shadow-2xl shadow-black/60 backdrop-blur-xl',
+              'border-white/12 bg-ink-850 shadow-[0_5px_0_rgb(0_0_0/0.45)]',
               'data-[state=open]:animate-toast-in data-[state=closed]:animate-toast-out',
               'data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=end]:animate-toast-out',
               t.variant === 'error' && 'border-rose-500/30',

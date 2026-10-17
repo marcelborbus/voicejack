@@ -17,7 +17,7 @@ export const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         'fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg animate-dialog-in',
-        'rounded-[var(--radius-card)] border border-white/10 bg-zinc-900 p-6 shadow-2xl shadow-black/70 sm:p-8',
+        'sticker rounded-[var(--radius-card)] p-6 sm:p-8',
         'focus:outline-none',
         className,
       )}
