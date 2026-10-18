@@ -57,6 +57,24 @@ describe('Matcher thresholds', () => {
   });
 });
 
+describe('Matcher clip cap (V13)', () => {
+  it('never forms a match larger than the cap', () => {
+    const m = queued(6);
+    expect(keys(m.take(T0, 4))).toEqual([['p0', 'p1', 'p2', 'p3']]);
+    expect(m.entries().map((x) => x.key)).toEqual(['p4', 'p5']);
+  });
+
+  it('a cap below minPlayers starts full (capped) matches at once', () => {
+    expect(keys(queued(3).take(T0, 2))).toEqual([['p0', 'p1']]);
+  });
+
+  it('matches nobody below 2 clips', () => {
+    const m = queued(6);
+    expect(m.take(T0 + 120_000, 1)).toEqual([]);
+    expect(m.size).toBe(6);
+  });
+});
+
 describe('Matcher queue', () => {
   it('re-join keeps the position; leave and position', () => {
     const m = queued(3);

@@ -96,10 +96,17 @@ export class Matcher<T extends QueueEntry = QueueEntry> {
     return i < 0 ? null : i + 1;
   }
 
-  /** Forms every match the rules allow at `now` and removes those players from the queue. */
-  take(now: number): T[][] {
-    const { minPlayers, maxPlayers, fullWaitMs, pairWaitMs, compatible, score } = this.rules;
+  /**
+   * Forms every match the rules allow at `now` and removes those players from the queue.
+   * `cap` lowers `maxPlayers` for this call (V13: the public library's clip count, since every
+   * player needs a different clip); below 2 nobody is matched.
+   */
+  take(now: number, cap = Infinity): T[][] {
+    const { fullWaitMs, pairWaitMs, compatible, score } = this.rules;
+    const maxPlayers = Math.min(this.rules.maxPlayers, cap);
+    const minPlayers = Math.min(this.rules.minPlayers, maxPlayers);
     const out: T[][] = [];
+    if (maxPlayers < 2) return out;
     let i = 0;
     while (i < this.queue.length) {
       const a = this.queue[i]!;

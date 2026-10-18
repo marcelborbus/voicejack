@@ -163,6 +163,17 @@ export class RoomManager {
   }
 
   /** V08: an empty, server-hosted public room; the matchmaker seats the players. */
+  /**
+   * V13: clips a new public room can deal per round: the default library's enabled clips
+   * (public rooms keep the default settings), same fallback as `Room`.
+   */
+  publicClipCount(): number {
+    const lib = this.deps.library;
+    const d = lib?.defaultId();
+    const clips = (d && lib?.clipsOf(d)) || this.deps.clips;
+    return clips.length;
+  }
+
   createPublic(mode: QueueMode = 'casual'): Room | RoomError {
     const room = this.newRoom('public');
     if (!(room instanceof Room)) return room;

@@ -195,7 +195,8 @@ export class Matchmaker {
   tick(): void {
     if (this.disposed) return;
     const now = this.clock.now();
-    for (const group of this.matcher.take(now)) {
+    // V13: never seat more players than the public library has clips (V14 start blocker).
+    for (const group of this.matcher.take(now, this.deps.rooms.publicClipCount())) {
       if (!this.startMatch(group)) {
         // No room available (server full): back to the front, same order, retry next tick.
         for (const e of [...group].reverse()) this.matcher.requeueFront(e);
