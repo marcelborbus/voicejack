@@ -23,7 +23,7 @@ const NGINX_LOG_DAYS = 14; // /etc/logrotate.d/nginx: daily, rotate 14
 const MAIL_LOG_WEEKS = 5; // /etc/logrotate.d/rsyslog: weekly, rotate 4 (+ the current file)
 const GUEST_RETENTION_DAYS = 180; // server Accounts GUEST_RETENTION_MS
 const SESSION_DAYS = 30; // server Accounts SESSION_TTL_MS
-const STUN_HOST = 'stun.l.google.com'; // server config DEFAULT_ICE (no ICE_SERVERS override in prod)
+const STUN_HOST = 'stun.nextcloud.com'; // server config DEFAULT_ICE (no ICE_SERVERS override in prod)
 
 export default function Datenschutz() {
   const legal = useLegal();
@@ -164,8 +164,6 @@ function German({ legal }: { legal: LegalInfo | null | undefined }) {
       </p>
 
       <h2>8. Sprachchat (WebRTC)</h2>
-      {/* TODO(owner): verify Google LLC's active Data Privacy Framework certification
-          (dataprivacyframework.gov) before relying on it. */}
       <p>
         Der Sprachchat läuft <strong>direkt zwischen den Browsern</strong> der Spieler
         (Peer-to-Peer). Die Sprache geht nicht über unseren Server und wird nicht aufgezeichnet;
@@ -180,13 +178,12 @@ function German({ legal }: { legal: LegalInfo | null | undefined }) {
         </strong>
       </p>
       <p>
-        Um einen Verbindungsweg zu finden, fragt dein Browser den STUN-Server{' '}
-        <code>{STUN_HOST}</code> der Google LLC (USA) nach deiner öffentlichen IP-Adresse. Google
-        erhält dabei deine IP-Adresse und deinen Port, aber keine Sprache und keine Spieldaten. Das
-        ist eine Übermittlung in ein Drittland (USA); sie stützt sich auf den
-        Angemessenheitsbeschluss der EU-Kommission zum EU-US Data Privacy Framework (Art. 45 DSGVO),
-        unter dem Google LLC zertifiziert ist. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO
-        (Sprachchat als Teil des Spiels).
+        Um einen Verbindungsweg zu finden, fragt dein Browser beim Aufbau einer solchen Verbindung
+        den STUN-Server <code>{STUN_HOST}</code> der Nextcloud GmbH (Stuttgart, Deutschland) nach
+        deiner öffentlichen IP-Adresse. Nextcloud erhält dabei deine IP-Adresse und deinen Port,
+        damit deine öffentliche Adresse für die Peer-to-Peer-Verbindung ermittelt werden kann;
+        Sprache und Spieldaten laufen nicht über diesen Server. Rechtsgrundlage: Art. 6 Abs. 1 lit.
+        b DSGVO (Sprachchat als Teil des Spiels).
       </p>
 
       <h2>9. Öffentliche Spiele und Meldungen</h2>
@@ -391,12 +388,11 @@ function English({ legal }: { legal: LegalInfo | null | undefined }) {
         </strong>
       </p>
       <p>
-        To find a connection path, your browser asks Google LLC's (USA) STUN server{' '}
-        <code>{STUN_HOST}</code> for your public IP address. Google receives your IP address and
-        port, but no voice and no game data. This is a transfer to a third country (USA); it relies
-        on the European Commission's adequacy decision for the EU-US Data Privacy Framework (Art. 45
-        GDPR), under which Google LLC is certified. Legal basis: Art. 6(1)(b) GDPR (voice chat as
-        part of the game).
+        To find a connection path, your browser asks the STUN server <code>{STUN_HOST}</code> of
+        Nextcloud GmbH (Stuttgart, Germany) for your public IP address whenever it sets up such a
+        connection. Nextcloud receives your IP address and port so that your public address can be
+        determined for the peer-to-peer connection; no voice and no game data pass through it. Legal
+        basis: Art. 6(1)(b) GDPR (voice chat as part of the game).
       </p>
 
       <h2>9. Public games and reports</h2>

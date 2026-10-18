@@ -99,7 +99,7 @@ export interface Config {
 /** Repo root (server/src/config.ts → ../..). */
 export const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
-const DEFAULT_ICE: IceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+const DEFAULT_ICE: IceServer[] = [{ urls: 'stun:stun.nextcloud.com:443' }];
 
 function bool(v: string | undefined, dflt = false): boolean {
   if (v === undefined || v === '') return dflt;

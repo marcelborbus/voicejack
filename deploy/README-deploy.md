@@ -73,8 +73,12 @@ docker compose ps                    # wait for (healthy)
 curl -sf http://127.0.0.1:3087/api/health
 ```
 
-Optional `.env` next to `compose.yaml`: `PORT=3087` (host port), `ICE_SERVERS='[...]'` (JSON;
-add a TURN server here later, no client change needed), `LOG_LEVEL=info`.
+Optional `.env` next to `compose.yaml`: `PORT=3087` (host port), `ICE_SERVERS='[...]'` (JSON
+array of RTCIceServer, sent to clients in `welcome`; unset = the default
+`[{"urls":"stun:stun.nextcloud.com:443"}]`, Nextcloud GmbH's public STUN in Germany, as named in
+the Datenschutzerklärung; add a TURN server here later, no client change needed; if you change
+the STUN provider, update `STUN_HOST` and §8 in `client/src/pages/legal/Datenschutz.tsx`),
+`LOG_LEVEL=info`.
 
 **Test bots (V01, off by default).** With `DEV_BOTS=1` the host of a room gets "Add bot" /
 "Remove bot" (1–7 server-side bots that ready up, dub with clip snippets and vote randomly; no

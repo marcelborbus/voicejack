@@ -26,7 +26,7 @@ describe('legal pages', () => {
     expect(html).toContain('data-testid="legal-datenschutz"');
     expect(html).toContain('Datenschutzerklärung');
     expect(html).toContain('Stand:');
-    for (const fact of ['vj_session', 'stun.l.google.com', 'Hetzner', 'Liberapay', '90 Tagen']) {
+    for (const fact of ['vj_session', 'stun.nextcloud.com', 'Hetzner', 'Liberapay', '90 Tagen']) {
       expect(html).toContain(fact);
     }
   });
