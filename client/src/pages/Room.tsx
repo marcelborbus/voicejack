@@ -20,7 +20,9 @@ import { getRoomInfo } from '@/net/api';
 import { errorText } from '@/net/errors';
 import { useRoom } from '@/state/room';
 import { joinRoom, leaveRoom, releaseRoom } from '@/state/session';
-import { getSavedName, getToken, normalizeRoomCode, saveName } from '@/state/storage';
+import { usePlayerName } from '@/state/me';
+import { getToken, normalizeRoomCode, saveName } from '@/state/storage';
+import { RoomOnlyNameHint } from '@/components/RoomOnlyNameHint';
 import { Dubbing } from './phases/Dubbing';
 import { Final } from './phases/Final';
 import { Lobby } from './phases/Lobby';
@@ -178,7 +180,7 @@ function NamePrompt({
   notice?: string;
   onSubmit: (name: string) => void;
 }) {
-  const [name, setName] = useState(getSavedName);
+  const { name, setName, accountName } = usePlayerName();
   const [info, setInfo] = useState<RoomInfoResponse | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
 
@@ -257,6 +259,7 @@ function NamePrompt({
                     autoComplete="nickname"
                   />
                 </div>
+                <RoomOnlyNameHint accountName={accountName} />
               </div>
               <Button type="submit" size="xl" data-testid="room-join" disabled={!trimmed || !info}>
                 {!info ? <Spinner className="text-white" /> : null}

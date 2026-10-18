@@ -25,6 +25,21 @@ test('guest signs in by magic link, renames, signs out', async ({ browser }) => 
       .evaluate((m) => m.querySelector('svg')!.getBoundingClientRect().width / m.clientWidth);
     expect(fill).toBeGreaterThan(0.9);
 
+    // #41: the account name is the default (over a stale last-room name in this browser); a
+    // different name is for that room only and doesn't rename the account.
+    await page.evaluate(() => localStorage.setItem('dub.name', 'Stale'));
+    await page.reload();
+    await page.getByTestId('tab-create').click();
+    await expect(page.getByTestId('name-input')).toHaveValue('Renamed');
+    await page.getByTestId('name-input').fill('Party Name');
+    await expect(page.getByTestId('room-only-name-hint')).toContainText('Renamed');
+    await page.getByTestId('create-room').click();
+    await expect(page.getByTestId('lobby')).toBeVisible();
+    await page.goto('/');
+    await expect(page.getByTestId('account-button')).toContainText('Renamed');
+    await page.getByTestId('tab-create').click();
+    await expect(page.getByTestId('name-input')).toHaveValue('Renamed');
+
     await page.getByTestId('account-button').click();
     await page.getByTestId('account-dialog').getByRole('button', { name: 'Sign out' }).click();
     await expect(page.getByTestId('signin-button')).toBeVisible();

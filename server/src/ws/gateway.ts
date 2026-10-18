@@ -198,13 +198,16 @@ class Session implements Connection {
     room.connect(playerId);
   }
 
-  /** Links the room player to the cookie's account and remembers the name for next visit. */
+  /**
+   * Links the room player to the cookie's account and remembers a guest's name for next visit
+   * (a registered account's name is not overwritten by a per-room name, #41).
+   */
   private linkUser(room: Room, playerId: PlayerId, helloName: string | undefined): void {
     const name = room.linkUser(playerId, this.userId!);
     const display = helloName?.trim() || name;
     if (!display) return;
     try {
-      this.deps.accounts?.setDisplayName(this.userId!, display);
+      this.deps.accounts?.rememberName(this.userId!, display);
     } catch (e) {
       this.log.warn({ err: e }, 'saving display name failed');
     }

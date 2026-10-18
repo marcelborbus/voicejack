@@ -18,16 +18,16 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { ApiRequestError, createRoom, getRoomInfo } from '@/net/api';
 import { errorText } from '@/net/errors';
-import { getSavedName, normalizeRoomCode, saveName, setToken } from '@/state/storage';
-import { usePrefillName } from '@/state/me';
+import { normalizeRoomCode, saveName, setToken } from '@/state/storage';
+import { usePlayerName } from '@/state/me';
+import { RoomOnlyNameHint } from '@/components/RoomOnlyNameHint';
 
 type Tab = 'create' | 'join';
 
 export function Home() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('create');
-  const [name, setName] = useState(getSavedName);
-  usePrefillName(name, setName);
+  const { name, setName, accountName } = usePlayerName();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -227,6 +227,7 @@ export function Home() {
               <p className="font-scribble text-lg leading-none text-zinc-400">
                 your name picks your face. Roll the dice!
               </p>
+              <RoomOnlyNameHint accountName={accountName} />
             </div>
             {error && (
               <p

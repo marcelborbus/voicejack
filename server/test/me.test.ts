@@ -199,4 +199,35 @@ describe('room join links the cookie user', () => {
       expect(raw).not.toContain(u2);
     }
   });
+
+  // #41: a per-room name never overwrites a registered account's name; guests keep the last one.
+  it('remembers a guest name, but keeps a registered account name', async () => {
+    const [g, r, empty] = await Promise.all(
+      [0, 1, 2].map(() => srv.app.inject('/api/me')),
+    );
+    const id = (x: typeof g) => x.json<MeResponse>().user.id;
+    srv.db
+      .prepare("UPDATE users SET kind = 'registered', email = ?, display_name = ? WHERE id = ?")
+      .run('reg@example.org', 'Account Name', id(r));
+    srv.db
+      .prepare("UPDATE users SET kind = 'registered', email = ? WHERE id = ?")
+      .run('empty@example.org', id(empty));
+    const created = (
+      await srv.app.inject({ method: 'POST', url: '/api/rooms', payload: { name: 'Host' } })
+    ).json<{ code: string }>();
+    await hello({ code: created.code, name: 'Guest One' }, `vj_session=${token(g)}`);
+    await hello({ code: created.code, name: 'Room Only' }, `vj_session=${token(r)}`);
+    await hello({ code: created.code, name: 'First Name' }, `vj_session=${token(empty)}`);
+    expect(srv.accounts.getUser(id(g))!.displayName).toBe('Guest One');
+    expect(srv.accounts.getUser(id(r))!.displayName).toBe('Account Name');
+    expect(srv.accounts.getUser(id(empty))!.displayName).toBe('First Name');
+
+    const other = (
+      await srv.app.inject({ method: 'POST', url: '/api/rooms', payload: { name: 'Host' } })
+    ).json<{ code: string }>();
+    await hello({ code: other.code, name: 'Guest Two' }, `vj_session=${token(g)}`);
+    await hello({ code: other.code, name: 'Another' }, `vj_session=${token(empty)}`);
+    expect(srv.accounts.getUser(id(g))!.displayName).toBe('Guest Two');
+    expect(srv.accounts.getUser(id(empty))!.displayName).toBe('First Name');
+  });
 });

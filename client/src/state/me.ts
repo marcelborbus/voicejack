@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { paths, type MeResponse, type MeUser } from '@dub/shared';
+import { defaultPlayerName, prefillName, roomOnlyNameOf, type NameField } from './playerName';
+import { getSavedName } from './storage';
 
 /**
  * The browser's profile (V03). `GET /api/me` creates a guest account + HttpOnly session
@@ -36,12 +38,28 @@ export function loadMe(force = false): Promise<MeUser | null> {
 
 if (typeof window !== 'undefined' && typeof fetch === 'function') void loadMe();
 
-/** Fills an empty name field with the profile's last name once it is known. */
-export function usePrefillName(name: string, setName: (n: string) => void): void {
-  const displayName = useMe((s) => s.user?.displayName ?? null);
+/**
+ * A player-name field (Home, invite prompt) that starts with the default name and follows the
+ * profile while it loads or changes (sign-in, account rename), until the user edits it (#41).
+ */
+export function usePlayerName(): {
+  name: string;
+  /** For user edits (typing, dice): stops the prefill. */
+  setName: (n: string) => void;
+  /** Registered user's account name when `name` is a different, room-only name. */
+  accountName: string | null;
+} {
+  const user = useMe((s) => s.user);
+  const [field, setField] = useState<NameField>(() => ({
+    value: defaultPlayerName(user, getSavedName()),
+    edited: false,
+  }));
   useEffect(() => {
-    if (displayName && !name) setName(displayName);
-    // Only when the profile arrives; never overwrite what the user typed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayName]);
+    setField((f) => prefillName(f, user, getSavedName()));
+  }, [user]);
+  return {
+    name: field.value,
+    setName: useCallback((value: string) => setField({ value, edited: true }), []),
+    accountName: roomOnlyNameOf(user, field.value),
+  };
 }

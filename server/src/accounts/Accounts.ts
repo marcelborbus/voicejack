@@ -132,6 +132,20 @@ export class Accounts {
     user.lastSeenAt = t;
   }
 
+  /**
+   * The name a player joined a room with (#41). A guest's last-used name is remembered; a
+   * registered account keeps its own name (renamed only via PATCH /api/me) and only takes the
+   * room name when it has none yet.
+   */
+  rememberName(userId: string, name: string): void {
+    this.db
+      .prepare(
+        `UPDATE users SET display_name = ?
+          WHERE id = ? AND display_name <> ? AND (kind = 'guest' OR display_name = '')`,
+      )
+      .run(name, userId, name);
+  }
+
   setDisplayName(userId: string, name: string): void {
     this.db
       .prepare('UPDATE users SET display_name = ? WHERE id = ? AND display_name <> ?')
