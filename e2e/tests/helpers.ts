@@ -133,7 +133,10 @@ export async function readyUp(p: Player) {
   const toggle = page.getByTestId('ready-toggle');
   await expect(toggle).toBeEnabled();
   await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  // Public rooms start the moment the last player is ready, so the toggle may vanish at once.
+  await expect(
+    page.locator('[data-testid=ready-toggle][aria-pressed=true]').or(page.getByTestId('editor')),
+  ).toBeVisible();
 }
 
 /** In the editor: R, ~2 s, R; waits until the take is uploaded and saved. */
@@ -151,4 +154,70 @@ export async function recordOneTake(p: Player) {
     before + 1,
   );
   await expect(page.locator('[data-testid=upload-status][data-state=saved]')).toBeVisible();
+}
+
+/** Number of RTCPeerConnections this page has created (see `trackPeerConnections`). */
+export async function peerConnectionCount(p: Player): Promise<number> {
+  return p.page.evaluate(
+    () => (window as unknown as { __pcs?: RTCPeerConnection[] }).__pcs?.length ?? 0,
+  );
+}
+
+/** Home page with the name field filled in (Create tab). */
+export async function homeWithName(p: Player) {
+  await p.page.goto('/');
+  await p.page.getByTestId('tab-create').click();
+  await p.page.getByTestId('name-input').fill(p.name);
+}
+
+/** Unique per run, so reruns against the same server never hit the per-address limit. */
+export function testEmail(tag: string): string {
+  return `${tag}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}@example.org`;
+}
+
+/**
+ * Magic-link sign-in (V04) through the UI. The link comes from the server's test outbox
+ * (`MAIL_TRANSPORT=log` + `TIMINGS=fast` only, see serve.sh).
+ */
+export async function signIn(p: Player, email: string) {
+  const { page } = p;
+  if (!page.url().startsWith('http')) await page.goto('/');
+  await page.getByTestId('signin-button').click();
+  const dialog = page.getByTestId('signin-dialog');
+  await dialog.getByLabel('Email').fill(email);
+  await dialog.getByRole('button', { name: 'Email me a link' }).click();
+  await expect(dialog).toContainText('Check your inbox');
+  let link = '';
+  await expect(async () => {
+    const r = await page.request.get(`/api/test/outbox?to=${encodeURIComponent(email)}`);
+    const { text } = (await r.json()) as { text: string | null };
+    const m = text?.match(/https?:\/\/\S+\/api\/auth\/verify\?t=[\w%-]+/);
+    expect(m, 'magic link in the outbox').toBeTruthy();
+    link = m![0];
+  }).toPass({ timeout: 10_000 });
+  await page.goto(link);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL((u) => !u.pathname.startsWith('/api/'));
+  await expect(page.getByTestId('account-button')).toBeVisible();
+}
+
+/** Account dialog → display name → Save. */
+export async function renameAccount(p: Player, name: string) {
+  const { page } = p;
+  await page.getByTestId('account-button').click();
+  const dialog = page.getByTestId('account-dialog');
+  await dialog.getByLabel('Display name').fill(name);
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByTestId('account-button')).toContainText(name);
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
+}
+
+/** `connectionState` of each RTCPeerConnection this page created. */
+export async function peerStates(p: Player): Promise<string[]> {
+  return p.page.evaluate(() =>
+    ((window as unknown as { __pcs?: RTCPeerConnection[] }).__pcs ?? []).map(
+      (pc) => pc.connectionState,
+    ),
+  );
 }
