@@ -3,7 +3,8 @@ import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { usePhase } from '@/state/room';
+import { VoiceRosterButton } from '@/components/voice/PeerVoiceControls';
+import { useMe, usePhase } from '@/state/room';
 import { VoiceMesh } from './VoiceMesh';
 import { toggleSelfMute, useVoice } from './voiceStore';
 
@@ -26,9 +27,10 @@ export function VoiceProvider() {
   );
 }
 
-/** Inline voice pill: self-mute + status. Lives in the room header. */
+/** Inline voice pill: self-mute + status + players' voices (#43). Lives in the room header. */
 export function VoiceDock() {
   const phase = usePhase();
+  const hostMuted = !!useMe()?.mutedByHost;
   const allowed = useVoice((s) => s.allowed);
   const selfMuted = useVoice((s) => s.selfMuted);
   const speaking = useVoice((s) => s.selfSpeaking);
@@ -41,7 +43,19 @@ export function VoiceDock() {
       data-testid="voice-dock"
       data-allowed={allowed}
     >
-      {allowed ? (
+      {allowed && hostMuted ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="inline-flex size-8 items-center justify-center rounded-lg bg-rose-500/20 text-rose-300"
+              data-testid="voice-host-muted"
+            >
+              <MicOff className="size-4" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>The host muted you for everyone</TooltipContent>
+        </Tooltip>
+      ) : allowed ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -64,7 +78,9 @@ export function VoiceDock() {
         </span>
       )}
       <span className="whitespace-nowrap text-xs font-semibold text-zinc-300">
-        {allowed ? (
+        {allowed && hostMuted ? (
+          <span className="text-rose-300">Host muted you</span>
+        ) : allowed ? (
           <span className="flex items-center gap-1.5">
             <Volume2 className="size-3.5 text-emerald-300" />
             Voice on
@@ -78,6 +94,7 @@ export function VoiceDock() {
           </span>
         )}
       </span>
+      <VoiceRosterButton className="-mr-2" />
     </div>
   );
 }

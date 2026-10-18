@@ -72,6 +72,12 @@ describe('C2S schema', () => {
     expect(parseC2S(JSON.stringify(offer))).toEqual(offer);
     expect(parseC2S(JSON.stringify(cand))).toEqual(cand);
   });
+
+  it('round-trips hostMute (#43) and rejects it without a boolean', () => {
+    const m: C2S = { t: 'hostMute', playerId: 'p1', muted: true };
+    expect(parseC2S(JSON.stringify(m))).toEqual(m);
+    expect(parseC2S(JSON.stringify({ t: 'hostMute', playerId: 'p1' }))).toBeNull();
+  });
 });
 
 describe('shared schemas', () => {

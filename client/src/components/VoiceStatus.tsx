@@ -1,10 +1,13 @@
 import type { PlayerId } from '@dub/shared';
-import { Volume2, VolumeX } from 'lucide-react';
+import { VolumeX } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { togglePeerMute, useVoice } from '@/voice/voiceStore';
+import { useVoice } from '@/voice/voiceStore';
 
-/** Voice connection dot, speaking indicator and local mute for one player card. */
+/**
+ * Voice connection dot and speaking indicator for one player card (the mute / volume controls
+ * are `components/voice/PeerVoiceControls`, #43).
+ */
 export function VoiceStatus({ playerId, isSelf }: { playerId: PlayerId; isSelf: boolean }) {
   const active = useVoice((s) => s.active);
   const state = useVoice((s) => s.peers[playerId]);
@@ -63,23 +66,7 @@ export function VoiceStatus({ playerId, isSelf }: { playerId: PlayerId; isSelf: 
         </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>
-      {state === 'connected' && bars}
-      {state === 'connected' && (
-        <button
-          type="button"
-          onClick={() => togglePeerMute(playerId)}
-          aria-pressed={muted}
-          aria-label={muted ? 'Unmute this player' : 'Mute this player'}
-          data-testid="voice-peer-mute"
-          className="rounded-md p-0.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-200"
-        >
-          {muted ? (
-            <VolumeX className="size-3.5 text-rose-300" />
-          ) : (
-            <Volume2 className="size-3.5" />
-          )}
-        </button>
-      )}
+      {state === 'connected' && (muted ? <VolumeX className="size-3.5 text-rose-300" /> : bars)}
       {state === 'failed' && (
         <span className="text-[10px] font-semibold text-rose-300">no route</span>
       )}

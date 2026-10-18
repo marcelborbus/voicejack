@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   desiredPeers,
   diffPeers,
+  hostMutedIds,
   isPolite,
+  peerVolume,
   remoteMuted,
   voiceGate,
 } from '../src/voice/voicePolicy';
@@ -105,5 +107,41 @@ describe('desiredPeers in public rooms (V13)', () => {
       open: [],
       close: ['b'],
     });
+  });
+});
+
+// #43: per-peer mute/volume and the host's "mute for everyone".
+describe('host mute and volume', () => {
+  it('a player the host muted sends nothing, whatever their own mute says', () => {
+    for (const phase of PHASES) {
+      expect(voiceGate(phase, false, true).send).toBe(false);
+      expect(voiceGate(phase, false, true).play).toBe(phase !== 'DUBBING');
+    }
+    expect(voiceGate('LOBBY', false, false).send).toBe(true);
+  });
+
+  it('everyone else forces a host-muted peer silent, on top of their own mute', () => {
+    const gate = voiceGate('LOBBY', false);
+    expect(remoteMuted(gate, false, false)).toBe(false);
+    expect(remoteMuted(gate, false, true)).toBe(true);
+    expect(remoteMuted(gate, true, false)).toBe(true);
+    expect(remoteMuted(voiceGate('DUBBING', false), false, false)).toBe(true);
+  });
+
+  it('reads host mutes from the snapshot', () => {
+    const players = [
+      { ...player('a'), mutedByHost: true },
+      { ...player('b'), mutedByHost: false },
+      player('c'),
+    ];
+    expect([...hostMutedIds(players)]).toEqual(['a']);
+  });
+
+  it('clamps the per-peer volume (default full)', () => {
+    expect(peerVolume(undefined)).toBe(1);
+    expect(peerVolume(0.4)).toBe(0.4);
+    expect(peerVolume(-1)).toBe(0);
+    expect(peerVolume(3)).toBe(1);
+    expect(peerVolume(Number.NaN)).toBe(1);
   });
 });

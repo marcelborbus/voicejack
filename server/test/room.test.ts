@@ -242,6 +242,53 @@ describe('lobby', () => {
     expect(h.removed).toEqual([b]);
   });
 
+  it('host mutes a player for everyone (#43), in any phase; never in public rooms', () => {
+    const h = setup();
+    const a = h.add('Ann');
+    const b = h.add('Bob');
+    const c = h.add('Cy');
+    const mutedOf = (viewer: string, id: string) =>
+      h.snap(viewer).players.find((p) => p.id === id)!.mutedByHost;
+    expect(mutedOf(c, b)).toBe(false);
+    expect(h.room.handle(b, { t: 'hostMute', playerId: c, muted: true })?.code).toBe('NOT_HOST');
+    expect(h.room.handle(a, { t: 'hostMute', playerId: a, muted: true })?.code).toBe('INVALID');
+    expect(h.room.handle(a, { t: 'hostMute', playerId: 'nope', muted: true })?.code).toBe(
+      'INVALID',
+    );
+    const rev = h.room.revision;
+    expect(h.room.handle(a, { t: 'hostMute', playerId: b, muted: true })).toBeNull();
+    expect(h.room.revision).toBeGreaterThan(rev);
+    for (const viewer of [a, b, c]) expect(mutedOf(viewer, b)).toBe(true);
+    expect(lastState(h, c)!.players.find((p) => p.id === b)!.mutedByHost).toBe(true);
+    // Idempotent, and it survives the game starting.
+    const rev2 = h.room.revision;
+    expect(h.room.handle(a, { t: 'hostMute', playerId: b, muted: true })).toBeNull();
+    expect(h.room.revision).toBe(rev2);
+    h.readyAll();
+    expect(h.room.handle(a, { t: 'startGame' })).toBeNull();
+    expect(mutedOf(c, b)).toBe(true);
+    expect(h.room.handle(a, { t: 'hostMute', playerId: b, muted: false })).toBeNull();
+    expect(mutedOf(c, b)).toBe(false);
+
+    const pub = setup({}, undefined, 'public');
+    const x = pub.add('X');
+    const y = pub.add('Y');
+    expect(pub.room.handle(x, { t: 'hostMute', playerId: y, muted: true })?.code).toBe('INVALID');
+    expect(pub.snap(x).players.every((p) => p.mutedByHost === undefined)).toBe(true);
+  });
+
+  it('a muted player who becomes host is unmuted (#43)', () => {
+    const h = setup();
+    const a = h.add('Ann');
+    const b = h.add('Bob');
+    h.add('Cy');
+    expect(h.room.handle(a, { t: 'hostMute', playerId: b, muted: true })).toBeNull();
+    h.room.leave(a);
+    const s = h.snap(b);
+    expect(s.hostId).toBe(b);
+    expect(s.players.find((p) => p.id === b)!.mutedByHost).toBe(false);
+  });
+
   it('join fails with ROOM_FULL and GAME_IN_PROGRESS', () => {
     const h = setup({ maxPlayers: 2 });
     h.add('A');

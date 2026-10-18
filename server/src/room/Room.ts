@@ -59,6 +59,8 @@ interface PlayerState {
   isBot: boolean;
   /** V13, public rooms: opted in to voice (see `voicePeers`). */
   voiceOptIn: boolean;
+  /** #43, private rooms: muted for everyone by the host. */
+  mutedByHost?: boolean;
   /** V15 analytics: phase of a mid-game disconnect not yet followed by a reconnect. */
   dropPhase?: Phase | null;
   /** V15 analytics: games this player finished in this room (a next start = "played again"). */
@@ -424,6 +426,8 @@ export class Room {
         return this.report(p, msg.playerId, msg.reason);
       case 'voiceOptIn':
         return this.setVoiceOptIn(p, msg.on);
+      case 'hostMute':
+        return this.hostMute(p, msg.playerId, msg.muted);
       case 'hello':
       case 'ping':
       case 'rtc':
@@ -513,6 +517,18 @@ export class Room {
     const { min, max, step } = DUBBING_SECONDS_RANGE;
     if (s >= min && s <= max && (s - min) % step === 0) return true;
     return this.deps.options.allowShortDubbing && s >= SHORT_DUBBING_MIN_SECONDS && s <= max;
+  }
+
+  /** #43: the host mutes a player for everyone (any phase; private rooms only). */
+  private hostMute(p: PlayerState, target: PlayerId, muted: boolean): Outcome {
+    if (this.kind !== 'private') return err('INVALID', 'public games have no host');
+    if (p.id !== this.hostId) return err('NOT_HOST', 'only the host can mute players');
+    const t = this.players.get(target);
+    if (!t || t.id === p.id || t.isBot) return err('INVALID', 'cannot mute that player');
+    if (!!t.mutedByHost === muted) return null;
+    t.mutedByHost = muted;
+    this.changed();
+    return null;
   }
 
   private kick(p: PlayerState, target: PlayerId): Outcome {
@@ -1209,6 +1225,8 @@ export class Room {
         totalScore: q.totalScore,
         isBot: q.isBot,
         ...(this.kind === 'public' && { voiceOptIn: q.voiceOptIn }),
+        // A muted player who becomes host is unmuted (nobody could unmute them otherwise).
+        ...(this.kind === 'private' && { mutedByHost: !!q.mutedByHost && q.id !== this.hostId }),
       }));
   }
 

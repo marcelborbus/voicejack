@@ -61,7 +61,7 @@ export function Lobby() {
             {!isPublic && <InviteCard code={snap.code} hostName={host?.name} />}
           </CardHeader>
           <CardContent>
-            <ul className="grid gap-3 sm:grid-cols-2" data-testid="player-list">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="player-list">
               {players.map((p, i) => (
                 <PlayerCard
                   key={p.id}

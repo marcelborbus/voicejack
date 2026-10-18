@@ -90,6 +90,12 @@ export const VoteKickSchema = z.object({
 });
 /** V13, public rooms: opt in to (or out of) voice; only two opted-in players connect. */
 export const VoiceOptInSchema = z.object({ t: z.literal('voiceOptIn'), on: z.boolean() });
+/** #43, private rooms: the host mutes (or unmutes) a player's voice for everyone. */
+export const HostMuteSchema = z.object({
+  t: z.literal('hostMute'),
+  playerId: PlayerIdSchema,
+  muted: z.boolean(),
+});
 export const REPORT_TEXT_MAX_LENGTH = 500;
 /** V08, public rooms: report a player to the moderators (stored server-side, once per target). */
 export const ReportSchema = z.object({
@@ -120,6 +126,7 @@ export const C2SSchema = z.discriminatedUnion('t', [
   VoteKickSchema,
   ReportSchema,
   VoiceOptInSchema,
+  HostMuteSchema,
 ]);
 export type C2S = z.infer<typeof C2SSchema>;
 export type C2SType = C2S['t'];

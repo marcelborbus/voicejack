@@ -13,7 +13,7 @@ import {
 } from '../constants.js';
 
 /** v2 (V14): per-player clips (`you.clip`, `ShowcaseItem.clip`, `RoundResultEntry.clip`). */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export type PlayerId = string; // nanoid(12)
 export type RoomCode = string; // /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/
@@ -140,6 +140,12 @@ export interface PlayerPublic {
    * private rooms, where everyone connects.
    */
   voiceOptIn?: boolean;
+  /**
+   * #43, private rooms only: the host muted this player for everyone. Their client disables
+   * its outgoing voice track and every other client mutes their audio. Never true for the
+   * current host. Absent in public rooms (no host).
+   */
+  mutedByHost?: boolean;
 }
 
 // ---------- chunks ----------

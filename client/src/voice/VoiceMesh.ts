@@ -8,7 +8,9 @@ import { Peer } from './Peer';
 import {
   desiredPeers,
   diffPeers,
+  hostMutedIds,
   isPolite,
+  peerVolume,
   remoteMuted,
   voiceGate,
   type VoiceGate,
@@ -43,13 +45,20 @@ export class VoiceMesh {
   private selfId: PlayerId | null = null;
   private publicRoom = false;
   private wanted = new Set<PlayerId>();
+  /** #43: players the host muted for everyone (self included: then we send nothing). */
+  private hostMuted = new Set<PlayerId>();
 
   constructor(private readonly container: HTMLElement) {
     useVoice.setState({ active: true, peers: {}, speaking: {}, selfSpeaking: false });
     this.unsubs.push(
       useRoomStore.subscribe((s) => this.syncFrom(s.snapshot)),
       useVoice.subscribe((s, prev) => {
-        if (s.selfMuted !== prev.selfMuted || s.peerMuted !== prev.peerMuted) this.applyGate();
+        if (
+          s.selfMuted !== prev.selfMuted ||
+          s.peerMuted !== prev.peerMuted ||
+          s.peerVolume !== prev.peerVolume
+        )
+          this.applyGate();
       }),
       useMic.subscribe((s, prev) => {
         if (s.status !== prev.status) this.refreshTrack();
@@ -73,10 +82,12 @@ export class VoiceMesh {
     phase: Phase | null,
   ): void {
     // Gate first: when DUBBING arrives, audio is cut before anything else happens.
-    this.gate = voiceGate(phase, useVoice.getState().selfMuted);
+    this.hostMuted = hostMutedIds(players);
+    if (selfId) this.selfId = selfId;
+    const selfHostMuted = !!selfId && this.hostMuted.has(selfId);
+    this.gate = voiceGate(phase, useVoice.getState().selfMuted, selfHostMuted);
     this.applyGate();
     if (!selfId) return;
-    this.selfId = selfId;
     this.wanted = desiredPeers(players, selfId, this.publicRoom);
     const { open, close } = diffPeers(this.remotes.keys(), players, selfId, this.publicRoom);
     for (const id of close) this.closePeer(id);
@@ -85,10 +96,12 @@ export class VoiceMesh {
 
   private applyGate(): void {
     const v = useVoice.getState();
-    this.gate = { ...this.gate, send: this.gate.play && !v.selfMuted };
+    const selfHostMuted = !!this.selfId && this.hostMuted.has(this.selfId);
+    this.gate = { ...this.gate, send: this.gate.play && !v.selfMuted && !selfHostMuted };
     if (this.voiceTrack) this.voiceTrack.enabled = this.gate.send;
     for (const [id, r] of this.remotes) {
-      r.audio.muted = remoteMuted(this.gate, !!v.peerMuted[id]);
+      r.audio.muted = remoteMuted(this.gate, !!v.peerMuted[id], this.hostMuted.has(id));
+      r.audio.volume = peerVolume(v.peerVolume[id]);
     }
     if (v.allowed !== this.gate.play) useVoice.setState({ allowed: this.gate.play });
   }
@@ -110,7 +123,9 @@ export class VoiceMesh {
     const audio = document.createElement('audio');
     audio.autoplay = true;
     audio.dataset.peer = id;
-    audio.muted = remoteMuted(this.gate, !!useVoice.getState().peerMuted[id]);
+    const v = useVoice.getState();
+    audio.muted = remoteMuted(this.gate, !!v.peerMuted[id], this.hostMuted.has(id));
+    audio.volume = peerVolume(v.peerVolume[id]);
     this.container.appendChild(audio);
     const iceServers = useRoomStore.getState().iceServers as RTCIceServer[];
     const remote: Remote = { audio, analyser: null, source: null, frame: null } as Remote;

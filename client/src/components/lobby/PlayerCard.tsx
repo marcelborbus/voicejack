@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { BotBadge } from '@/components/lobby/BotControls';
 import { VoiceStatus } from '@/components/VoiceStatus';
+import {
+  HostMutedBadge,
+  PeerMuteButton,
+  PeerVoiceMenu,
+} from '@/components/voice/PeerVoiceControls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -95,8 +100,16 @@ export function PlayerCard({
               </Badge>
             </>
           )}
+          <HostMutedBadge player={player} />
         </div>
       </div>
+
+      {!isSelf && !player.isBot && (
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <PeerMuteButton player={player} />
+          <PeerVoiceMenu player={player} />
+        </div>
+      )}
 
       {canKick && !isSelf && (
         <>
