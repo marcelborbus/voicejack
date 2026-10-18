@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import {
   FEEDBACK_COMMENT_MAX,
   FEEDBACK_PAGE_SIZE,
@@ -24,6 +25,9 @@ import { utcDay } from './time.js';
 export const EVENT_DIMS = {
   // client (`POST /api/t`)
   page_view: ['route', 'browser', 'device'],
+  // v1.2 #45: distinct visitors / players per UTC day (see `DailyUniques`; counts only)
+  page_view_unique: ['device'],
+  game_player_unique: ['kind'],
   client_error: ['hash', 'where', 'route'],
   feedback: ['kind', 'mood'],
   // rooms + games (server-side; bots never count)
@@ -53,6 +57,60 @@ export type Dims = Record<string, string | number | boolean | null | undefined>;
 /** What instrumented code depends on (rooms, matchmaker, routes). */
 export interface Tracker {
   track(event: AnalyticsEvent, dims?: Dims, by?: number): void;
+  /**
+   * Counts `id` (a user id) once per UTC day for `event`; only the count is kept (`DailyUniques`).
+   * Optional so plain counters (tests, noop) need not implement it.
+   */
+  unique?(event: UniqueEvent, id: string, dims?: Dims): void;
+}
+
+export type UniqueEvent = 'page_view_unique' | 'game_player_unique';
+
+/**
+ * v1.2 #45: "unique per day" without storing ids. Each UTC day gets a fresh random salt that
+ * lives only in memory; we remember `sha256(salt + event + id)` (truncated) in an in-memory Set
+ * and bump the aggregate counter by 1 the first time a hash shows up that day. At midnight
+ * (first call of a new day) the salt and the Sets are dropped, so yesterday's hashes can't be
+ * linked to today's. Nothing but the counter ever reaches the DB.
+ *
+ * Restart mid-day: the Sets and salt are gone, so a person seen before and after the restart is
+ * counted twice that day (the persisted count and the new one are summed). The daily figure is
+ * therefore an upper bound; restarts are rare (deploys), so the error is small.
+ */
+export class DailyUniques {
+  private day = '';
+  private salt: Buffer = Buffer.alloc(0);
+  private seen = new Set<string>();
+
+  constructor(
+    private readonly sink: Pick<Tracker, 'track'>,
+    private readonly now: () => number = Date.now,
+    /** Safety valve: beyond this many distinct ids a day, further ones are not counted. */
+    private readonly max = 200_000,
+  ) {}
+
+  add(event: UniqueEvent, id: string, dims: Dims = {}): boolean {
+    const day = utcDay(this.now());
+    if (day !== this.day) {
+      this.day = day;
+      this.salt = randomBytes(32);
+      this.seen = new Set();
+    }
+    const h = createHash('sha256')
+      .update(this.salt)
+      .update(`${event}\u0000${id}`)
+      .digest('base64url')
+      .slice(0, 22);
+    if (this.seen.has(h) || this.seen.size >= this.max) return false;
+    this.seen.add(h);
+    this.sink.track(event, dims);
+    return true;
+  }
+
+  /** Distinct hashes held for today (tests/diagnostics). */
+  get size(): number {
+    return this.seen.size;
+  }
 }
 
 export const noopTracker: Tracker = { track: () => {} };
@@ -160,12 +218,18 @@ export class Analytics implements Tracker {
   private buffer = new Map<string, number>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly now: () => number;
+  private readonly uniques: DailyUniques;
 
   constructor(
     private readonly db: Db,
     opts: { now?: () => number } = {},
   ) {
     this.now = opts.now ?? Date.now;
+    this.uniques = new DailyUniques(this, this.now);
+  }
+
+  unique(event: UniqueEvent, id: string, dims: Dims = {}): void {
+    this.uniques.add(event, id, dims);
   }
 
   track(event: AnalyticsEvent, dims: Dims = {}, by = 1): void {

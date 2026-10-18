@@ -22,7 +22,7 @@ export const STATS_PATH = '/api/stats';
 export interface PresenceCounts {
   /** Distinct users (or anonymous sockets) with a presence or room socket. Bots never count. */
   online: number;
-  /** Humans connected to rooms whose phase is not LOBBY. */
+  /** Distinct humans connected to rooms whose phase is not LOBBY. */
   inGame: number;
   /** Users in the public matchmaking queue (V08). */
   lookingForGame: number;

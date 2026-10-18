@@ -99,9 +99,18 @@ export function buildReport(
       if (!by.has(key)) by.set(key, new Map());
       bump(by.get(key)!, v, r.count);
     }
-    const dp = daily.get(r.day) ?? { day: r.day, visits: 0, games: 0, feedback: 0 };
+    const dp = daily.get(r.day) ?? {
+      day: r.day,
+      visits: 0,
+      uniqueVisitors: 0,
+      games: 0,
+      uniquePlayers: 0,
+      feedback: 0,
+    };
     if (r.event === 'page_view') dp.visits += r.count;
     if (r.event === 'game_started') dp.games += r.count;
+    if (r.event === 'page_view_unique') dp.uniqueVisitors += r.count;
+    if (r.event === 'game_player_unique') dp.uniquePlayers += r.count;
     if (r.event === 'feedback') dp.feedback += r.count;
     daily.set(r.day, dp);
 
@@ -132,7 +141,16 @@ export function buildReport(
   const days: DailyPoint[] = [];
   for (let t = fromMs; t < toMs; t += DAY_MS) {
     const d = utcDay(t);
-    days.push(daily.get(d) ?? { day: d, visits: 0, games: 0, feedback: 0 });
+    days.push(
+      daily.get(d) ?? {
+        day: d,
+        visits: 0,
+        uniqueVisitors: 0,
+        games: 0,
+        uniquePlayers: 0,
+        feedback: 0,
+      },
+    );
   }
 
   const titles = new Map(
@@ -205,6 +223,7 @@ export function buildReport(
     breakdowns: {
       browser: sorted(breakdown('page_view.browser')),
       device: sorted(breakdown('page_view.device')),
+      uniqueDevice: sorted(breakdown('page_view_unique.device')),
       route: sorted(breakdown('page_view.route')),
       roomKind: sorted(breakdown('room_created.kind')),
       players: byKey(players),

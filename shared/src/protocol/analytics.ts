@@ -161,8 +161,17 @@ export interface ErrorStat {
 
 export interface DailyPoint {
   day: string;
+  /** Page views. */
   visits: number;
+  /**
+   * v1.2 #45: distinct visitors (session cookies) with a page view that day, counted via
+   * in-memory daily-salted hashes; only the number is stored. An upper bound if the server
+   * restarted that day (people seen on both sides of the restart count twice).
+   */
+  uniqueVisitors: number;
   games: number;
+  /** v1.2 #45: distinct users who started a game that day (same method; bots never count). */
+  uniquePlayers: number;
   feedback: number;
 }
 

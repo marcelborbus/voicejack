@@ -25,8 +25,10 @@ export interface PresenceDeps {
 /**
  * Who is online, and the counts pushed to every presence socket (V07).
  *
- * `online` counts distinct identities over presence and room sockets: a cookie user is one
- * identity however many tabs/sockets they have; an anonymous socket is one identity on its own.
+ * `online` and `inGame` count distinct people over presence and room sockets: a cookie user is
+ * one person however many tabs/sockets they have (v1.2 #45). Every browser gets a guest cookie
+ * before it opens a socket (V03), so a socket without a user is rare (cookies blocked) and then
+ * counts on its own.
  * Counts are recomputed lazily: anything that may change them calls `markDirty()`, and a
  * broadcast happens at most once per `throttleMs`, only when the numbers actually changed.
  */
@@ -142,13 +144,21 @@ export class Presence {
       if (uid) ids.add(uid);
       else anon++;
     }
-    let inGame = 0;
+    // v1.2 #45: in-game is distinct people too (one user in two game tabs counts once).
+    const playing = new Set<string>();
+    let anonPlaying = 0;
     for (const c of this.deps.rooms?.humanConnections() ?? []) {
       if (c.userId) ids.add(c.userId);
       else anon++;
-      if (c.phase !== 'LOBBY') inGame++;
+      if (c.phase === 'LOBBY') continue;
+      if (c.userId) playing.add(c.userId);
+      else anonPlaying++;
     }
-    return { online: ids.size + anon, inGame, lookingForGame: this.looking.size };
+    return {
+      online: ids.size + anon,
+      inGame: playing.size + anonPlaying,
+      lookingForGame: this.looking.size,
+    };
   }
 
   /** Something may have changed; schedules a (throttled) recount + broadcast. */

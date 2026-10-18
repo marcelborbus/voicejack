@@ -85,6 +85,22 @@ describe('Presence (unit)', () => {
     expect(presence.sendToUser('u1', { t: 'pong', c: 0, s: 0 })).toBe(2);
   });
 
+  it('counts in-game people once too (v1.2 #45: same user in two game tabs)', () => {
+    const fake = {
+      onActivity: () => () => {},
+      *humanConnections() {
+        yield { code: 'AAAAAA', playerId: 'p1', userId: 'u1', phase: 'DUBBING' as const };
+        yield { code: 'BBBBBB', playerId: 'p2', userId: 'u1', phase: 'SHOWCASE' as const };
+        yield { code: 'BBBBBB', playerId: 'p3', userId: 'u2', phase: 'LOBBY' as const };
+      },
+    } as unknown as RoomManager;
+    const p = new Presence({ rooms: fake });
+    p.add(new FakeClient(), 'u1');
+    p.add(new FakeClient(), 'u1');
+    expect(p.counts()).toEqual({ online: 2, inGame: 1, lookingForGame: 0 });
+    p.dispose();
+  });
+
   it('throttles pushes to at most one per interval and skips unchanged counts', () => {
     const watcher = new FakeClient();
     presence.add(watcher, null);
@@ -229,6 +245,24 @@ describe('/ws/presence + /api/stats (integration)', () => {
     anon.close();
     await anon.closed;
     await watcher.wait(isCounts((c) => c.online === 2));
+  });
+
+  it('v1.2 #45: two tabs of one browser are one unique visitor; nothing id-like is stored', async () => {
+    const cookie = await guestCookie();
+    const other = await guestCookie();
+    const before = srv.analytics.report({}).daily.at(-1)!.uniqueVisitors;
+    for (const c of [cookie, cookie, other]) await presenceSock({ cookie: c }).opened;
+    await presenceSock({ cookie, 'user-agent': 'Googlebot/2.1' }).opened; // bots never count
+    await presenceSock().opened; // no cookie: not counted
+    const day = srv.analytics.report({}).daily.at(-1)!;
+    expect(day.uniqueVisitors - before).toBe(2);
+    const rows = JSON.stringify(srv.db.prepare('SELECT * FROM analytics_daily').all());
+    expect(rows).toContain('page_view_unique');
+    for (const c of [cookie, other]) {
+      const uid = srv.accounts.userIdFromCookie(c)!;
+      expect(rows).not.toContain(uid);
+    }
+    expect(rows).not.toMatch(/[A-Za-z0-9_-]{20,}/);
   });
 
   it('answers ping, rejects junk and foreign origins', async () => {

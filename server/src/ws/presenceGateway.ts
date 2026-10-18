@@ -7,6 +7,7 @@ import {
   type PresenceS2C,
 } from '@dub/shared';
 import type { AppDeps } from '../http/app.js';
+import { uaInfo } from '../analytics/Analytics.js';
 import type { Presence, PresenceClient } from '../presence/Presence.js';
 import type { Matchmaker } from '../match/Matchmaker.js';
 import { TokenBucket, WS_RATE } from '../security/rateLimit.js';
@@ -28,6 +29,12 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
     },
     (socket, req) => {
       const userId = deps.accounts?.userIdFromCookie(req.headers.cookie) ?? null;
+      // v1.2 #45: every page opens this socket (with the session cookie it needs anyway), so it
+      // is where distinct visitors per day are counted: daily-salted in-memory hash, count only.
+      if (userId && deps.analytics) {
+        const { device } = uaInfo(req.headers['user-agent']);
+        if (device !== 'bot') deps.analytics.unique('page_view_unique', userId, { device });
+      }
       new PresenceSession(socket, presence, req.log, userId, deps.matchmaker ?? null, req.ip);
     },
   );

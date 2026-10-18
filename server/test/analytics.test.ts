@@ -14,6 +14,7 @@ import { openDb, type Db } from '../src/db/index.js';
 import { migrate } from '../src/db/migrate.js';
 import {
   Analytics,
+  DailyUniques,
   canonicalDims,
   countBucket,
   sanitizeComment,
@@ -22,6 +23,7 @@ import {
 } from '../src/analytics/Analytics.js';
 import { weekStart } from '../src/analytics/report.js';
 import { Room } from '../src/room/Room.js';
+import { RoomManager } from '../src/room/RoomManager.js';
 import { realScheduler } from '../src/room/timers.js';
 import { TIMINGS_PRESETS } from '../src/config.js';
 import { TRACK_RATE_LIMIT } from '../src/routes/track.js';
@@ -502,5 +504,111 @@ describe('DAU/WAU/MAU + weekly cohorts from users / game_players', () => {
     const cur = r.cohorts.find((c) => c.week === '2026-10-12')!;
     expect(cur).toEqual({ week: '2026-10-12', size: 1, active: [1], played: [0] });
     expect(JSON.stringify(r.cohorts)).not.toContain('u1');
+  });
+});
+
+// ------------------------------------------------------------------ v1.2 #45 unique counts
+
+describe('unique visitors / players per day (no ids or hashes persisted)', () => {
+  /** Every value stored anywhere in the DB, as one string. */
+  const dumpDb = (db: Db) => {
+    const tables = (
+      db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+    ).map((t) => t.name);
+    return JSON.stringify(tables.map((t) => db.prepare(`SELECT * FROM "${t}"`).all()));
+  };
+
+  it('counts each id once a day, resets with a new salt at midnight, stores only counts', () => {
+    let t = T0;
+    const { db, analytics } = fresh(() => t);
+    const u = new DailyUniques(analytics, () => t);
+    expect(u.add('page_view_unique', 'user-secret-1', { device: 'mobile' })).toBe(true);
+    expect(u.add('page_view_unique', 'user-secret-1', { device: 'desktop' })).toBe(false);
+    expect(u.add('page_view_unique', 'user-secret-2', { device: 'desktop' })).toBe(true);
+    expect(u.add('game_player_unique', 'user-secret-1', { kind: 'private' })).toBe(true);
+    expect(u.size).toBe(3);
+    t += DAY;
+    expect(u.add('page_view_unique', 'user-secret-1', { device: 'desktop' })).toBe(true);
+    expect(u.size).toBe(1); // yesterday's hashes (and salt) are gone
+    analytics.flush();
+    expect(rows(db)).toEqual(
+      [
+        {
+          day: '2026-10-14',
+          event: 'game_player_unique',
+          dims_json: '{"kind":"private"}',
+          count: 1,
+        },
+        {
+          day: '2026-10-14',
+          event: 'page_view_unique',
+          dims_json: '{"device":"desktop"}',
+          count: 1,
+        },
+        {
+          day: '2026-10-15',
+          event: 'page_view_unique',
+          dims_json: '{"device":"desktop"}',
+          count: 1,
+        },
+        {
+          day: '2026-10-14',
+          event: 'page_view_unique',
+          dims_json: '{"device":"mobile"}',
+          count: 1,
+        },
+      ].sort((a, b) => a.event.localeCompare(b.event) || a.dims_json.localeCompare(b.dims_json)),
+    );
+    // Neither the ids nor anything hash-like reaches the DB: only words and counts.
+    const dump = dumpDb(db);
+    expect(dump).not.toContain('user-secret');
+    expect(dump).not.toMatch(/[A-Za-z0-9_-]{20,}/);
+  });
+
+  it('a restart mid-day sums (upper bound): the same person counts again', () => {
+    const { db, analytics } = fresh();
+    analytics.unique('page_view_unique', 'u1', { device: 'desktop' });
+    analytics.unique('page_view_unique', 'u1', { device: 'desktop' });
+    analytics.flush();
+    const after = new Analytics(db, { now: () => T0 }); // "restarted" process, new salt
+    after.unique('page_view_unique', 'u1', { device: 'desktop' });
+    after.flush();
+    expect(rows(db).find((r) => r.event === 'page_view_unique')?.count).toBe(2);
+    expect(after.report({}).daily.at(-1)).toMatchObject({ day: '2026-10-14', uniqueVisitors: 2 });
+  });
+
+  it('unique players: humans with a user id once per day per game start; bots never', () => {
+    vi.useFakeTimers({ now: T0 });
+    const { db, analytics } = fresh(() => Date.now());
+    const rooms = new RoomManager({
+      config: testConfig({ allowSolo: true, devBots: true }),
+      clips: ['ca', 'cb', 'cc', 'cd'].map(clip),
+      analytics,
+    });
+    const play = () => {
+      const made = rooms.create('Host');
+      if (!('room' in made)) throw new Error('no room');
+      const r = made.room;
+      const host = made.join.playerId;
+      r.connect(host);
+      r.linkUser(host, 'user-secret-host');
+      expect(r.handle(host, { t: 'addBot' })).toBeNull();
+      expect(r.handle(host, { t: 'micStatus', ok: true })).toBeNull();
+      expect(r.handle(host, { t: 'setReady', ready: true })).toBeNull();
+      vi.advanceTimersByTime(3000);
+      expect(r.handle(host, { t: 'startGame' })).toBeNull();
+      return r;
+    };
+    play();
+    play(); // same user again the same day
+    analytics.flush();
+    const uniq = rows(db).filter((x) => x.event === 'game_player_unique');
+    expect(uniq).toEqual([
+      { day: '2026-10-14', event: 'game_player_unique', dims_json: '{"kind":"private"}', count: 1 },
+    ]);
+    expect(rows(db).find((x) => x.event === 'game_started')?.count).toBe(2);
+    expect(dumpDb(db)).not.toContain('user-secret');
+    void rooms.stop();
+    vi.useRealTimers();
   });
 });

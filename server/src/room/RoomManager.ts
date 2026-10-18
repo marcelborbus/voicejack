@@ -238,10 +238,30 @@ export class RoomManager {
       onFinal: (seats) => this.gameOver(code, kind, seats),
       isAdmin: () => false, // V05: admin users may add bots without DEV_BOTS
       rng: this.deps.rng,
-      analytics: this.deps.analytics,
+      analytics: this.roomTracker(() => room),
     });
     this.deps.analytics?.track('room_created', { kind });
     return room;
+  }
+
+  /**
+   * The room's V15 tracker, plus v1.2 #45 unique players: when a game starts, every human
+   * player linked to a user counts once per day (`game_player_unique`, in-memory hashes only).
+   */
+  private roomTracker(room: () => Room): Tracker | undefined {
+    const a = this.deps.analytics;
+    if (!a) return undefined;
+    return {
+      track: (event, dims, by) => {
+        a.track(event, dims, by);
+        if (event !== 'game_started' || !a.unique) return;
+        const r = room();
+        for (const pid of r.playerIds()) {
+          const uid = r.userIdOf(pid);
+          if (uid) a.unique('game_player_unique', uid, { kind: dims?.kind });
+        }
+      },
+    };
   }
 
   /** V09: public games are rated; private ones never touch Elo. */

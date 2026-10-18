@@ -160,6 +160,13 @@ user / player id or a room code.
 - DAU / WAU / MAU and weekly cohort retention are **not** copied into analytics: the admin
   report aggregates `users.created_at` / `last_seen_at` and `game_players` ⨝ `games` with
   GROUP BY queries (`analytics/report.ts`).
+- Unique visitors / players per day (v1.2 #45): `page_view_unique {device}` (bumped when a
+  user's `/ws/presence` socket connects, which every page opens with the session cookie) and
+  `game_player_unique {kind}` (each linked human at `game_started`; via `RoomManager`'s room
+  tracker). `DailyUniques` keeps `sha256(dailySalt, event, userId)` in an in-memory Set; the
+  32-byte salt is random per UTC day and never persisted, so only the counts reach the DB.
+  A restart mid-day starts a new salt and Set and the counts **sum**, so a person seen before
+  and after the restart counts twice that day (an upper bound; restarts are rare).
 
 ## Planned migrations (not built yet)
 

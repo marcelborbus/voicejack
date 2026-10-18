@@ -166,10 +166,33 @@ export default function AnalyticsPage() {
             testId="chart-visits"
           />
         </Panel>
+        <Panel
+          title="Unique visitors per day"
+          hint="Distinct visitors with a page view that day (one per browser, or per account when signed in). Counted with daily-salted hashes held in memory only; a server restart that day can count someone twice."
+        >
+          <ColumnChart
+            data={data.daily.map((d) => ({ key: d.day, value: d.uniqueVisitors }))}
+            label="unique visitors"
+            testId="chart-unique-visitors"
+          />
+        </Panel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="Games started per day">
           <ColumnChart
             data={data.daily.map((d) => ({ key: d.day, value: d.games }))}
             label="games"
+          />
+        </Panel>
+        <Panel
+          title="Unique players per day"
+          hint="Distinct people who started a game that day (same method; bots never count)."
+        >
+          <ColumnChart
+            data={data.daily.map((d) => ({ key: d.day, value: d.uniquePlayers }))}
+            label="unique players"
+            testId="chart-unique-players"
           />
         </Panel>
       </div>

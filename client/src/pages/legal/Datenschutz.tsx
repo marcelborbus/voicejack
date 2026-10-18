@@ -56,8 +56,8 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
         Voicejack ist ein kostenloses Partyspiel, das eine Einzelperson als Hobbyprojekt betreibt.
         Es gibt <strong>keine Werbung, kein Tracking und keine Analysedienste Dritter</strong> und
         keine Skripte, Schriften oder Bilder von fremden Servern. Wir zählen nur selbst, ohne
-        Cookies und ohne Profile, wie das Spiel genutzt wird (siehe 12). Hier steht, welche Daten
-        anfallen, wofür und wie lange.
+        zusätzliche Cookies und ohne Profile, wie das Spiel genutzt wird (siehe 12). Hier steht,
+        welche Daten anfallen, wofür und wie lange.
       </p>
 
       <h2>1. Verantwortlicher</h2>
@@ -123,7 +123,7 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
       </ul>
       <p>
         Nichts davon dient der Verfolgung über andere Websites hinweg. Für die Analyse (siehe 12)
-        wird nichts im Browser gespeichert oder ausgelesen.
+        wird nichts zusätzlich im Browser gespeichert oder ausgelesen.
       </p>
 
       <h2>5. Gastprofil und Konto</h2>
@@ -230,11 +230,12 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
       <h2>12. Analyse / Produktverbesserung</h2>
       <p>
         Damit wir sehen, was am Spiel funktioniert und was nicht, zählen wir auf unserem eigenen
-        Server, wie Voicejack genutzt wird. Es gibt dafür <strong>keine Cookies</strong>, nichts
-        wird im Browser gespeichert, <strong>keine IP-Adresse</strong>, keine vollständige
-        Browserkennung, keine Profil-, Spieler- oder Raumkennung und kein Fingerprinting.
-        Gespeichert werden nur <strong>Tagessummen</strong> („am 18.10. wurden 12 Spiele
-        gestartet“), aus denen sich keine einzelne Person ablesen lässt:
+        Server, wie Voicejack genutzt wird. Es gibt dafür{' '}
+        <strong>keine zusätzlichen Cookies</strong>, nichts wird zusätzlich im Browser gespeichert,
+        und wir speichern <strong>keine IP-Adresse</strong>, keine vollständige Browserkennung,
+        keine Profil-, Spieler- oder Raumkennung und betreiben kein Fingerprinting. Gespeichert
+        werden nur <strong>Tagessummen</strong> („am 18.10. wurden 12 Spiele gestartet“), aus denen
+        sich keine einzelne Person ablesen lässt:
       </p>
       <ul>
         <li>
@@ -249,6 +250,17 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
           und wie bewertet wurden, Zustimmungen zum Sprachchat in öffentlichen Spielen,
           Registrierungen und die Wartezeit in der Warteschlange (in groben Stufen). Bots zählen
           nicht.
+        </li>
+        <li>
+          Eindeutige Besucher und Spieler pro Tag: wie viele verschiedene Profile an einem Tag die
+          Seite geöffnet (mit Geräteklasse) bzw. ein Spiel gestartet haben. Dazu bildet der Server
+          aus der Profilkennung, die er beim Verbindungsaufbau ohnehin erhält (Cookie{' '}
+          <code>vj_session</code>, siehe 4), und einem zufälligen Tageswert einen Prüfwert (Hash)
+          und merkt sich diesen nur im Arbeitsspeicher, um niemanden doppelt zu zählen. Der
+          Tageswert wird nie gespeichert und jeden Tag neu erzeugt; um Mitternacht (UTC) werden er
+          und alle Prüfwerte verworfen. Gespeichert wird <strong>nur die Anzahl</strong>, nie die
+          Kennung oder der Prüfwert; Tage lassen sich nicht miteinander verknüpfen. Startet der
+          Server im Laufe eines Tages neu, kann eine Person an diesem Tag doppelt gezählt werden.
         </li>
         <li>
           Fehler im Browser: ein kurzer Prüfwert (Hash) der vereinfachten Fehlermeldung, die Art der
@@ -272,12 +284,14 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
         schreib keine persönlichen Daten hinein.
       </p>
       <p>
-        Die Übermittlung an unseren Server erfolgt ohne Cookie. Die IP-Adresse wird dabei nur
-        kurzzeitig im Arbeitsspeicher für die Ratenbegrenzung verwendet; wie jeder Aufruf erscheint
-        die Anfrage aber im Webserver-Log (siehe 3). Da für die Analyse nichts auf deinem Gerät
+        Seitenaufrufe, Fehler und Feedback werden ohne Cookie an unseren Server übermittelt. Die
+        IP-Adresse wird dabei nur kurzzeitig im Arbeitsspeicher für die Ratenbegrenzung verwendet;
+        wie jeder Aufruf erscheint die Anfrage aber im Webserver-Log (siehe 3). Für die Zählung
+        eindeutiger Besucher und Spieler nutzen wir nur die Profilkennung, die das Spiel für seine
+        Funktion ohnehin verwendet. Da für die Analyse nichts zusätzlich auf deinem Gerät
         gespeichert oder von dort ausgelesen wird, ist keine Einwilligung nach § 25 Abs. 1 TDDDG
         nötig. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse daran, das Spiel
-        zu verbessern und Fehler zu finden; ohne Kennungen ist der Eingriff gering).
+        zu verbessern und Fehler zu finden; ohne gespeicherte Kennungen ist der Eingriff gering).
       </p>
       <p>
         Speicherdauer: Tagessummen {AGGREGATE_YEARS} Jahre, Feedback und Fehlerberichte{' '}
@@ -355,9 +369,9 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
       <p>
         Voicejack is a free party game run by one person as a hobby project. There are{' '}
         <strong>no ads, no tracking and no third-party analytics</strong>, and no scripts, fonts or
-        images from other servers. We only count ourselves, without cookies and without profiles,
-        how the game is used (see 12). This page says which data comes up, what for, and for how
-        long.
+        images from other servers. We only count ourselves, without extra cookies and without
+        profiles, how the game is used (see 12). This page says which data comes up, what for, and
+        for how long.
       </p>
 
       <h2>1. Controller</h2>
@@ -415,8 +429,8 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
         </li>
       </ul>
       <p>
-        None of this is used to follow you across other websites. Nothing is stored in or read from
-        your browser for analytics (see 12).
+        None of this is used to follow you across other websites. Nothing extra is stored in or read
+        from your browser for analytics (see 12).
       </p>
 
       <h2>5. Guest profile and account</h2>
@@ -510,10 +524,10 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
       <h2>12. Analytics / product improvement</h2>
       <p>
         To see what works in the game and what doesn't, we count on our own server how Voicejack is
-        used. There are <strong>no cookies</strong> for this, nothing is stored in your browser,{' '}
-        <strong>no IP address</strong>, no full browser identifier, no profile, player or room id
-        and no fingerprinting. Only <strong>daily totals</strong> are stored ("12 games were started
-        on 18 Oct"), from which no individual can be read:
+        used. There are <strong>no extra cookies</strong> for this, nothing extra is stored in your
+        browser, and we store <strong>no IP address</strong>, no full browser identifier, no
+        profile, player or room id, and do no fingerprinting. Only <strong>daily totals</strong> are
+        stored ("12 games were started on 18 Oct"), from which no individual can be read:
       </p>
       <ul>
         <li>
@@ -526,6 +540,16 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
           number of players, in which game phase players leave, number of takes and re-records per
           dub, votes cast, which clips were played how often and how they scored, voice opt-ins in
           public games, sign-ups, and queue waiting time (in coarse steps). Bots do not count.
+        </li>
+        <li>
+          Unique visitors and players per day: how many different profiles opened the site (with
+          device class) or started a game on a day. For this the server takes the profile id it
+          receives anyway when you connect (cookie <code>vj_session</code>, see 4), hashes it
+          together with a random value for the day, and keeps that hash in memory only, so nobody is
+          counted twice. The daily value is never stored and is new every day; at midnight (UTC) it
+          and all hashes are discarded. <strong>Only the number</strong> is stored, never the id or
+          the hash, and days cannot be linked to each other. If the server restarts during a day, a
+          person may be counted twice that day.
         </li>
         <li>
           Browser errors: a short hash of the simplified error message, the kind of page and the
@@ -547,11 +571,13 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
         Please don't put personal data in it.
       </p>
       <p>
-        These requests are sent to our server without a cookie. The IP address is only used briefly
-        in memory for rate limiting; like every request, though, it appears in the web server log
-        (see 3). Since nothing is stored on or read from your device for analytics, no consent under
-        § 25(1) TDDDG is needed. Legal basis: Art. 6(1)(f) GDPR (legitimate interest in improving
-        the game and finding bugs; without identifiers the impact is minimal).
+        Page views, errors and feedback are sent to our server without a cookie. The IP address is
+        only used briefly in memory for rate limiting; like every request, though, it appears in the
+        web server log (see 3). Counting unique visitors and players only uses the profile id the
+        game already uses to work. Since nothing extra is stored on or read from your device for
+        analytics, no consent under § 25(1) TDDDG is needed. Legal basis: Art. 6(1)(f) GDPR
+        (legitimate interest in improving the game and finding bugs; without stored identifiers the
+        impact is minimal).
       </p>
       <p>
         Retention: daily totals {AGGREGATE_YEARS} years, feedback and bug reports {FEEDBACK_YEARS}{' '}
