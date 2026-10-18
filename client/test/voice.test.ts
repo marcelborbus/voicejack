@@ -1,9 +1,24 @@
 import type { Phase, PlayerPublic } from '@dub/shared';
 import { describe, expect, it } from 'vitest';
-import { desiredPeers, diffPeers, isPolite, remoteMuted, voiceGate } from '../src/voice/voicePolicy';
+import {
+  desiredPeers,
+  diffPeers,
+  isPolite,
+  remoteMuted,
+  voiceGate,
+} from '../src/voice/voicePolicy';
 
 function player(id: string, connected = true): PlayerPublic {
-  return { id, name: id, isHost: false, connected, micOk: true, ready: false, dubDone: false, totalScore: 0 };
+  return {
+    id,
+    name: id,
+    isHost: false,
+    connected,
+    micOk: true,
+    ready: false,
+    dubDone: false,
+    totalScore: 0,
+  };
 }
 
 const PHASES: Phase[] = ['LOBBY', 'DUBBING', 'SHOWCASE', 'ROUND_RESULTS', 'FINAL'];
@@ -69,5 +84,26 @@ describe('desiredPeers / diffPeers', () => {
 
   it('never opens a peer to self and closes everything when alone', () => {
     expect(diffPeers(['a', 'b'], [player('a')], 'a')).toEqual({ open: [], close: ['a', 'b'] });
+  });
+});
+
+describe('desiredPeers in public rooms (V13)', () => {
+  const opt = (id: string, on: boolean): PlayerPublic => ({ ...player(id), voiceOptIn: on });
+
+  it('wants nobody until we opted in', () => {
+    expect([...desiredPeers([opt('a', false), opt('b', true)], 'a', true)]).toEqual([]);
+  });
+
+  it('wants only the other opted-in players', () => {
+    const roster = [opt('a', true), opt('b', true), opt('c', false), opt('d', true)];
+    expect([...desiredPeers(roster, 'a', true)].sort()).toEqual(['b', 'd']);
+    expect(diffPeers(['b', 'c'], roster, 'a', true)).toEqual({ open: ['d'], close: ['c'] });
+  });
+
+  it('closes everything when we opt out', () => {
+    expect(diffPeers(['b'], [opt('a', false), opt('b', true)], 'a', true)).toEqual({
+      open: [],
+      close: ['b'],
+    });
   });
 });

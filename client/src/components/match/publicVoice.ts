@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import { useRoomStore } from '@/state/room';
+import { setSticky } from '@/state/session';
 import { useVoice } from '@/voice/voiceStore';
 
 /** Public rooms: are other players audible by default ("tap to listen")? */
@@ -31,7 +32,24 @@ export function usePublicVoiceDefaults(): void {
     useVoice.setState({ selfMuted: true, peerMuted: {} });
     muteNew();
     const unsub = useRoomStore.subscribe(muteNew);
+    // V13: tapping "talk" or "listen" opts in to voice; only two opted-in players open a peer
+    // connection (which exposes IPs). Mic off and not listening again = opted out.
+    const syncOptIn = () => {
+      const s = useRoomStore.getState().snapshot;
+      if (!s?.public) return;
+      const want = !useVoice.getState().selfMuted || usePublicListen.getState().on;
+      const self = s.players.find((p) => p.id === s.you.playerId);
+      // Sticky: re-sent after a reconnect.
+      if (!!self?.voiceOptIn !== want) setSticky('voiceOptIn', { t: 'voiceOptIn', on: want });
+    };
+    const unsubOpt = [
+      useVoice.subscribe((v, prev) => v.selfMuted !== prev.selfMuted && syncOptIn()),
+      usePublicListen.subscribe(syncOptIn),
+    ];
+    syncOptIn();
     return () => {
+      for (const u of unsubOpt) u();
+      setSticky('voiceOptIn', null);
       unsub();
       usePublicListen.setState({ on: false });
       useVoice.setState({ selfMuted: false, peerMuted: {} });

@@ -88,6 +88,8 @@ export const VoteKickSchema = z.object({
   playerId: PlayerIdSchema,
   kick: z.boolean(),
 });
+/** V13, public rooms: opt in to (or out of) voice; only two opted-in players connect. */
+export const VoiceOptInSchema = z.object({ t: z.literal('voiceOptIn'), on: z.boolean() });
 export const REPORT_TEXT_MAX_LENGTH = 500;
 /** V08, public rooms: report a player to the moderators (stored server-side, once per target). */
 export const ReportSchema = z.object({
@@ -117,6 +119,7 @@ export const C2SSchema = z.discriminatedUnion('t', [
   RemoveBotSchema,
   VoteKickSchema,
   ReportSchema,
+  VoiceOptInSchema,
 ]);
 export type C2S = z.infer<typeof C2SSchema>;
 export type C2SType = C2S['t'];

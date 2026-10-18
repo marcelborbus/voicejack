@@ -134,6 +134,12 @@ export interface PlayerPublic {
   totalScore: number;
   /** Server-side bot (V01, dev test mode): never in voice, excluded from Elo. Absent = false. */
   isBot?: boolean;
+  /**
+   * V13, public rooms only: the player opted in to voice ("tap to talk" / "tap to listen").
+   * Peer connections (which expose IPs) exist only between two opted-in players. Absent in
+   * private rooms, where everyone connects.
+   */
+  voiceOptIn?: boolean;
 }
 
 // ---------- chunks ----------

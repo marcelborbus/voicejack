@@ -26,10 +26,21 @@ export function isPolite(selfId: PlayerId, peerId: PlayerId): boolean {
   return selfId < peerId;
 }
 
-/** Which peers we want: every other connected player (server-side bots never do voice). */
-export function desiredPeers(players: readonly PlayerPublic[], selfId: PlayerId): Set<PlayerId> {
+/**
+ * Which peers we want: every other connected player (server-side bots never do voice). In
+ * public rooms (V13) only when both we and they opted in to voice: a peer connection exposes
+ * IP addresses even while muted, so strangers connect only after both said yes.
+ */
+export function desiredPeers(
+  players: readonly PlayerPublic[],
+  selfId: PlayerId,
+  publicRoom = false,
+): Set<PlayerId> {
+  if (publicRoom && !players.find((p) => p.id === selfId)?.voiceOptIn) return new Set();
   return new Set(
-    players.filter((p) => p.id !== selfId && p.connected && !p.isBot).map((p) => p.id),
+    players
+      .filter((p) => p.id !== selfId && p.connected && !p.isBot && (!publicRoom || p.voiceOptIn))
+      .map((p) => p.id),
   );
 }
 
@@ -38,8 +49,9 @@ export function diffPeers(
   current: Iterable<PlayerId>,
   players: readonly PlayerPublic[],
   selfId: PlayerId,
+  publicRoom = false,
 ): { open: PlayerId[]; close: PlayerId[] } {
-  const want = desiredPeers(players, selfId);
+  const want = desiredPeers(players, selfId, publicRoom);
   const have = new Set(current);
   return {
     open: [...want].filter((id) => !have.has(id)).sort(),

@@ -217,6 +217,9 @@ class Session implements Connection {
       this.error('INVALID', 'unknown peer');
       return;
     }
+    // Public rooms (V13): no signaling, so no IP exchange, unless both players opted in to voice.
+    // Dropped silently: an opt-out can race a negotiation that is already under way.
+    if (!room.voicePeers(playerId, msg.to)) return;
     const payload: S2C = { t: 'rtc', from: playerId, data: msg.data };
     if (Buffer.byteLength(JSON.stringify(msg.data)) > RTC_MAX_BYTES) {
       this.error('LIMIT', 'signal too large');

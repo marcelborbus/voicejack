@@ -1,11 +1,18 @@
-import type { Phase, PlayerId, PlayerPublic, RtcSignal } from '@dub/shared';
+import type { Phase, PlayerId, PlayerPublic, RoomSnapshot, RtcSignal } from '@dub/shared';
 import { getAudioContext, isAudioRunning, onAudioStateChange } from '@/audio/context';
 import { rms, toDb } from '@/audio/levels';
 import { getMicLevelDb, getMicStream, useMic } from '@/audio/mic';
 import { useRoomStore } from '@/state/room';
 import { onServerMessage, send } from '@/state/session';
 import { Peer } from './Peer';
-import { diffPeers, isPolite, remoteMuted, voiceGate, type VoiceGate } from './voicePolicy';
+import {
+  desiredPeers,
+  diffPeers,
+  isPolite,
+  remoteMuted,
+  voiceGate,
+  type VoiceGate,
+} from './voicePolicy';
 import { useVoice, type PeerState } from './voiceStore';
 
 const SPEAKING_DB = -48;
@@ -34,11 +41,13 @@ export class VoiceMesh {
   private unsubs: (() => void)[] = [];
   private meterTimer: ReturnType<typeof setInterval>;
   private selfId: PlayerId | null = null;
+  private publicRoom = false;
+  private wanted = new Set<PlayerId>();
 
   constructor(private readonly container: HTMLElement) {
     useVoice.setState({ active: true, peers: {}, speaking: {}, selfSpeaking: false });
     this.unsubs.push(
-      useRoomStore.subscribe((s) => this.sync(s.snapshot?.you.playerId ?? null, s.snapshot?.players ?? [], s.snapshot?.phase ?? null)),
+      useRoomStore.subscribe((s) => this.syncFrom(s.snapshot)),
       useVoice.subscribe((s, prev) => {
         if (s.selfMuted !== prev.selfMuted || s.peerMuted !== prev.peerMuted) this.applyGate();
       }),
@@ -50,17 +59,26 @@ export class VoiceMesh {
     );
     this.meterTimer = setInterval(() => this.meter(), 100);
     this.refreshTrack();
-    const s = useRoomStore.getState();
-    this.sync(s.snapshot?.you.playerId ?? null, s.snapshot?.players ?? [], s.snapshot?.phase ?? null);
+    this.syncFrom(useRoomStore.getState().snapshot);
   }
 
-  private sync(selfId: PlayerId | null, players: readonly PlayerPublic[], phase: Phase | null): void {
+  private syncFrom(s: RoomSnapshot | null): void {
+    this.publicRoom = !!s?.public;
+    this.sync(s?.you.playerId ?? null, s?.players ?? [], s?.phase ?? null);
+  }
+
+  private sync(
+    selfId: PlayerId | null,
+    players: readonly PlayerPublic[],
+    phase: Phase | null,
+  ): void {
     // Gate first: when DUBBING arrives, audio is cut before anything else happens.
     this.gate = voiceGate(phase, useVoice.getState().selfMuted);
     this.applyGate();
     if (!selfId) return;
     this.selfId = selfId;
-    const { open, close } = diffPeers(this.remotes.keys(), players, selfId);
+    this.wanted = desiredPeers(players, selfId, this.publicRoom);
+    const { open, close } = diffPeers(this.remotes.keys(), players, selfId, this.publicRoom);
     for (const id of close) this.closePeer(id);
     for (const id of open) this.openPeer(id);
   }
@@ -152,11 +170,16 @@ export class VoiceMesh {
   }
 
   private retryPlayback(): void {
-    for (const r of this.remotes.values()) if (r.audio.srcObject && r.audio.paused) this.play(r.audio);
+    for (const r of this.remotes.values())
+      if (r.audio.srcObject && r.audio.paused) this.play(r.audio);
   }
 
   private async onSignal(from: PlayerId, data: RtcSignal): Promise<void> {
     if (!this.selfId || from === this.selfId) return;
+    // Public rooms (V13): never answer a peer we have not both opted in with. The server only
+    // relays between opted-in players and pushes the snapshot first, so this never drops a
+    // wanted offer.
+    if (this.publicRoom && !this.wanted.has(from)) return;
     // A signal can beat the roster update; open lazily (the next diff keeps it if wanted).
     const isOffer = data.kind === 'description' && data.description.type === 'offer';
     let r = this.remotes.get(from);
@@ -196,6 +219,12 @@ export class VoiceMesh {
     for (const id of [...this.remotes.keys()]) this.closePeer(id);
     this.voiceTrack?.stop();
     this.voiceTrack = null;
-    useVoice.setState({ active: false, peers: {}, speaking: {}, selfSpeaking: false, allowed: false });
+    useVoice.setState({
+      active: false,
+      peers: {},
+      speaking: {},
+      selfSpeaking: false,
+      allowed: false,
+    });
   }
 }

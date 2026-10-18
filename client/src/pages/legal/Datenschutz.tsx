@@ -164,19 +164,20 @@ function German({ legal }: { legal: LegalInfo | null | undefined }) {
       </p>
 
       <h2>8. Sprachchat (WebRTC)</h2>
-      {/* TODO(owner): the voice mesh connects to every other human player as soon as you are in
-          a room, also in public games and while muted (client/src/voice/VoiceMesh.ts), so IPs are
-          exchanged with strangers in public matches. Consider opening peer connections only after
-          the voice opt-in, and/or a self-hosted STUN/TURN server instead of Google's. */}
       {/* TODO(owner): verify Google LLC's active Data Privacy Framework certification
           (dataprivacyframework.gov) before relying on it. */}
       <p>
         Der Sprachchat läuft <strong>direkt zwischen den Browsern</strong> der Spieler
         (Peer-to-Peer). Die Sprache geht nicht über unseren Server und wird nicht aufgezeichnet;
-        unser Server vermittelt nur den Verbindungsaufbau. Sobald du mit anderen in einem Raum bist,
-        baut dein Browser zu jedem Mitspieler eine direkte Verbindung auf, auch wenn du
-        stummgeschaltet bist und auch in öffentlichen Spielen.{' '}
-        <strong>Dabei ist deine IP-Adresse für die Mitspieler technisch sichtbar.</strong>
+        unser Server vermittelt nur den Verbindungsaufbau. In privaten Räumen baut dein Browser zu
+        jedem Mitspieler eine direkte Verbindung auf, auch wenn du stummgeschaltet bist. In{' '}
+        <strong>öffentlichen Spielen</strong> („Zufälliges Spiel“) ist der Sprachchat aus, bis du
+        „Tap to talk“ oder „Tap to listen“ antippst; eine Verbindung entsteht nur zwischen zwei
+        Spielern, die beide zugestimmt haben, und wird getrennt, sobald du beides wieder
+        ausschaltest.{' '}
+        <strong>
+          Über eine solche Verbindung ist deine IP-Adresse für den Mitspieler technisch sichtbar.
+        </strong>
       </p>
       <p>
         Um einen Verbindungsweg zu finden, fragt dein Browser den STUN-Server{' '}
@@ -381,9 +382,13 @@ function English({ legal }: { legal: LegalInfo | null | undefined }) {
       <p>
         Voice chat runs <strong>directly between the players' browsers</strong> (peer-to-peer).
         Voice does not pass through our server and is not recorded; our server only helps set up the
-        connection. As soon as you are in a room with others, your browser opens a direct connection
-        to every other player, even while you are muted and also in public games.{' '}
-        <strong>This makes your IP address technically visible to the other players.</strong>
+        connection. In private rooms your browser opens a direct connection to every other player,
+        even while you are muted. In <strong>public games</strong> ("Join a random game") voice is
+        off until you tap "Tap to talk" or "Tap to listen"; a connection is only made between two
+        players who both opted in, and it is closed once you switch both off again.{' '}
+        <strong>
+          Over such a connection your IP address is technically visible to that player.
+        </strong>
       </p>
       <p>
         To find a connection path, your browser asks Google LLC's (USA) STUN server{' '}

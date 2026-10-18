@@ -61,7 +61,7 @@ export class Peer {
     };
     this.cb.onState('connecting');
 
-    if (!polite) pc.addTransceiver('audio', { direction: 'sendrecv'});
+    if (!polite) pc.addTransceiver('audio', { direction: 'sendrecv' });
     this.applyTrack();
   }
 
@@ -75,14 +75,18 @@ export class Peer {
     for (const t of this.pc.getTransceivers()) {
       if (t.receiver.track.kind !== 'audio' || t.currentDirection === 'stopped') continue;
       if (t.direction !== 'sendrecv') t.direction = 'sendrecv';
-      if (t.sender.track !== this.track) void t.sender.replaceTrack(this.track).catch(() => undefined);
+      if (t.sender.track !== this.track)
+        void t.sender.replaceTrack(this.track).catch(() => undefined);
     }
   }
 
   private sendDescription(): void {
     const d = this.pc.localDescription;
     if (!d) return;
-    this.cb.signal({ kind: 'description', description: { type: d.type as 'offer' | 'answer' | 'rollback', sdp: d.sdp } });
+    this.cb.signal({
+      kind: 'description',
+      description: { type: d.type as 'offer' | 'answer' | 'rollback', sdp: d.sdp },
+    });
   }
 
   /** Returns false if the signal could not be applied (e.g. the remote restarted). */
@@ -92,7 +96,8 @@ export class Peer {
     try {
       if (data.kind === 'description') {
         const desc = data.description;
-        const offerCollision = desc.type === 'offer' && (this.makingOffer || pc.signalingState !== 'stable');
+        const offerCollision =
+          desc.type === 'offer' && (this.makingOffer || pc.signalingState !== 'stable');
         this.ignoreOffer = !this.polite && offerCollision;
         if (this.ignoreOffer) return true;
         await pc.setRemoteDescription(desc as RTCSessionDescriptionInit);
@@ -116,7 +121,9 @@ export class Peer {
   }
 
   get dead(): boolean {
-    return this.closed || this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed';
+    return (
+      this.closed || this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed'
+    );
   }
 
   close(): void {

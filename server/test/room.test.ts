@@ -52,6 +52,7 @@ interface Harness {
 function setup(
   opts: Partial<RoomOptions> = {},
   clips: ClipInfo[] = [clip('a'), clip('b'), clip('c'), clip('d')],
+  kind: 'private' | 'public' = 'private',
 ): Harness {
   const inbox = new Map<string, S2C[]>();
   const uploaded = new Set<string>();
@@ -70,6 +71,7 @@ function setup(
     isUploaded: (s, c) => uploaded.has(`${s}/${c}`),
     onPlayerRemoved: (id) => removed.push(id),
     rng: seeded(),
+    kind,
   });
   const h: Harness = {
     room,
@@ -82,7 +84,7 @@ function setup(
       return s;
     },
     add(name) {
-      const j = ok<JoinResult>(room.join(name));
+      const j = ok<JoinResult>(kind === 'public' ? room.seat(name) : room.join(name));
       expect(room.connect(j.playerId)).toBeNull();
       return j.playerId;
     },
@@ -665,5 +667,31 @@ describe('showcase & voting rules', () => {
     const s = h.snap(ids[0]);
     expect(JSON.stringify(s.showcase)).not.toContain(ids[1]);
     expect(JSON.stringify(s.showcase)).not.toContain(ids[2]);
+  });
+});
+
+describe('voice opt-in (V13)', () => {
+  it('private rooms: everyone may signal, no voiceOptIn field', () => {
+    const h = setup();
+    const a = h.add('A');
+    const b = h.add('B');
+    expect(h.room.voicePeers(a, b)).toBe(true);
+    expect(h.snap(a).players[0]).not.toHaveProperty('voiceOptIn');
+  });
+
+  it('public rooms: only two opted-in players may signal', () => {
+    const h = setup({}, undefined, 'public');
+    const a = h.add('A');
+    const b = h.add('B');
+    const c = h.add('C');
+    expect(h.room.voicePeers(a, b)).toBe(false);
+    expect(h.room.handle(a, { t: 'voiceOptIn', on: true })).toBeNull();
+    expect(h.room.voicePeers(a, b)).toBe(false);
+    expect(h.room.handle(b, { t: 'voiceOptIn', on: true })).toBeNull();
+    expect(h.room.voicePeers(a, b)).toBe(true);
+    expect(h.room.voicePeers(a, c)).toBe(false);
+    expect(h.snap(c).players.map((p) => p.voiceOptIn)).toEqual([true, true, false]);
+    h.room.handle(a, { t: 'voiceOptIn', on: false });
+    expect(h.room.voicePeers(a, b)).toBe(false);
   });
 });

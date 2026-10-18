@@ -56,6 +56,8 @@ interface PlayerState {
   totalScore: number;
   /** Server-side bot (V01): driven by a BotPlayer, never host, excluded from Elo. */
   isBot: boolean;
+  /** V13, public rooms: opted in to voice (see `voicePeers`). */
+  voiceOptIn: boolean;
 }
 
 interface RoundState {
@@ -195,6 +197,22 @@ export class Room {
   get revision(): number {
     return this.rev;
   }
+  /**
+   * V13: may these two players exchange WebRTC signaling (and so learn each other's IP)?
+   * Private rooms: always. Public rooms: only when both opted in to voice.
+   */
+  voicePeers(a: PlayerId, b: PlayerId): boolean {
+    if (this.kind !== 'public') return true;
+    return !!this.players.get(a)?.voiceOptIn && !!this.players.get(b)?.voiceOptIn;
+  }
+
+  private setVoiceOptIn(p: PlayerState, on: boolean): Outcome {
+    if (this.kind !== 'public' || p.voiceOptIn === on) return null;
+    p.voiceOptIn = on;
+    this.changed();
+    return null;
+  }
+
   hasPlayer(id: PlayerId): boolean {
     return this.players.has(id);
   }
@@ -301,6 +319,7 @@ export class Room {
       dubDone: false,
       totalScore: 0,
       isBot: false,
+      voiceOptIn: false,
     };
     this.players.set(p.id, p);
     this.tokens.set(p.token, p.id);
@@ -389,6 +408,8 @@ export class Room {
         return this.voteKick(p, msg.playerId, msg.kick);
       case 'report':
         return this.report(p, msg.playerId, msg.reason);
+      case 'voiceOptIn':
+        return this.setVoiceOptIn(p, msg.on);
       case 'hello':
       case 'ping':
       case 'rtc':
@@ -518,6 +539,7 @@ export class Room {
       dubDone: false,
       totalScore: 0,
       isBot: true,
+      voiceOptIn: false,
     };
     this.players.set(bot.id, bot);
     this.tokens.set(bot.token, bot.id);
@@ -994,8 +1016,7 @@ export class Room {
     this.forgetVotes(id);
     if (this.connectedCount === 0 && p.connected) this.emptySinceAt = this.deps.clock.now();
     if (id === this.hostId) {
-      const next =
-        this.earliest((q) => q.connected && !q.isBot) ?? this.earliest((q) => !q.isBot);
+      const next = this.earliest((q) => q.connected && !q.isBot) ?? this.earliest((q) => !q.isBot);
       this.hostId = next?.id ?? '';
       this.timers.clear('hostMigrate');
     }
@@ -1090,6 +1111,7 @@ export class Room {
         dubDone: q.dubDone,
         totalScore: q.totalScore,
         isBot: q.isBot,
+        ...(this.kind === 'public' && { voiceOptIn: q.voiceOptIn }),
       }));
   }
 
