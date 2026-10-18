@@ -23,7 +23,87 @@ SQLite: an anonymous id, the last display name and game stats per browser cookie
 data until V04 adds optional email login.) Abuse is bounded by the app (30 rooms × 8 players,
 per-route REST limits, per-socket WS rate/size caps, Origin check) and by the `limit_req` /
 `limit_conn` zones (`dub_*`) in the vhost. If accounts or persistent storage are ever added,
-put an Authelia gate in front of it.
+put an Authelia gate in front of it. (v1.1 added optional email accounts and persistent
+storage; the owner kept the game public by design, with only `/admin` gated. See the rollout
+checklist below.)
+
+## v1.1 rollout (ordered checklist)
+
+Do these in order, in one session, from a quiet moment (step 9 ends running games). Details for
+each step are in the sections referenced. Nothing below has been applied to the host yet,
+except `legal.json` (placed by the orchestrator, step 4).
+
+1. **Pre-flight (host, read-only).** `free -h && docker stats --no-stream` (need ~450 MiB
+   headroom for the new limit), `ss -ltn | grep 3087`, `docker compose -f /opt/voicejack/compose.yaml ps`.
+2. **Build + ship the image (dev box).** `pnpm install && pnpm typecheck && pnpm test && pnpm e2e`,
+   then `pnpm docker:build` and `docker save voicejack:latest | gzip | ssh hetzner 'gunzip |
+   docker load'` (§1). The image is ~300 MB now (ffmpeg).
+3. **Directories (host), owned by uid 1000** (the container runs as `node`):
+   `cd /opt/voicejack && install -d -o 1000 -g 1000 data data/db data/library`. `data/uploads`
+   is created and wiped by the server; never put the DB or library under it.
+4. **`legal.json` (host).** Already at `/opt/voicejack/data/legal.json` (orchestrator). Check
+   only: `sudo -u '#1000' cat /opt/voicejack/data/legal.json | python3 -m json.tool` (readable
+   by uid 1000, valid JSON with `name`, `address`, `email`). Optional: `data/costs.json` (§V11).
+5. **Compose + env (host).** Copy the new `deploy/compose.yaml` to `/opt/voicejack/` (it has
+   `mem_limit: 450m` / `memswap_limit: 450m`, the mail settings and `extra_hosts`). Env vars:
+   - Set by the image (no action): `NODE_ENV=production`, `DB_PATH=/app/data/db/voicejack.sqlite`,
+     `LIBRARY_DIR=/app/data/library`, `LEGAL_PATH=/app/data/legal.json`,
+     `COSTS_PATH=/app/data/costs.json`, `DATA_DIR=/app/data/uploads`,
+     `TRUST_PROXY=loopback,uniquelocal`.
+   - Set by `compose.yaml` with defaults (override in `.env` only if needed):
+     `MAIL_TRANSPORT=smtp`, `SMTP_HOST=host.docker.internal`, `SMTP_PORT=25`,
+     `MAIL_FROM=Voicejack <noreply@borbus.eu>`, `PUBLIC_URL=https://voicejack.borbus.eu`,
+     `LOG_LEVEL=info`.
+   - Leave **unset** in prod: `ICE_SERVERS` (default = Nextcloud STUN, as the
+     Datenschutzerklärung says), `DEV_BOTS`, `ADMIN_DEV` (ignored in production anyway),
+     `READY_CHECK_MS`, `GUEST_LIMIT_PER_IP` (e2e only).
+   - App logs no longer contain client IPs (method, path, status only), as stated in the
+     Datenschutzerklärung §3; no log config change needed.
+6. **Authelia access_control rule (host)** for `^/(admin|api/admin)([/?].*)?$`, group
+   `admins`, `one_factor`, in `/opt/authelia/config/configuration.yml` (YAML in "Clip libraries
+   + admin", step 4), then `cd /opt/authelia && docker compose restart authelia` and check its
+   log for config errors.
+7. **nginx vhost (host).** Deploy `deploy/nginx/voicejack.borbus.eu.conf` (§4). v1.1 changes
+   against v1: `include snippets/authelia-location.conf` at server level; `location /admin` and
+   `location /api/admin/` with `authelia-authrequest.conf` (210m body, buffering off, 300 s
+   timeouts); `location /api/my/` (host uploads, 210m, buffering off, 300 s); `location =
+   /ws/presence` (presence socket, `dub_conn` 16, 1 h timeouts); every other location blanks
+   `Remote-User`/`Remote-Groups`. Then `nginx -t && systemctl reload nginx`.
+8. **Backups (host).** Add `/opt/voicejack/data/db` **and** `/opt/voicejack/data/library` to
+   `/opt/backups` like the other services' state (DB rows and library files belong together;
+   use `sqlite3 ... ".backup ..."` for a consistent live copy, see "Database and backups").
+   Then fill in the `TODO(owner)` about backup location in
+   `client/src/pages/legal/Datenschutz.tsx`.
+9. **Start (host).** `cd /opt/voicejack && docker compose up -d`, wait for `(healthy)`, check
+   `docker logs voicejack` for `db: … at schema v6`, `clips: N from /app/clips` and **no**
+   `legal:` warning.
+10. **Verify (host + browser).**
+    - `curl -sf http://127.0.0.1:3087/api/health`; `curl -s https://voicejack.borbus.eu/api/me`
+      (guest JSON + `Set-Cookie: vj_session`); `curl -sI https://voicejack.borbus.eu/api/legal`
+      (`X-Robots-Tag: noindex, nofollow`, body has no `@`); `curl -s
+      https://voicejack.borbus.eu/robots.txt`.
+    - Admin gate: `curl -s -o /dev/null -w "%{http_code}\n" https://voicejack.borbus.eu/admin`
+      → 302 to auth.borbus.eu; `curl -s -o /dev/null -w "%{http_code}\n"
+      https://voicejack.borbus.eu/api/admin/libraries` → 302/401, never 200;
+      `curl -s -H 'Remote-Groups: admins' https://voicejack.borbus.eu/api/me` grants nothing.
+    - Sign in with your own address (magic link through Postfix, `mailq` empty afterwards),
+      `/admin` as `marcel` lists Classics, a "Join a random game" with two devices,
+      `docker stats --no-stream voicejack` well under 450 MiB.
+    - Uptime Kuma check on `/api/health` still green.
+11. **ARCHITECTURE.md (host, same session).** Update `/opt/docs/ARCHITECTURE.md`, bump **Last
+    verified**:
+    - **§3.9 Voicejack**: no longer "nothing persistent / nothing to back up": SQLite DB
+      (`data/db`) + clip library (`data/library`), both backed up; optional email accounts
+      (magic link); `/admin` + `/api/admin` Authelia-gated (`admins`), re-checked via
+      `Remote-Groups`; `mem_limit 450m`; image ~300 MB with ffmpeg; voice opt-in in public games,
+      STUN = `stun.nextcloud.com:443`; app logs carry no client IPs; `legal.json` in `data/`.
+    - **§3.1 access-control table**: the `voicejack.borbus.eu` `^/(admin|api/admin)` rule.
+    - **§2 nginx layout row**: "public, except `/admin` + `/api/admin/` (Authelia)"; new
+      locations `/api/my/`, `/ws/presence`.
+    - **§5 resource budget**: `voicejack` ~30 MB idle, ~290 MB peak while normalizing (cap 450m).
+    - **§7 "What sends mail"**: `| Voicejack | magic-link sign-in mails |`.
+    - **Backups section**: the two new paths.
+    - **§10 Verifying**: the `/admin` 302 check next to the public `/api/health` one.
 
 ## 0. Prerequisites (already done as of 2026-10-16)
 
@@ -257,6 +337,8 @@ Restarting ends all running games (rooms are in memory); pick a quiet moment.
 ## 6. Update `/opt/docs/ARCHITECTURE.md` (same session — AGENTS.md requires it)
 
 Draft text for each section; adjust to what you actually verified, and bump **Last verified**.
+This is the v1 text; for v1.1 apply the changes listed in step 11 of the v1.1 rollout checklist
+on top of it (persistent state, backups, `/admin` gate, 450m, Nextcloud STUN).
 
 **§1 DNS and TLS**, hostname table, add a row:
 
