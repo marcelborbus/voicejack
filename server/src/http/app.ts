@@ -36,6 +36,8 @@ import * as eloRoutes from '../routes/elo.js';
 import type { Ratings } from '../elo/Ratings.js';
 import * as costsRoutes from '../routes/costs.js';
 import * as legalRoutes from '../routes/legal.js';
+import * as trackRoutes from '../routes/track.js';
+import type { Analytics } from '../analytics/Analytics.js';
 import { loggerOptions } from './logger.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
@@ -61,6 +63,8 @@ export interface AppDeps {
   friends?: Friends;
   /** V09 Elo + game history (`/api/me/last-game`). Needs `accounts`. */
   ratings?: Ratings;
+  /** V15 aggregate analytics + feedback (`POST /api/t`, `/api/admin/analytics`). */
+  analytics?: Analytics;
   /** Epoch ms the process started (health uptime). */
   startedAt?: number;
 }
@@ -135,6 +139,7 @@ export async function buildApp(
     eloRoutes.register,
     costsRoutes.register,
     legalRoutes.register,
+    trackRoutes.register,
   ];
   for (const register of modules) await register(app, deps);
 

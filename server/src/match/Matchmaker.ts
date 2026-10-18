@@ -16,6 +16,7 @@ import type { Clock, PlayerReport, Scheduler } from '../room/types.js';
 import { Matcher, type MatcherRules } from './Matcher.js';
 import { eloMatchRules, type RatedEntry } from './ranked.js';
 import type { Reports } from './Reports.js';
+import { waitBucket, type Tracker } from '../analytics/Analytics.js';
 
 /** A vote-kicked player cannot queue again for this long. */
 export const VOTE_KICK_BLOCK_MS = 5 * 60_000;
@@ -61,6 +62,8 @@ export interface MatchmakerDeps {
   /** Rule overrides (default: V09 casual/ranked `compatible` / `score`, `ranked.ts`). */
   rules?: Partial<MatcherRules<QueuedPlayer>>;
   blockMs?: number;
+  /** V15: queue wait histogram (mode + bucket only). */
+  analytics?: Tracker;
   log?: { warn(obj: unknown, msg?: string): void };
 }
 
@@ -245,6 +248,10 @@ export class Matchmaker {
         continue;
       }
       this.seated.set(`${room.code}:${seat.playerId}`, e);
+      this.deps.analytics?.track('queue_wait', {
+        mode: e.mode ?? 'casual',
+        wait: waitBucket(this.clock.now() - e.joinedAt),
+      });
       e.client.send({ t: 'matchFound', code: room.code, token: seat.token });
     }
     room.beginReadyCheck();

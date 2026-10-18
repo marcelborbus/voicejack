@@ -114,6 +114,7 @@ export async function register(app: FastifyInstance, deps: AppDeps): Promise<voi
         const fresh = accounts.createSession(res.user.id);
         reply.header('Set-Cookie', sessionCookie(fresh.token, SESSION_TTL_MS, secure));
         req.log.info({ userId: res.user.id, merged: res.merged }, 'login');
+        if (!res.merged) deps.analytics?.track('signup'); // V15: a new registered account
         return reply.redirect('/?login=ok', 303);
       },
     );

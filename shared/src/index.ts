@@ -9,3 +9,4 @@ export * from './protocol/friends.js';
 export * from './protocol/elo.js';
 export * from './protocol/legal.js';
 export * from './helpers/index.js';
+export * from './protocol/analytics.js';

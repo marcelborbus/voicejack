@@ -8,6 +8,9 @@ import {
   UploadBanBodySchema,
   UploadClipQuerySchema,
   libraryRoutes,
+  analyticsRoutes,
+  AnalyticsQuerySchema,
+  type AdminAnalyticsResponse,
   type AdminClipsResponse,
   type AdminLibrariesResponse,
   type AdminMeResponse,
@@ -238,5 +241,35 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
       }
       return reply.status(204).send();
     });
+
+    // ---------------------------------------------------------- V15 analytics
+
+    const analytics = deps.analytics;
+    if (analytics) {
+      admin.get(analyticsRoutes.admin, async (req, reply) => {
+        const q = AnalyticsQuerySchema.safeParse(req.query);
+        if (!q.success)
+          return bad(reply, 'from/to: YYYY-MM-DD, page ≥ 1, status open|resolved|all');
+        const res: AdminAnalyticsResponse = analytics.report(q.data);
+        return res;
+      });
+      const feedbackId = (raw: string) => (/^\d{1,12}$/.test(raw) ? Number(raw) : NaN);
+      admin.post<{ Params: { id: string }; Body: { resolved?: unknown } | undefined }>(
+        analyticsRoutes.feedbackResolve,
+        async (req, reply) => {
+          const resolved = req.body?.resolved !== false;
+          if (!analytics.resolveFeedback(feedbackId(req.params.id), resolved)) {
+            return reply.status(404).send(sendError('INVALID', 'unknown feedback'));
+          }
+          return reply.status(204).send();
+        },
+      );
+      admin.delete<{ Params: { id: string } }>(analyticsRoutes.feedback, async (req, reply) => {
+        if (!analytics.deleteFeedback(feedbackId(req.params.id))) {
+          return reply.status(404).send(sendError('INVALID', 'unknown feedback'));
+        }
+        return reply.status(204).send();
+      });
+    }
   });
 }

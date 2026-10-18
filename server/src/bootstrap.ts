@@ -14,6 +14,7 @@ import { Matchmaker } from './match/Matchmaker.js';
 import { Reports } from './match/Reports.js';
 import { Friends } from './friends/Friends.js';
 import { Ratings } from './elo/Ratings.js';
+import { Analytics } from './analytics/Analytics.js';
 
 /** Expired sessions / idle guests are purged this often (and once at startup). */
 export const DB_CLEANUP_MS = 3600_000;
@@ -29,6 +30,7 @@ export interface RunningServer {
   reports: Reports;
   friends: Friends;
   ratings: Ratings;
+  analytics: Analytics;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -47,14 +49,18 @@ export async function startServer(
     throw new Error(`DB_PATH (${config.dbPath}) must not be inside DATA_DIR, which is wiped`);
   }
   if ((path.resolve(config.libraryDir) + path.sep).startsWith(dataDir)) {
-    throw new Error(`LIBRARY_DIR (${config.libraryDir}) must not be inside DATA_DIR, which is wiped`);
+    throw new Error(
+      `LIBRARY_DIR (${config.libraryDir}) must not be inside DATA_DIR, which is wiped`,
+    );
   }
   const db = openDb(config.dbPath);
   const mig = migrate(db);
   const clips = ClipLibrary.open(db, { clipsDir: config.clipsDir, libraryDir: config.libraryDir });
   const accounts = new Accounts(db);
   const ratings = new Ratings(db);
+  const analytics = new Analytics(db);
   const rooms = new RoomManager({
+    analytics,
     config,
     clips: clips.clips.map(toClipInfo),
     store,
@@ -64,16 +70,26 @@ export async function startServer(
   clips.onChange(() => rooms.libraryChanged());
   const presence = new Presence({ rooms });
   const reports = new Reports(db);
-  const matchmaker = new Matchmaker({ rooms, presence, reports, ratings, timings: config.timings });
+  const matchmaker = new Matchmaker({
+    rooms,
+    presence,
+    reports,
+    ratings,
+    analytics,
+    timings: config.timings,
+  });
   const friends = new Friends({ db, presence, rooms });
   const app = await buildApp(
-    { config, clips, rooms, store, accounts, presence, matchmaker, friends, ratings },
+    { config, clips, rooms, store, accounts, presence, matchmaker, friends, ratings, analytics },
     opts,
   );
   const cleanup = () => {
     try {
       const n = accounts.cleanup();
       if (n.sessions || n.guests) app.log.info(n, 'db cleanup');
+      // V15 retention: aggregates 2 years, feedback 1 year.
+      const a = analytics.prune();
+      if (a.aggregates || a.feedback) app.log.info(a, 'analytics cleanup');
     } catch (e) {
       app.log.error(e, 'db cleanup failed');
     }
@@ -87,6 +103,11 @@ export async function startServer(
     matchmaker.dispose();
     presence.dispose();
     await rooms.stop();
+    try {
+      analytics.stop(); // flush the last counters (rooms.stop may have added drop-offs)
+    } catch (e) {
+      app.log.error(e, 'analytics flush failed');
+    }
     db.close();
   });
   if (mig.applied.length) app.log.info(`db: applied ${mig.applied.join(', ')}`);
@@ -94,6 +115,7 @@ export async function startServer(
   app.log.info(`db: ${config.dbPath} at schema v${mig.version}`);
   cleanup();
   rooms.start();
+  analytics.start(undefined, (e) => app.log.error(e, 'analytics flush failed'));
   for (const w of clips.warnings) app.log.warn(w);
   const legal = await readLegal(config.legalPath);
   if (!legal.ok) {
@@ -115,6 +137,7 @@ export async function startServer(
     reports,
     friends,
     ratings,
+    analytics,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),

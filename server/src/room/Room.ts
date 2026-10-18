@@ -36,6 +36,7 @@ import {
 } from '@dub/shared';
 import { pickBotName } from '../bots/names.js';
 import { Timers } from './timers.js';
+import { countBucket, type AnalyticsEvent, type Dims } from '../analytics/Analytics.js';
 import type { Outcome, RemoveReason, RoomDeps, RoomError, Submission } from './types.js';
 
 /** V08: a public game starts once at least this many matched players are ready. */
@@ -58,6 +59,12 @@ interface PlayerState {
   isBot: boolean;
   /** V13, public rooms: opted in to voice (see `voicePeers`). */
   voiceOptIn: boolean;
+  /** V15 analytics: phase of a mid-game disconnect not yet followed by a reconnect. */
+  dropPhase?: Phase | null;
+  /** V15 analytics: games this player finished in this room (a next start = "played again"). */
+  gamesFinished?: number;
+  /** V15 analytics: voice opt-in already counted. */
+  voiceCounted?: boolean;
 }
 
 interface RoundState {
@@ -209,6 +216,10 @@ export class Room {
   private setVoiceOptIn(p: PlayerState, on: boolean): Outcome {
     if (this.kind !== 'public' || p.voiceOptIn === on) return null;
     p.voiceOptIn = on;
+    if (on && !p.isBot && !p.voiceCounted) {
+      p.voiceCounted = true;
+      this.track('voice_opt_in');
+    }
     this.changed();
     return null;
   }
@@ -324,6 +335,7 @@ export class Room {
     this.players.set(p.id, p);
     this.tokens.set(p.token, p.id);
     if (!this.hostId && this.kind === 'private') this.hostId = p.id;
+    this.track('room_seat');
     // A created-but-never-connected player is dropped like a disconnected one.
     this.timers.set(`drop:${p.id}`, this.deps.timings.lobbyDropMs, () => this.dropIfGone(p.id));
     this.changed();
@@ -335,6 +347,7 @@ export class Room {
     if (!p) return err('BAD_TOKEN', 'unknown player');
     p.connected = true;
     p.disconnectedAt = null;
+    p.dropPhase = null;
     this.timers.clear(`drop:${p.id}`);
     this.maybeMigrateHost();
     this.changed();
@@ -346,6 +359,7 @@ export class Room {
     if (!p || !p.connected) return;
     p.connected = false;
     p.disconnectedAt = this.deps.clock.now();
+    if (!p.isBot && this.inGame()) p.dropPhase = this.phase;
     if (this.connectedCount === 0) this.emptySinceAt = p.disconnectedAt;
     if (this.phase === 'LOBBY') {
       this.timers.set(`drop:${p.id}`, this.deps.timings.lobbyDropMs, () => this.dropIfGone(p.id));
@@ -428,6 +442,8 @@ export class Room {
   }
 
   dispose(): void {
+    // V15: a game that never reached FINAL (everyone left, or the 3 h cap): count its drop-offs.
+    if (!this.disposed && this.inGame()) this.trackDropoffs();
     this.disposed = true;
     this.timers.clearAll();
   }
@@ -594,6 +610,13 @@ export class Room {
   }
 
   private beginGame(): void {
+    const humans = this.humans();
+    this.track('game_started', {
+      players: humans.length,
+      bots: humans.length < this.players.size,
+    });
+    this.track('game_seat', {}, humans.length);
+    this.track('replay_seat', {}, humans.filter((q) => (q.gamesFinished ?? 0) > 0).length);
     for (const q of this.players.values()) {
       q.totalScore = 0;
       this.timers.clear(`drop:${q.id}`);
@@ -655,6 +678,11 @@ export class Room {
     const check = validateManifest(chunks, sub.clip.durationMs, this.deps.options.limits);
     if (!check.ok) return err('INVALID', check.reason);
     sub.manifest = check.chunks;
+    if (!p.isBot) {
+      sub.seen ??= new Set();
+      // Bounded by the chunk limits per manifest; a re-record replaces a chunk with a new id.
+      if (sub.seen.size < 500) for (const c of check.chunks) sub.seen.add(c.id);
+    }
     this.changedFor(p.id);
     return null;
   }
@@ -686,6 +714,7 @@ export class Room {
     }
     r.finalized = true;
     this.closing = false;
+    this.trackSubmissions(r);
     this.phaseEndsAt = null;
     for (const q of this.players.values()) q.dubDone = false;
     const nonEmpty = [...r.subs.values()].filter((s) => s.chunks!.length > 0);
@@ -764,6 +793,7 @@ export class Room {
     if (this.phase !== 'SHOWCASE' || !sc || sc.status !== 'PLAYING') return;
     sc.status = 'LOCKED';
     sc.order[sc.index]!.votes = [...sc.votes.values()];
+    this.trackVotes(sc.order[sc.index]!, sc.votes);
     this.timers.set('phase', this.deps.timings.betweenItemsMs, () => {
       if (sc.index + 1 < sc.order.length) this.startItem(sc.index + 1);
       else this.enterRoundResults();
@@ -791,6 +821,7 @@ export class Room {
       if (q) q.totalScore += e.points;
     }
     this.results[r.round] = result;
+    this.track('round_played');
     this.phase = 'ROUND_RESULTS';
     this.showcase = null;
     const ms = this.deps.timings.roundResultsMs;
@@ -821,6 +852,7 @@ export class Room {
     this.final = buildFinal(players, this.results.filter(Boolean), (round, subId) =>
       this.chunkRefs(round, this.rounds[round]?.subs.get(subId)),
     );
+    this.trackFinal();
     this.phase = 'FINAL';
     this.phaseEndsAt = null;
     this.showcase = null;
@@ -980,6 +1012,71 @@ export class Room {
       youKickVoted,
       youReported,
     };
+  }
+
+  // ---------------------------------------------------------------- analytics (V15)
+
+  /** Aggregate counter; only the room kind and coarse values, never ids or the room code. */
+  private track(event: AnalyticsEvent, dims: Dims = {}, by = 1): void {
+    if (by > 0) this.deps.analytics?.track(event, { kind: this.kind, ...dims }, by);
+  }
+
+  private humans(): PlayerState[] {
+    return [...this.players.values()].filter((q) => !q.isBot);
+  }
+
+  private inGame(): boolean {
+    return this.phase === 'DUBBING' || this.phase === 'SHOWCASE' || this.phase === 'ROUND_RESULTS';
+  }
+
+  private trackDropoffs(): void {
+    for (const q of this.humans()) {
+      if (q.dropPhase) this.track('dropoff', { phase: q.dropPhase });
+      q.dropPhase = null;
+    }
+  }
+
+  /** At finalize: takes / re-records per human submission, clip picks and completion. */
+  private trackSubmissions(r: RoundState): void {
+    for (const sub of r.subs.values()) {
+      if (this.players.get(sub.playerId)?.isBot !== false) continue;
+      const takes = sub.chunks?.length ?? 0;
+      const seen = sub.seen?.size ?? 0;
+      this.track('submission', {
+        takes: countBucket(takes),
+        rerecords: countBucket(Math.max(0, seen - sub.manifest.length)),
+      });
+      this.track('clip_dealt', { clip: sub.clip.id });
+      if (takes > 0) this.track('clip_dubbed', { clip: sub.clip.id });
+    }
+  }
+
+  /** At lock: human votes (score histogram) and per-clip vote sums for human dubs. */
+  private trackVotes(item: Submission, votes: Map<PlayerId, number>): void {
+    const authorHuman = this.players.get(item.playerId)?.isBot === false;
+    let n = 0;
+    let sum = 0;
+    for (const [voter, score] of votes) {
+      if (this.players.get(voter)?.isBot !== false) continue;
+      this.track('vote', { score });
+      n++;
+      sum += score;
+    }
+    if (authorHuman && n > 0) {
+      this.track('clip_votes', { clip: item.clip.id }, n);
+      this.track('clip_vote_sum', { clip: item.clip.id }, sum);
+    }
+  }
+
+  private trackFinal(): void {
+    const humans = this.humans();
+    this.track('game_finished', {
+      rounds: this.results.filter(Boolean).length,
+      players: humans.length,
+    });
+    this.track('finish_seat', {}, humans.filter((q) => q.connected).length);
+    this.trackDropoffs();
+    for (const q of humans) q.gamesFinished = (q.gamesFinished ?? 0) + 1;
   }
 
   // ---------------------------------------------------------------- internals

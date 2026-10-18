@@ -11,6 +11,7 @@ import type {
   SubmissionId,
 } from '@dub/shared';
 import type { Timings } from '../config.js';
+import type { Tracker } from '../analytics/Analytics.js';
 
 export interface Clock {
   now(): number;
@@ -102,6 +103,8 @@ export interface RoomDeps {
    */
   isAdmin?(playerId: PlayerId): boolean;
   rng?: () => number;
+  /** V15 aggregate analytics. Bots never count; no player ids or room codes are passed. */
+  analytics?: Tracker;
   /** nanoid(12) by default (player and submission ids). */
   newId?: () => string;
   /** 32 random bytes, base64url, by default. */
@@ -127,4 +130,6 @@ export interface Submission {
   /** `manifest ∩ uploaded`, set at finalize. */
   chunks: ChunkMeta[] | null;
   votes: number[];
+  /** V15: every chunk id seen in this submission's manifests (takes incl. discarded ones). */
+  seen?: Set<ChunkId>;
 }

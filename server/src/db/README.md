@@ -134,6 +134,24 @@ At FINAL the room reports every seat still on its roster (`Room` → `RoomManage
   (Δ = 0). Ranked unlocks at 3 public games (`RANKED_MIN_GAMES`).
 - `GET /api/me/last-game?room=CODE` returns the caller's row for Final.
 
+## Analytics + feedback (V15, `007_analytics.sql`, `analytics/Analytics.ts`)
+
+First-party, cookieless, aggregate only (#39). Nothing here holds an IP, a user agent, a
+user / player id or a room code.
+
+- `analytics_daily (day, event, dims_json, count)` — `day` is the UTC date, `dims_json` the
+  canonical (sorted, string-valued) dimensions. `Analytics.track(event, dims, by)` counts in
+  memory; `flush()` upserts (`count = count + excluded.count`) every 60 s and on shutdown.
+  Events and their dimension keys are allow-listed in `EVENT_DIMS`; values must be short tokens.
+  Clip ids are allowed (content, not people). Bots never count. Kept 2 years.
+- `feedback` — mood (1–4) after Final or a "Report a bug" text, `comment` ≤ 200 chars with
+  control / bidi characters stripped, `context_json` {phase, route, version, error hashes},
+  `resolved_at` (admin). No user link. Kept 1 year.
+- Pruned by the hourly DB cleanup (`Analytics.prune`).
+- DAU / WAU / MAU and weekly cohort retention are **not** copied into analytics: the admin
+  report aggregates `users.created_at` / `last_seen_at` and `game_players` ⨝ `games` with
+  GROUP BY queries (`analytics/report.ts`).
+
 ## Planned migrations (not built yet)
 
 ```sql

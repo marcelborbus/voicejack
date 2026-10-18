@@ -18,6 +18,7 @@ import { loadBotSounds } from '../bots/sounds.js';
 import { Room, type JoinResult } from './Room.js';
 import { realScheduler } from './timers.js';
 import type { FinishedGame } from '../elo/Ratings.js';
+import type { Tracker } from '../analytics/Analytics.js';
 import type { Clock, FinalSeat, PlayerReport, RoomError, RoomLibrary, Scheduler } from './types.js';
 
 /** Upload storage as seen by rooms (implemented by ChunkStore). */
@@ -72,6 +73,8 @@ export interface RoomManagerDeps {
   rng?: () => number;
   /** V09: rates finished public games (`Ratings`); private games never reach it. */
   ratings?: { recordGame(game: FinishedGame): unknown };
+  /** V15 aggregate analytics (no ids); rooms count games, rounds, votes, drop-offs. */
+  analytics?: Tracker;
 }
 
 /** V08: public-room events, routed to the matchmaker. */
@@ -235,7 +238,9 @@ export class RoomManager {
       onFinal: (seats) => this.gameOver(code, kind, seats),
       isAdmin: () => false, // V05: admin users may add bots without DEV_BOTS
       rng: this.deps.rng,
+      analytics: this.deps.analytics,
     });
+    this.deps.analytics?.track('room_created', { kind });
     return room;
   }
 
