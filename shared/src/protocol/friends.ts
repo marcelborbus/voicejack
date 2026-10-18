@@ -98,6 +98,37 @@ export const ReportBodySchema = z.object({
 });
 export type ReportBody = z.infer<typeof ReportBodySchema>;
 
+// Friend search (v1.2 #44). GET /api/friends/search?q= — registered callers, ≥ 3 characters,
+// case-insensitive prefix match on display names of registered, discoverable, non-blocked users.
+// Results never carry an account id or email: `ref` is opaque (the same pair hash as requests)
+// and is only accepted by `POST /api/friends/add` shortly after a search returned it.
+export const FRIEND_SEARCH_MIN = 3;
+export const FRIEND_SEARCH_MAX_RESULTS = 10;
+export const FRIEND_SEARCHES_PER_MINUTE = 30;
+export const FriendSearchQuerySchema = z.object({
+  q: z.string().trim().min(FRIEND_SEARCH_MIN).max(40),
+});
+export interface FriendSearchResult {
+  ref: string;
+  name: string;
+  /** Seed for the doodle avatar (currently the display name). */
+  avatarSeed: string;
+  /** 4-character disambiguator derived from `ref` (stable for you, differs per searcher). */
+  tag: string;
+  /** Month the account was registered, `YYYY-MM` (names are not unique). */
+  joined: string;
+  relation: RoomRelation;
+}
+export interface FriendSearchResponse {
+  results: FriendSearchResult[];
+}
+// POST /api/friends/add {ref} → AddFromRoomResponse
+export const AddByRefBodySchema = z.object({ ref: z.string().regex(/^[\w-]{1,64}$/) });
+export type AddByRefBody = z.infer<typeof AddByRefBodySchema>;
+// GET / PATCH /api/friends/settings {discoverable}
+export const FriendSettingsSchema = z.object({ discoverable: z.boolean() });
+export type FriendSettings = z.infer<typeof FriendSettingsSchema>;
+
 // Control characters (except newline), bidi overrides/isolates, zero-width joiners & co.
 // eslint-disable-next-line no-control-regex
 const STRIP_RE = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F​-‏‪-‮⁠-⁩﻿]/g;
@@ -114,6 +145,9 @@ export function sanitizeDmBody(raw: string): string {
 export const friendPaths = {
   friends: () => '/api/friends',
   fromRoom: () => '/api/friends/from-room',
+  search: (q: string) => `/api/friends/search?q=${encodeURIComponent(q)}`,
+  add: () => '/api/friends/add',
+  settings: () => '/api/friends/settings',
   room: (code: RoomCode) => `/api/friends/room/${encodeURIComponent(code)}`,
   request: (ref: string) => `/api/friends/requests/${encodeURIComponent(ref)}`,
   block: (ref: string) => `/api/friends/blocks/${encodeURIComponent(ref)}`,
@@ -129,6 +163,9 @@ export const friendPaths = {
 export const friendRoutes = {
   friends: '/api/friends',
   fromRoom: '/api/friends/from-room',
+  search: '/api/friends/search',
+  add: '/api/friends/add',
+  settings: '/api/friends/settings',
   room: '/api/friends/room/:code',
   request: '/api/friends/requests/:ref',
   block: '/api/friends/blocks/:ref',

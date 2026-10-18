@@ -3,7 +3,9 @@ import type { FastifyInstance } from 'fastify';
 import {
   DMS_PER_MINUTE,
   FRIEND_REQUESTS_PER_DAY,
+  FRIEND_SEARCHES_PER_MINUTE,
   friendPaths,
+  type FriendSearchResponse,
   sanitizeDmBody,
   type ClipInfo,
   type FriendsResponse,
@@ -74,7 +76,12 @@ describe('V10 friends', () => {
     return u.id;
   }
 
-  function call(uid: string, method: 'GET' | 'POST' | 'DELETE', url: string, payload?: object) {
+  function call(
+    uid: string,
+    method: 'GET' | 'POST' | 'DELETE' | 'PATCH',
+    url: string,
+    payload?: object,
+  ) {
     return app.inject({ method, url, payload, headers: { cookie: cookies.get(uid)! } });
   }
 
@@ -417,5 +424,82 @@ describe('V10 friends', () => {
       count('SELECT COUNT(*) AS n FROM friendships WHERE user_a = ? OR user_b = ?', alice, alice),
     ).toBe(1);
     expect(friends.list(alice).friends).toEqual([]);
+  });
+
+  describe('search (v1.2 #44)', () => {
+    const search = async (uid: string, q: string) =>
+      (await call(uid, 'GET', friendPaths.search(q))).json<FriendSearchResponse>().results;
+
+    it('prefix, case-insensitive, registered + discoverable + unblocked only, no ids', async () => {
+      const me = user('Searcher');
+      const bob1 = user('Bobby');
+      const bob2 = user('bobcat');
+      user('BOBO', 'guest');
+      user('Rob Bob');
+      const blocker = user('Bobblocker');
+      const blocked = user('Bobblocked');
+      const hidden = user('Bobhidden');
+      const deleted = user('Bobdeleted');
+      user('Ölaf');
+      friends.request(blocker, me);
+      friends.requestAction(blocker, Friends.ref(blocker, me), 'block');
+      friends.request(me, blocked);
+      friends.requestAction(me, Friends.ref(me, blocked), 'block');
+      friends.setDiscoverable(hidden, false);
+      accounts.deleteAccount(deleted);
+
+      const res = await call(me, 'GET', friendPaths.search('bOb'));
+      expect(res.statusCode).toBe(200);
+      const { results } = res.json<FriendSearchResponse>();
+      expect(results.map((r) => r.name).sort()).toEqual(['Bobby', 'bobcat']);
+      for (const id of [me, bob1, bob2]) expect(res.body).not.toContain(id);
+      expect(res.body).not.toContain('@example.com');
+      expect(results[0]).toEqual({
+        ref: expect.any(String),
+        name: expect.any(String),
+        avatarSeed: expect.any(String),
+        tag: expect.stringMatching(/^[a-z0-9]{4}$/),
+        joined: '2026-10',
+        relation: 'none',
+      });
+      expect((await search(me, 'öla')).map((r) => r.name)).toEqual(['Ölaf']);
+      // LIKE wildcards are literal.
+      expect(await search(me, 'b%b')).toEqual([]);
+      expect(await search(me, 'Sea')).toEqual([]); // never yourself
+    });
+
+    it('needs ≥ 3 characters, registered caller, at most 10 results, rate limited', async () => {
+      const me = user('Me');
+      const guest = user('Guest', 'guest');
+      for (let i = 0; i < 12; i++) user(`Sam${i}`);
+      expect((await call(me, 'GET', friendPaths.search('Sa'))).statusCode).toBe(400);
+      expect((await call(guest, 'GET', friendPaths.search('Sam'))).statusCode).toBe(403);
+      expect(await search(me, 'sam')).toHaveLength(10);
+      for (let i = 1; i < FRIEND_SEARCHES_PER_MINUTE; i++) await search(me, 'sam');
+      expect((await call(me, 'GET', friendPaths.search('sam'))).statusCode).toBe(429);
+    });
+
+    it('add by ref sends a request; refs are per searcher; discoverable toggle', async () => {
+      const me = user('Alice');
+      const bob = user('Bobby');
+      const eve = user('Eve');
+      const [hit] = await search(me, 'bob');
+      // Another user can't use Alice's ref (and never saw it).
+      expect((await call(eve, 'POST', friendPaths.add(), { ref: hit!.ref })).statusCode).toBe(404);
+      const add = await call(me, 'POST', friendPaths.add(), { ref: hit!.ref });
+      expect(add.json()).toEqual({ result: 'requested' });
+      expect(friends.list(bob).incoming.map((r) => r.name)).toEqual(['Alice']);
+      expect((await search(me, 'bob'))[0]!.relation).toBe('outgoing');
+
+      expect((await call(bob, 'GET', friendPaths.settings())).json()).toEqual({
+        discoverable: true,
+      });
+      const off = await call(bob, 'PATCH', friendPaths.settings(), { discoverable: false });
+      expect(off.json()).toEqual({ discoverable: false });
+      expect(await search(me, 'bob')).toEqual([]);
+      expect(await search(eve, 'bob')).toEqual([]);
+      // An old ref stops working once the target hides.
+      expect((await call(me, 'POST', friendPaths.add(), { ref: hit!.ref })).statusCode).toBe(404);
+    });
   });
 });

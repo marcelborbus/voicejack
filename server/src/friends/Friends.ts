@@ -4,12 +4,16 @@ import {
   DM_PAGE_SIZE,
   DMS_PER_MINUTE,
   FRIEND_REQUESTS_PER_DAY,
+  FRIEND_SEARCH_MAX_RESULTS,
+  FRIEND_SEARCH_MIN,
+  FRIEND_SEARCHES_PER_MINUTE,
   INVITES_PER_MINUTE,
   sanitizeDmBody,
   type AddFromRoomResponse,
   type DirectMessage,
   type ErrorCode,
   type FriendRefInfo,
+  type FriendSearchResult,
   type FriendsResponse,
   type FriendStatus,
   type MessagesResponse,
@@ -24,6 +28,14 @@ import type { RoomManager } from '../room/RoomManager.js';
 
 const DAY_MS = 24 * 3600_000;
 const REPORTS_PER_HOUR = 10;
+/** How long a search result's `ref` can be used for `addByRef`. */
+const SEARCH_REF_TTL_MS = 30 * 60_000;
+const SEARCH_REF_MAX = 200;
+
+/** `LIKE` pattern for a literal prefix (`\` escapes). */
+const likePrefix = (q: string): string => q.replace(/[\\%_]/g, (c) => `\\${c}`) + '%';
+/** Unicode-aware case fold for names (SQLite's own lower()/LIKE only fold ASCII). */
+const fold = (s: string): string => s.normalize('NFC').toLocaleLowerCase('en');
 
 export class FriendsError extends Error {
   constructor(
@@ -111,6 +123,9 @@ export class Friends {
   private readonly dmLimit: WindowLimiter;
   private readonly inviteLimit: WindowLimiter;
   private readonly reportLimit: WindowLimiter;
+  private readonly searchLimit: WindowLimiter;
+  /** Per searcher: refs handed out by `search` → target user id (in memory, short-lived). */
+  private readonly searchRefs = new Map<string, Map<string, { userId: string; at: number }>>();
   private readonly unsubscribe: (() => void) | null;
 
   constructor(private readonly deps: FriendsDeps) {
@@ -120,6 +135,10 @@ export class Friends {
     this.dmLimit = new WindowLimiter(DMS_PER_MINUTE, 60_000, this.now);
     this.inviteLimit = new WindowLimiter(INVITES_PER_MINUTE, 60_000, this.now);
     this.reportLimit = new WindowLimiter(REPORTS_PER_HOUR, 3600_000, this.now);
+    this.searchLimit = new WindowLimiter(FRIEND_SEARCHES_PER_MINUTE, 60_000, this.now);
+    this.db.function('vj_fold', { deterministic: true }, (v) =>
+      typeof v === 'string' ? fold(v) : v,
+    );
     this.unsubscribe = deps.presence?.onStatusChange((c) => this.pushStatuses(c)) ?? null;
   }
 
@@ -230,6 +249,98 @@ export class Friends {
     return out;
   }
 
+  // ------------------------------------------------------------------ search (v1.2 #44)
+
+  private relation(me: string, other: string): RoomRelation {
+    const r = this.row(me, other);
+    if (!r) return 'none';
+    if (r.status === 'accepted') return 'friend';
+    return r.requested_by === me ? 'outgoing' : 'incoming';
+  }
+
+  /**
+   * Prefix search on display names (case-insensitive, ≥ 3 characters, ≤ 10 results). Only
+   * registered, non-deleted, discoverable users who don't block you (and whom you don't block);
+   * never yourself. Results carry an opaque `ref` (no id/email) that `addByRef` accepts.
+   */
+  search(me: string, rawQuery: string): FriendSearchResult[] {
+    const q = fold(rawQuery.trim());
+    if ([...q].length < FRIEND_SEARCH_MIN)
+      fail(400, 'INVALID', `type at least ${FRIEND_SEARCH_MIN} characters`);
+    if (!this.searchLimit.take(me)) fail(429, 'RATE_LIMITED', 'too many searches, wait a minute');
+    const rows = this.db
+      .prepare(
+        `SELECT id, display_name, created_at FROM users u
+         WHERE kind = 'registered' AND deleted_at IS NULL AND discoverable = 1
+           AND id != ? AND display_name != ''
+           AND vj_fold(display_name) LIKE ? ESCAPE '\\'
+           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = u.id AND b.blocked = ?)
+                                                   OR (b.blocker = ? AND b.blocked = u.id))
+         ORDER BY vj_fold(display_name), created_at
+         LIMIT ?`,
+      )
+      .all(me, likePrefix(q), me, me, FRIEND_SEARCH_MAX_RESULTS) as {
+      id: string;
+      display_name: string;
+      created_at: number;
+    }[];
+    const t = this.now();
+    let refs = this.searchRefs.get(me);
+    if (!refs) this.searchRefs.set(me, (refs = new Map()));
+    for (const [k, v] of refs) if (v.at < t - SEARCH_REF_TTL_MS) refs.delete(k);
+    const out = rows.map((r): FriendSearchResult => {
+      const ref = Friends.ref(me, r.id);
+      refs!.delete(ref);
+      refs!.set(ref, { userId: r.id, at: t });
+      return {
+        ref,
+        name: r.display_name,
+        avatarSeed: r.display_name,
+        tag: Friends.tag(ref),
+        joined: new Date(r.created_at).toISOString().slice(0, 7),
+        relation: this.relation(me, r.id),
+      };
+    });
+    while (refs.size > SEARCH_REF_MAX) refs.delete(refs.keys().next().value!);
+    if (this.searchRefs.size > 5000) {
+      for (const [k, m] of this.searchRefs)
+        if (![...m.values()].some((v) => v.at >= t - SEARCH_REF_TTL_MS)) this.searchRefs.delete(k);
+    }
+    return out;
+  }
+
+  /** 4 lowercase alphanumerics from a ref, shown as `#abcd` next to same-named results. */
+  static tag(ref: string): string {
+    const h = createHash('sha256').update(`vj-tag:${ref}`).digest();
+    const A = 'abcdefghjkmnpqrstuvwxyz23456789';
+    return Array.from(h.subarray(0, 4), (b) => A[b % A.length]).join('');
+  }
+
+  /** Friend request to a search result (re-checks registration, discoverability and blocks). */
+  addByRef(me: string, ref: string): AddFromRoomResponse['result'] {
+    const hit = this.searchRefs.get(me)?.get(ref);
+    if (!hit || hit.at < this.now() - SEARCH_REF_TTL_MS) {
+      return fail(404, 'INVALID', 'search again to add this player');
+    }
+    const ok = this.db
+      .prepare(
+        "SELECT 1 FROM users WHERE id = ? AND kind = 'registered' AND deleted_at IS NULL AND discoverable = 1",
+      )
+      .get(hit.userId);
+    if (!ok || hit.userId === me) return fail(404, 'INVALID', 'that player is not available');
+    return this.request(me, hit.userId);
+  }
+
+  discoverable(me: string): boolean {
+    const r = this.db.prepare('SELECT discoverable FROM users WHERE id = ?').get(me) as
+      { discoverable: number } | undefined;
+    return r?.discoverable !== 0;
+  }
+
+  setDiscoverable(me: string, on: boolean): void {
+    this.db.prepare('UPDATE users SET discoverable = ? WHERE id = ?').run(on ? 1 : 0, me);
+  }
+
   // ------------------------------------------------------------------ rooms
 
   /** The caller must be a (human) player in the room; returns the room or throws. */
@@ -248,14 +359,7 @@ export class Friends {
     for (const pid of room.playerIds()) {
       const uid = room.userIdOf(pid);
       if (!uid || uid === me || !this.isRegistered(uid) || this.blockedBetween(me, uid)) continue;
-      const r = this.row(me, uid);
-      out[pid] = !r
-        ? 'none'
-        : r.status === 'accepted'
-          ? 'friend'
-          : r.requested_by === me
-            ? 'outgoing'
-            : 'incoming';
+      out[pid] = this.relation(me, uid);
     }
     return out;
   }

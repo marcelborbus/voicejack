@@ -2,6 +2,8 @@ import {
   friendPaths,
   type AddFromRoomResponse,
   type ApiError,
+  type FriendSearchResponse,
+  type FriendSettings,
   type FriendsResponse,
   type MessagesResponse,
   type RequestActionBody,
@@ -46,6 +48,11 @@ export const friendsApi = {
   roomRelations: (code: RoomCode) => call<RoomRelationsResponse>(friendPaths.room(code)),
   addFromRoom: (code: RoomCode, playerId: string) =>
     call<AddFromRoomResponse>(friendPaths.fromRoom(), 'POST', { code, playerId }),
+  search: (q: string) => call<FriendSearchResponse>(friendPaths.search(q)),
+  addByRef: (ref: string) => call<AddFromRoomResponse>(friendPaths.add(), 'POST', { ref }),
+  settings: () => call<FriendSettings>(friendPaths.settings()),
+  setSettings: (body: FriendSettings) =>
+    call<FriendSettings>(friendPaths.settings(), 'PATCH', body),
   request: (ref: string, action: RequestActionBody['action']) =>
     call<unknown>(friendPaths.request(ref), 'POST', { action }),
   unblock: (ref: string) => call<unknown>(friendPaths.block(ref), 'DELETE'),

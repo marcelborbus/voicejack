@@ -214,7 +214,7 @@ export function FriendList({ compact = false }: { compact?: boolean }) {
         </ul>
       ) : (
         <p className="text-sm text-zinc-400">
-          No friends yet. After a game, hit{' '}
+          No friends yet. Search by name on the home page, or after a game hit{' '}
           <span className="font-semibold text-zinc-200">Add friend</span> next to someone who has an
           account.
         </p>

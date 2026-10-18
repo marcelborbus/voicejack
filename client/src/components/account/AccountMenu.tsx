@@ -3,6 +3,7 @@ import { Library, LogIn, LogOut, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 import { NAME_MAX_LENGTH } from '@dub/shared';
 import { EloBadge } from '@/components/elo/EloBadge';
+import { DiscoverableToggle } from '@/components/friends/DiscoverableToggle';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -144,6 +145,7 @@ function AccountDialog({ className }: { className?: string }) {
               <Library /> My clips
             </Link>
           </Button>
+          <DiscoverableToggle className="mt-4" />
           <Separator className="my-5" />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Button

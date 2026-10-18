@@ -1,6 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
+  AddByRefBodySchema,
   AddFromRoomBodySchema,
+  FRIEND_SEARCHES_PER_MINUTE,
+  FriendSearchQuerySchema,
+  FriendSettingsSchema,
   InviteBodySchema,
   ReportBodySchema,
   RequestActionBodySchema,
@@ -8,6 +12,8 @@ import {
   SendMessageBodySchema,
   friendRoutes,
   type AddFromRoomResponse,
+  type FriendSearchResponse,
+  type FriendSettings,
   type FriendsResponse,
   type MessagesResponse,
   type RoomRelationsResponse,
@@ -75,6 +81,37 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
     friendRoutes.friends,
     opts,
     handle((me): FriendsResponse => friends.list(me)),
+  );
+
+  // v1.2 #44: search by name (30/min per IP here, 30/min per user in `Friends`).
+  app.get(
+    friendRoutes.search,
+    { config: { rateLimit: { max: FRIEND_SEARCHES_PER_MINUTE, timeWindow: 60_000 } } },
+    handle((me, req): FriendSearchResponse => {
+      const { q } = parse(FriendSearchQuerySchema, req.query);
+      return { results: friends.search(me, q) };
+    }),
+  );
+  app.post(
+    friendRoutes.add,
+    opts,
+    handle((me, req): AddFromRoomResponse => {
+      return { result: friends.addByRef(me, parse(AddByRefBodySchema, req.body).ref) };
+    }),
+  );
+  app.get(
+    friendRoutes.settings,
+    opts,
+    handle((me): FriendSettings => ({ discoverable: friends.discoverable(me) })),
+  );
+  app.patch(
+    friendRoutes.settings,
+    opts,
+    handle((me, req): FriendSettings => {
+      const { discoverable } = parse(FriendSettingsSchema, req.body);
+      friends.setDiscoverable(me, discoverable);
+      return { discoverable };
+    }),
   );
 
   app.get(

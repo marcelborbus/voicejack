@@ -112,6 +112,15 @@ Pending requests and blocks are addressed by `ref` = sha256 of the ordered pair,
 side's id is not revealed until both sides accept. A room player is only ever addressed by
 `playerId`, which the server resolves through `room.userIdOf`.
 
+**Friend search (v1.2 #44, `008_discoverable.sql`):** `users.discoverable` (default 1, switch in
+the account menu). `GET /api/friends/search?q=` matches a case-insensitive (Unicode-folded via
+the `vj_fold` SQL function `Friends` registers) prefix of `display_name`, at least 3 characters,
+10 results, only registered, non-deleted, discoverable users with no block either way, never
+the caller. Results carry the pair `ref`, a 4-character tag derived from it, and the month the
+row was created, never an id or email. `POST /api/friends/add {ref}` accepts only refs the same
+caller got from a search in the last 30 min (kept in memory), and re-checks the target. Limit 30
+searches a minute per user (and per IP at the route).
+
 The SQL below was the V10 plan; `004_friends.sql` is what shipped.
 
 ## Elo + game history (V09, `006_games.sql`, `elo/Ratings.ts`)

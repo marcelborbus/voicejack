@@ -1,6 +1,7 @@
 import { Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FriendList } from './FriendList';
+import { FriendSearch } from './FriendSearch';
 import { useFriends, useIsRegistered, useUnreadTotal } from './store';
 
 /** Home page friends panel (registered users only): requests, live status, chat. */
@@ -24,7 +25,8 @@ export function FriendsPanel({ className }: { className?: string }) {
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
+        <FriendSearch />
         <FriendList />
       </CardContent>
     </Card>
