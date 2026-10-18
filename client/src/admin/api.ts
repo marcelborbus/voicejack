@@ -1,4 +1,5 @@
 import {
+  TEST_ROOM_PATH,
   analyticsPaths,
   libraryPaths,
   type AdminAnalyticsResponse,
@@ -9,6 +10,8 @@ import {
   type AdminLibrary,
   type AdminMeResponse,
   type AdminUserLibrariesResponse,
+  type TestRoomBody,
+  type TestRoomResponse,
   type CreateLibraryBody,
   type UpdateClipBody,
   type UpdateLibraryBody,
@@ -55,6 +58,8 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const adminApi = {
   me: () => call<AdminMeResponse>(libraryPaths.adminMe()),
+  /** v1.2 #46: private room with bots, you as host. */
+  testRoom: (body: TestRoomBody) => call<TestRoomResponse>(TEST_ROOM_PATH, json('POST', body)),
   libraries: () =>
     call<AdminLibrariesResponse>(libraryPaths.adminLibraries()).then((r) => r.libraries),
   createLibrary: (body: CreateLibraryBody) =>

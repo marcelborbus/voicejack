@@ -13,6 +13,7 @@ import { Presence } from './presence/Presence.js';
 import { Matchmaker } from './match/Matchmaker.js';
 import { Reports } from './match/Reports.js';
 import { Friends } from './friends/Friends.js';
+import { LibraryBotSounds } from './bots/librarySounds.js';
 import { Ratings } from './elo/Ratings.js';
 import { Analytics } from './analytics/Analytics.js';
 
@@ -59,7 +60,16 @@ export async function startServer(
   const accounts = new Accounts(db);
   const ratings = new Ratings(db);
   const analytics = new Analytics(db);
+  // v1.2 #46: bots "speak" snippets cut from the official library (cached in LIBRARY_DIR).
+  let botLog = (m: string) => console.log(`[bots] ${m}`);
+  const botSounds = new LibraryBotSounds({
+    library: clips,
+    libraryDir: config.libraryDir,
+    clipsDir: config.clipsDir,
+    log: (m) => botLog(m),
+  });
   const rooms = new RoomManager({
+    botSounds: () => botSounds.get(),
     analytics,
     config,
     clips: clips.clips.map(toClipInfo),
@@ -97,6 +107,7 @@ export async function startServer(
   const cleanupTimer = setInterval(cleanup, DB_CLEANUP_MS);
   cleanupTimer.unref();
   matchmaker.setLog(app.log);
+  botLog = (m) => app.log.info(m);
   app.addHook('onClose', async () => {
     clearInterval(cleanupTimer);
     friends.dispose();

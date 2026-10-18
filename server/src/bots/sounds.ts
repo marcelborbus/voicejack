@@ -28,7 +28,11 @@ type Log = (msg: string) => void;
 
 /** Snippets from `<clipsDir>/bot-sounds/manifest.json`; `[]` if missing or invalid. */
 export function loadSoundPool(clipsDir: string, warn: Log = () => {}): BotSound[] {
-  const dir = path.join(clipsDir, BOT_SOUNDS_DIR);
+  return loadSoundDir(path.join(clipsDir, BOT_SOUNDS_DIR), warn);
+}
+
+/** Snippets listed in `<dir>/manifest.json` ({sounds: [{file, durationMs}]}); `[]` if none. */
+export function loadSoundDir(dir: string, warn: Log = () => {}): BotSound[] {
   const file = path.join(dir, 'manifest.json');
   if (!fs.existsSync(file)) return [];
   let entries: BotSoundEntry[];

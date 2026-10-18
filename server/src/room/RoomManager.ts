@@ -4,6 +4,7 @@ import {
   type AudioMime,
   type ChunkId,
   type ClipInfo,
+  type GameSettings,
   type Phase,
   type PlayerId,
   type QueueMode,
@@ -46,7 +47,7 @@ export const ROOM_EMPTY_TTL_MS = 10 * 60_000;
 export const ROOM_MAX_AGE_MS = 3 * 60 * 60_000;
 export const SWEEP_INTERVAL_MS = 60_000;
 
-/** What bots need to "upload" (V01; only used when `config.devBots`). */
+/** What bots need to "upload" (V01 `DEV_BOTS`, v1.2 admin test rooms). */
 export interface BotEnv {
   sounds: readonly BotSound[];
   put(
@@ -66,8 +67,13 @@ export interface RoomManagerDeps {
   /** V05 clip libraries (DB-backed); without it every room plays `clips`. */
   library?: RoomLibrary;
   store?: RoomStore;
-  /** Bot environment; by default built from `store.put` + `loadBotSounds(clipsDir)`. */
+  /** Bot environment; by default built from `store.put` + `botSounds`. */
   bots?: BotEnv;
+  /**
+   * Bot sound pool provider (v1.2 #46: snippets of the official library, `LibraryBotSounds`).
+   * Default `loadBotSounds(clipsDir)`. Called at startup with DEV_BOTS, else on each test room.
+   */
+  botSounds?: () => Promise<readonly BotSound[]>;
   clock?: Clock;
   scheduler?: Scheduler;
   rng?: () => number;
@@ -103,33 +109,121 @@ export class RoomManager {
   private publicHooks: PublicRoomHooks | null = null;
   /** V09: queue mode each public room was matched from (its games' `kind`). */
   private readonly modes = new Map<RoomCode, QueueMode>();
-  private readonly bots: BotEnv | null;
+  /** v1.2 #46: admin test rooms (bots allowed without DEV_BOTS, no analytics). */
+  private readonly testRooms = new Set<RoomCode>();
+  private readonly bots: BotEnv;
+  /** Our own sound array (filled in place) unless `deps.bots` was given. */
+  private readonly ownSounds: BotSound[] | null = null;
   /** Resolves once the bot sound pool is loaded (immediately without DEV_BOTS). */
-  readonly botsReady: Promise<void>;
+  botsReady: Promise<void>;
 
   constructor(private readonly deps: RoomManagerDeps) {
     this.clock = deps.clock ?? { now: () => Date.now() };
     this.scheduler = deps.scheduler ?? realScheduler;
-    this.bots = deps.bots ?? null;
     this.botsReady = Promise.resolve();
-    if (!this.bots && deps.config.devBots) {
+    if (deps.bots) {
+      this.bots = deps.bots;
+    } else {
       const store = deps.store;
-      const sounds: BotSound[] = [];
+      this.ownSounds = [];
       this.bots = {
-        sounds,
+        sounds: this.ownSounds,
         put: (...args) => (store?.put ? store.put(...args) : Promise.resolve()),
       };
-      // Filled in place; bots only need sounds once a round starts.
-      this.botsReady = loadBotSounds(deps.config.clipsDir).then(
-        (s) => void sounds.push(...s),
-        () => {},
-      );
+      // Bots only need sounds once a round starts. DEV_BOTS: the quick dev pool (script output
+      // or synthetic tones) right away, then the library pool once it is cut (`botSounds`).
+      if (deps.config.devBots) {
+        const own = this.ownSounds;
+        this.botsReady = loadBotSounds(deps.config.clipsDir).then(
+          (s) => {
+            if (own.length === 0) own.push(...s);
+            if (deps.botSounds) void this.refreshBotSounds();
+          },
+          () => {},
+        );
+      }
     }
+  }
+
+  private botRefresh: Promise<void> = Promise.resolve();
+
+  /** (Re)loads the sound pool into the array every bot shares. Never rejects. */
+  refreshBotSounds(): Promise<void> {
+    const own = this.ownSounds;
+    if (!own) return Promise.resolve();
+    const load = this.deps.botSounds ?? (() => loadBotSounds(this.deps.config.clipsDir));
+    this.botRefresh = load().then(
+      (s) => {
+        if (s.length > 0 || own.length === 0) own.splice(0, own.length, ...s);
+      },
+      () => {},
+    );
+    return this.botRefresh;
+  }
+
+  /**
+   * Waits (at most `timeoutMs`) for the latest sound pool refresh: bots pick their snippets when
+   * DUBBING starts, so a test room should not start before the first pool exists.
+   */
+  async waitForBotSounds(timeoutMs: number): Promise<void> {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      this.botRefresh,
+      new Promise<void>((r) => {
+        t = setTimeout(r, timeoutMs);
+        t.unref?.();
+      }),
+    ]);
+    clearTimeout(t);
   }
 
   /** Number of snippets bots can "record" (0 = bots submit empty dubs). */
   get botSoundCount(): number {
-    return this.bots?.sounds.length ?? 0;
+    return this.bots.sounds.length;
+  }
+
+  isTestRoom(code: RoomCode): boolean {
+    return this.testRooms.has(code);
+  }
+
+  /**
+   * v1.2 #46 admin test game: a private room hosted by `name` (linked to `userId` if given), its
+   * settings applied (short dubbing times allowed), and `bots` bots seated. The room allows the
+   * lobby's bot controls without DEV_BOTS and never reaches analytics or Elo. Refreshes the bot
+   * sound pool in the background (the bots need it once DUBBING starts).
+   */
+  createTestRoom(opts: {
+    name: string;
+    userId?: string | null;
+    bots: number;
+    settings: Partial<GameSettings>;
+  }): { room: Room; join: JoinResult } | RoomError {
+    const room = this.newRoom('private', true);
+    if (!(room instanceof Room)) return room;
+    const join = room.join(opts.name);
+    if ('code' in join) {
+      room.dispose();
+      return join;
+    }
+    const host = join.playerId;
+    if (opts.userId) room.linkUser(host, opts.userId);
+    this.testRooms.add(room.code);
+    this.register(room); // before bots: they attach as connections
+    const fail = (e: RoomError) => {
+      void this.dispose(room.code);
+      return e;
+    };
+    const set = room.handle(host, {
+      t: 'updateSettings',
+      settings: { mode: 'extended', ...opts.settings },
+    });
+    if (set) return fail(set);
+    for (let i = 0; i < opts.bots; i++) {
+      const e = room.handle(host, { t: 'addBot' });
+      if (e) return fail(e);
+    }
+    void this.refreshBotSounds();
+    return { room, join };
   }
 
   get size(): number {
@@ -195,7 +289,7 @@ export class RoomManager {
     this.conns.set(room.code, new Map());
   }
 
-  private newRoom(kind: RoomKind): Room | RoomError {
+  private newRoom(kind: RoomKind, test = false): Room | RoomError {
     if (this.rooms.size >= this.deps.config.maxRooms) {
       return { code: 'ROOM_FULL', message: 'server is full, try again later' };
     }
@@ -217,7 +311,7 @@ export class RoomManager {
       timings: config.timings,
       options: {
         allowSolo: config.allowSolo,
-        allowShortDubbing: config.allowShortDubbing,
+        allowShortDubbing: config.allowShortDubbing || test,
         maxPlayers: config.maxPlayers,
         limits: LIMITS,
         devBots: config.devBots,
@@ -236,11 +330,13 @@ export class RoomManager {
       onVoteKicked: (pid, uid) => this.publicHooks?.onVoteKicked(code, pid, uid),
       onReport: (r) => this.publicHooks?.onReport(r),
       onFinal: (seats) => this.gameOver(code, kind, seats),
-      isAdmin: () => false, // V05: admin users may add bots without DEV_BOTS
+      // v1.2 #46: an admin test room lets its host add/remove bots without DEV_BOTS.
+      isAdmin: () => test,
       rng: this.deps.rng,
-      analytics: this.roomTracker(() => room),
+      // Test games are not product usage: no analytics at all (and private rooms skip Elo).
+      analytics: test ? undefined : this.roomTracker(() => room),
     });
-    this.deps.analytics?.track('room_created', { kind });
+    if (!test) this.deps.analytics?.track('room_created', { kind });
     return room;
   }
 
@@ -285,11 +381,10 @@ export class RoomManager {
       playerId,
       clock: this.clock,
       scheduler: this.scheduler,
-      sounds: bots?.sounds ?? [],
-      put: (round, sub, chunk, mime, data) =>
-        bots ? bots.put(room.code, round, sub, chunk, mime, data) : Promise.resolve(),
+      sounds: bots.sounds,
+      put: (round, sub, chunk, mime, data) => bots.put(room.code, round, sub, chunk, mime, data),
       rng: this.deps.rng,
-      onError: bots?.onError,
+      onError: bots.onError,
     });
   }
 
@@ -347,6 +442,7 @@ export class RoomManager {
     room.dispose();
     this.rooms.delete(code);
     this.modes.delete(code);
+    this.testRooms.delete(code);
     const map = this.conns.get(code);
     this.conns.delete(code);
     this.changed();

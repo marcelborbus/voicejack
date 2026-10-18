@@ -2,12 +2,12 @@
 # E2E clip library: Playwright's bundled Chromium has no H.264/AAC, so the clips are
 # VP9/Opus webm (8 s testsrc2 + 440 Hz sine, 320x180).
 #   bash e2e/scripts/make-fixtures.sh <outdir>
-# Writes test-{a,b,c}.webm, a poster each and <outdir>/manifest.json (ClipManifestSchema).
+# Writes test-{a,b,c,d}.webm, a poster each and <outdir>/manifest.json (ClipManifestSchema).
 # Skips the work when the manifest already exists.
 set -euo pipefail
 
 out=${1:?usage: make-fixtures.sh <outdir>}
-if [[ -f "$out/manifest.json" && -f "$out/test-c.webm" ]]; then
+if [[ -f "$out/manifest.json" && -f "$out/test-d.webm" ]]; then
   echo "fixtures already in $out"
   exit 0
 fi
@@ -21,9 +21,11 @@ ffmpeg -hide_banner -loglevel error -y \
   "$out/test-a.webm"
 cp "$out/test-a.webm" "$out/test-b.webm"
 cp "$out/test-a.webm" "$out/test-c.webm"
+cp "$out/test-a.webm" "$out/test-d.webm" # 4 clips: admin test room with 3 bots (v1.2 #46)
 ffmpeg -hide_banner -loglevel error -y -ss 2 -i "$out/test-a.webm" -frames:v 1 -q:v 5 "$out/test-a.jpg"
 cp "$out/test-a.jpg" "$out/test-b.jpg"
 cp "$out/test-a.jpg" "$out/test-c.jpg"
+cp "$out/test-a.jpg" "$out/test-d.jpg"
 
 dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$out/test-a.webm")
 dur_ms=$(awk -v d="$dur" 'BEGIN { printf "%d", d * 1000 }')
@@ -56,7 +58,9 @@ JSON
   entry b 'Test Clip B'
   echo ','
   entry c 'Test Clip C'
+  echo ','
+  entry d 'Test Clip D'
   echo '] }'
 } >"$out/manifest.tmp.json"
 mv "$out/manifest.tmp.json" "$out/manifest.json"
-echo "wrote $out/manifest.json (3 clips, ${dur_ms} ms each)"
+echo "wrote $out/manifest.json (4 clips, ${dur_ms} ms each)"

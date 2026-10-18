@@ -234,10 +234,11 @@ export async function normalize(opts: {
   };
 }
 
-export type JobPriority = 'admin' | 'user';
+/** v1.2 #46: `low` = background work (bot sound pool) after every admin and user job. */
+export type JobPriority = 'admin' | 'user' | 'low';
 
 export interface JobOptions {
-  /** Admin jobs always run before queued user jobs (default 'admin'). */
+  /** Admin jobs run before queued user jobs, user jobs before `low` ones (default 'admin'). */
   priority?: JobPriority;
   /** Job owner (user id) for the per-owner limit. */
   owner?: string;
@@ -288,7 +289,8 @@ export class JobQueue {
   refusal(opts: JobOptions = {}): 'busy' | 'owner' | null {
     const priority = opts.priority ?? 'admin';
     if (opts.owner && this.pendingFor(opts.owner) >= this.maxPerOwner) return 'owner';
-    const cap = priority === 'admin' ? this.maxPending : this.maxUserPending;
+    const cap =
+      priority === 'admin' ? this.maxPending : priority === 'user' ? this.maxUserPending : 1;
     return this.sizeOf(priority) >= cap ? 'busy' : null;
   }
 
@@ -302,10 +304,10 @@ export class JobQueue {
         owner: opts.owner,
         run: () => Promise.resolve().then(job).then(resolve, reject),
       };
-      if (priority === 'admin') {
-        const firstUser = this.queue.findIndex((j) => j.priority === 'user');
-        this.queue.splice(firstUser < 0 ? this.queue.length : firstUser, 0, q);
-      } else this.queue.push(q);
+      // Insert after every queued job of the same or a higher priority.
+      const rank = { admin: 0, user: 1, low: 2 } as const;
+      const after = this.queue.findIndex((j) => rank[j.priority] > rank[priority]);
+      this.queue.splice(after < 0 ? this.queue.length : after, 0, q);
       this.next();
     });
   }

@@ -10,3 +10,4 @@ export * from './protocol/elo.js';
 export * from './protocol/legal.js';
 export * from './helpers/index.js';
 export * from './protocol/analytics.js';
+export * from './protocol/testRoom.js';

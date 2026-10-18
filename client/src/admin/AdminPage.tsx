@@ -39,6 +39,7 @@ import { INITIAL_TRIM, trimError, trimQuery, type TrimFields } from '@/lib/trim'
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { AdminError, adminApi, uploadClip } from './api';
+import { TestGameCard } from './TestGameCard';
 import { UserLibraries } from './UserLibraries';
 
 /** Admin page (V05): official clip libraries. Gated by Authelia at nginx + server re-check. */
@@ -136,6 +137,8 @@ export default function AdminPage() {
           )}
         </div>
       </header>
+
+      <TestGameCard libraries={libraries} />
 
       {view === 'users' ? (
         <UserLibraries />

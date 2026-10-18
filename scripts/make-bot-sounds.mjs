@@ -7,6 +7,8 @@
 // clip that exists on disk, skips near-silent pieces, and writes <clips>/bot-sounds/*.webm plus
 // <clips>/bot-sounds/manifest.json ({sounds: [{file, durationMs, clipId, startMs}]}).
 // The output is gitignored media like the clips themselves. Needs ffmpeg + ffprobe.
+// The server does the same at runtime from the official library (server/src/bots/librarySounds.ts,
+// cached in LIBRARY_DIR/.bot-sounds); this dev pool is only its fallback.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
