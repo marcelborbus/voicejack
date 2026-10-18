@@ -27,6 +27,8 @@ export const routes = {
   chunkUpload: '/api/rooms/:code/rounds/:round/chunks/:chunkId',
   chunk: '/api/rooms/:code/rounds/:round/subs/:subId/chunks/:chunkId',
   clip: '/clips/:file',
+  /** v1.2 #47: one snippet of the bot sound pool (content-addressed, see `botVoice`). */
+  botSound: '/api/bot-sounds/:key',
   health: '/api/health',
   me: '/api/me',
   authRequest: '/api/auth/request',

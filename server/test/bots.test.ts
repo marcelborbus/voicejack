@@ -144,7 +144,10 @@ describe('bot management', () => {
     const a = h.join('Ann');
     for (let i = 0; i < MAX_BOTS; i++) expect(h.room.handle(a, { t: 'addBot' })).toBeNull();
     expect(h.room.handle(a, { t: 'addBot' })?.code).toBe('LIMIT');
-    const ids = h.snap(a).players.filter((p) => p.isBot).map((p) => p.id);
+    const ids = h
+      .snap(a)
+      .players.filter((p) => p.isBot)
+      .map((p) => p.id);
     expect(new Set(h.snap(a).players.map((p) => p.name)).size).toBe(8);
     expect(h.room.handle(a, { t: 'removeBot' })).toBeNull();
     expect(h.room.hasPlayer(ids.at(-1)!)).toBe(false);
@@ -187,7 +190,7 @@ describe('bot management', () => {
 });
 
 describe('bot game', () => {
-  it('dubs 2–5 uploaded chunks, preloads, votes 3–9 before lock, to FINAL', async () => {
+  it('dubs 3–6 uploaded chunks, preloads, votes 3–9 before lock, to FINAL', async () => {
     const h = setup();
     const a = h.join('Ann');
     for (let i = 0; i < 3; i++) h.room.handle(a, { t: 'addBot' });
@@ -205,9 +208,14 @@ describe('bot game', () => {
       expect(h.snap(a)).toMatchObject({ phase: 'DUBBING', round });
       // V14: bots get their own clips too, distinct from everyone else's.
       expect(new Set([a, ...botIds].map((id) => h.snap(id).you.clip!.id)).size).toBe(4);
-      // Bots record within the first 60 % of the phase, then press Done.
-      await vi.advanceTimersByTimeAsync(60_000 * BOT.dubWindow[1] + BOT.doneDelayMs[1] + 10);
-      expect(h.snap(a).players.filter((p) => p.isBot).every((p) => p.dubDone)).toBe(true);
+      // Bots record within the first seconds of the phase (#47: at most dubEndMs), then Done.
+      await vi.advanceTimersByTimeAsync(BOT.dubEndMs + BOT.doneDelayMs[1] + 10);
+      expect(
+        h
+          .snap(a)
+          .players.filter((p) => p.isBot)
+          .every((p) => p.dubDone),
+      ).toBe(true);
       expect(h.snap(a).phase).toBe('DUBBING'); // the human is not done yet
       for (const id of botIds) {
         const s = h.snap(id);
@@ -262,7 +270,61 @@ describe('bot game', () => {
     // Back in the lobby the bots get ready again.
     h.room.handle(a, { t: 'backToLobby' });
     await vi.advanceTimersByTimeAsync(BOT.readyDelayMs[1] + 10);
-    expect(h.snap(a).players.filter((p) => p.isBot).every((p) => p.ready)).toBe(true);
+    expect(
+      h
+        .snap(a)
+        .players.filter((p) => p.isBot)
+        .every((p) => p.ready),
+    ).toBe(true);
+  });
+
+  it('#47: long snippets spread over the clip; bots hurry once every human is Done', async () => {
+    const long: BotSound[] = [3000, 4000, 5000].map((ms, i) => ({
+      name: `l${i}`,
+      durationMs: ms,
+      mime: 'audio/webm;codecs=opus',
+      data: Buffer.alloc(200 + i, i),
+    }));
+    const h = setup({ devBots: true }, long);
+    const a = h.join('Ann');
+    for (let i = 0; i < 2; i++) h.room.handle(a, { t: 'addBot' });
+    h.room.handle(a, {
+      t: 'updateSettings',
+      settings: { mode: 'extended', rounds: 1, dubbingSeconds: 210 },
+    });
+    h.room.handle(a, { t: 'micStatus', ok: true });
+    h.room.handle(a, { t: 'setReady', ready: true });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(h.room.handle(a, { t: 'startGame' })).toBeNull();
+    // The human is done right away: bots record everything now instead of over ~12 s.
+    await vi.advanceTimersByTimeAsync(100);
+    h.room.handle(a, { t: 'dubDone', round: 0, done: true });
+    // Bots record now, press Done, and dubbing closes (upload grace) long before 210 s.
+    await vi.advanceTimersByTimeAsync(
+      BOT.preloadDelayMs[1] + BOT.doneDelayMs[1] + T.uploadGraceMs + 200,
+    );
+    expect(h.snap(a).phase).toBe('SHOWCASE');
+    for (const id of h.bots.keys()) {
+      const last = h.sent
+        .get(id)!
+        .filter((m) => m.t === 'manifest')
+        .at(-1);
+      expect(last?.t).toBe('manifest');
+      const m = [...(last as Extract<C2S, { t: 'manifest' }>).chunks].sort(
+        (x, y) => x.startMs - y.startMs,
+      );
+      expect(m.length).toBeGreaterThanOrEqual(BOT.chunks[0]);
+      expect(m.length).toBeLessThanOrEqual(BOT.chunks[1]);
+      for (const c of m) {
+        expect(c.durationMs).toBeGreaterThanOrEqual(3000);
+        expect(c.startMs).toBeGreaterThanOrEqual(0);
+        expect(c.startMs + c.durationMs).toBeLessThanOrEqual(CLIP_MS);
+      }
+      expect(m[0]!.startMs).toBeLessThan(CLIP_MS / 3);
+      expect(m.at(-1)!.startMs + m.at(-1)!.durationMs).toBeGreaterThan((CLIP_MS * 2) / 3);
+    }
+    // Both bot dubs made it into the showcase.
+    expect(h.snap(a).showcase!.total).toBe(2);
   });
 
   it('with an empty sound pool bots submit empty dubs and still finish', async () => {

@@ -25,7 +25,7 @@ import { setPeerVolume, togglePeerMute, useVoice } from '@/voice/voiceStore';
  * host of a private room, "mute for everyone" (C2S `hostMute`, `PlayerPublic.mutedByHost`).
  */
 
-/** The host of a private room may mute this (other, human) player for everyone. */
+/** The host of a private room may mute this (other) player for everyone (bots too, #47). */
 function useCanHostMute(player: PlayerPublic): boolean {
   return useRoom((s) => {
     const snap = s.snapshot;
@@ -33,8 +33,7 @@ function useCanHostMute(player: PlayerPublic): boolean {
       !!snap &&
       snap.kind === 'private' &&
       snap.hostId === snap.you.playerId &&
-      player.id !== snap.you.playerId &&
-      !player.isBot
+      player.id !== snap.you.playerId
     );
   });
 }
@@ -171,13 +170,14 @@ export function PeerVoiceMenu({ player }: { player: PlayerPublic }) {
 }
 
 /**
- * Voice roster for every phase with voice (from the header's voice pill): each other human
- * player's mute / volume / host mute.
+ * Voice roster for every phase with voice (from the header's voice pill): each other player's
+ * mute / volume / host mute (bots included, v1.2 #47).
  */
 export function VoiceRosterButton({ className }: { className?: string }) {
   const players = useRoom((s) => s.snapshot?.players);
   const selfId = useRoom((s) => s.snapshot?.you.playerId);
-  const others = (players ?? []).filter((p) => p.id !== selfId && !p.isBot);
+  // v1.2 #47: bots talk in voice too, so they are listed like everyone else.
+  const others = (players ?? []).filter((p) => p.id !== selfId);
   const mutedCount = useVoice((s) => others.filter((p) => s.peerMuted[p.id]).length);
   if (others.length === 0) return null;
   return (

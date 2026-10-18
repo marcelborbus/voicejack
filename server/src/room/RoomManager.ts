@@ -16,6 +16,7 @@ import {
 import type { Config } from '../config.js';
 import { BotPlayer, type BotSound } from '../bots/BotPlayer.js';
 import { loadBotSounds } from '../bots/sounds.js';
+import { BotVoiceScheduler, botSoundKey, botSoundUrl } from '../bots/BotVoice.js';
 import { Room, type JoinResult } from './Room.js';
 import { realScheduler } from './timers.js';
 import type { FinishedGame } from '../elo/Ratings.js';
@@ -111,6 +112,8 @@ export class RoomManager {
   private readonly modes = new Map<RoomCode, QueueMode>();
   /** v1.2 #46: admin test rooms (bots allowed without DEV_BOTS, no analytics). */
   private readonly testRooms = new Set<RoomCode>();
+  /** v1.2 #47: per-room bot voice schedulers (rooms with bots only). */
+  private readonly voices = new Map<RoomCode, BotVoiceScheduler>();
   private readonly bots: BotEnv;
   /** Our own sound array (filled in place) unless `deps.bots` was given. */
   private readonly ownSounds: BotSound[] | null = null;
@@ -175,6 +178,11 @@ export class RoomManager {
       }),
     ]);
     clearTimeout(t);
+  }
+
+  /** v1.2 #47: the pool snippet behind `GET /api/bot-sounds/:key`, if it is in the pool. */
+  botSound(key: string): BotSound | undefined {
+    return this.bots.sounds.find((s) => botSoundKey(s) === key);
   }
 
   /** Number of snippets bots can "record" (0 = bots submit empty dubs). */
@@ -325,7 +333,10 @@ export class RoomManager {
           this.changed();
         }
       },
-      onBotAdded: (pid) => this.attach(code, pid, this.newBot(room, pid)),
+      onBotAdded: (pid) => {
+        this.attach(code, pid, this.newBot(room, pid));
+        this.botVoice(room).sync();
+      },
       onRequeue: (pid, uid) => this.publicHooks?.onRequeue(code, pid, uid),
       onVoteKicked: (pid, uid) => this.publicHooks?.onVoteKicked(code, pid, uid),
       onReport: (r) => this.publicHooks?.onReport(r),
@@ -372,6 +383,35 @@ export class RoomManager {
     } catch (e) {
       console.error('[elo] recording game failed', e);
     }
+  }
+
+  /** v1.2 #47: the room's bot voice scheduler (created with its first bot). */
+  private botVoice(room: Room): BotVoiceScheduler {
+    const code = room.code;
+    let v = this.voices.get(code);
+    if (!v) {
+      v = new BotVoiceScheduler({
+        clock: this.clock,
+        scheduler: this.scheduler,
+        rng: this.deps.rng,
+        state: () => (this.rooms.get(code) === room ? room.botVoiceState() : null),
+        sounds: () => this.bots.sounds,
+        speak: (playerId, sound) => {
+          const msg: S2C = {
+            t: 'botVoice',
+            playerId,
+            soundUrl: botSoundUrl(sound),
+            durationMs: sound.durationMs,
+          };
+          // Humans only, and only those in voice (public rooms: opted in; they have no bots).
+          for (const [pid, conn] of this.conns.get(code) ?? []) {
+            if (!(conn instanceof BotPlayer) && room.inVoice(pid)) conn.send(msg);
+          }
+        },
+      });
+      this.voices.set(code, v);
+    }
+    return v;
   }
 
   private newBot(room: Room, playerId: PlayerId): BotPlayer {
@@ -443,6 +483,8 @@ export class RoomManager {
     this.rooms.delete(code);
     this.modes.delete(code);
     this.testRooms.delete(code);
+    this.voices.get(code)?.dispose();
+    this.voices.delete(code);
     const map = this.conns.get(code);
     this.conns.delete(code);
     this.changed();

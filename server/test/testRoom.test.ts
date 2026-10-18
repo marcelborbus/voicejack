@@ -11,6 +11,7 @@ import { RoomManager } from '../src/room/RoomManager.js';
 import type { Room } from '../src/room/Room.js';
 import type { AnalyticsEvent, Tracker } from '../src/analytics/Analytics.js';
 import { LibraryBotSounds, type SoundSourceLibrary } from '../src/bots/librarySounds.js';
+import { SNIPPET, SNIPPET_RECIPE } from '../src/bots/snippets.js';
 import { makeClipsDir, testConfig, tmpDir } from './helpers.js';
 
 describe('JobQueue low priority (v1.2 #46)', () => {
@@ -186,13 +187,14 @@ describe.skipIf(!hasFfmpeg())('LibraryBotSounds (ffmpeg)', () => {
     expect(lib.pushed).toBe(1);
     for (const s of first) {
       expect(s.mime).toBe('audio/webm;codecs=opus');
-      expect(s.durationMs).toBeGreaterThanOrEqual(500);
-      expect(s.durationMs).toBeLessThanOrEqual(3000);
+      expect(s.durationMs).toBeGreaterThanOrEqual(SNIPPET.minMs); // #47: 3–8 s
+      expect(s.durationMs).toBeLessThanOrEqual(SNIPPET.maxMs);
     }
     const manifest = JSON.parse(
       fs.readFileSync(path.join(libraryDir, '.bot-sounds', 'manifest.json'), 'utf8'),
     );
     expect(manifest.sounds.every((s: { clipId: string }) => s.clipId === 'a')).toBe(true);
+    expect(manifest.recipe).toBe(SNIPPET_RECIPE);
     expect(await pool.get()).toBe(first); // cached
     expect(lib.pushed).toBe(1);
 

@@ -8,7 +8,16 @@ import { useVoice } from '@/voice/voiceStore';
  * Voice connection dot and speaking indicator for one player card (the mute / volume controls
  * are `components/voice/PeerVoiceControls`, #43).
  */
-export function VoiceStatus({ playerId, isSelf }: { playerId: PlayerId; isSelf: boolean }) {
+export function VoiceStatus({
+  playerId,
+  isSelf,
+  bot = false,
+}: {
+  playerId: PlayerId;
+  isSelf: boolean;
+  /** v1.2 #47: a server bot: no connection to show, only its speaking bars (`botVoice`). */
+  bot?: boolean;
+}) {
   const active = useVoice((s) => s.active);
   const state = useVoice((s) => s.peers[playerId]);
   const speaking = useVoice((s) => (isSelf ? s.selfSpeaking : !!s.speaking[playerId]));
@@ -40,6 +49,8 @@ export function VoiceStatus({ playerId, isSelf }: { playerId: PlayerId; isSelf: 
 
   if (isSelf)
     return muted ? <VolumeX className="size-3.5 text-rose-300" aria-label="you are muted" /> : bars;
+  if (bot)
+    return muted ? <VolumeX className="size-3.5 text-rose-300" aria-label="muted for you" /> : bars;
 
   const label =
     state === 'connected'

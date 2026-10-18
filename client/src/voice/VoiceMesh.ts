@@ -4,8 +4,10 @@ import { rms, toDb } from '@/audio/levels';
 import { getMicLevelDb, getMicStream, useMic } from '@/audio/mic';
 import { useRoomStore } from '@/state/room';
 import { onServerMessage, send } from '@/state/session';
+import { BotVoices, type BotAudioContext } from './BotVoices';
 import { Peer } from './Peer';
 import {
+  botVoiceRoute,
   desiredPeers,
   diffPeers,
   hostMutedIds,
@@ -47,9 +49,41 @@ export class VoiceMesh {
   private wanted = new Set<PlayerId>();
   /** #43: players the host muted for everyone (self included: then we send nothing). */
   private hostMuted = new Set<PlayerId>();
+  private snapshot: RoomSnapshot | null = null;
+  /** v1.2 #47: server bots' lines (`botVoice`), routed like a peer's voice. */
+  private readonly bots: BotVoices;
 
   constructor(private readonly container: HTMLElement) {
     useVoice.setState({ active: true, peers: {}, speaking: {}, selfSpeaking: false });
+    this.bots = new BotVoices({
+      ctx: () => {
+        try {
+          return getAudioContext() as unknown as BotAudioContext;
+        } catch {
+          return null;
+        }
+      },
+      load: async (url) => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`bot sound ${res.status}`);
+        return getAudioContext().decodeAudioData(await res.arrayBuffer());
+      },
+      route: (id) => {
+        const v = useVoice.getState();
+        const s = this.snapshot;
+        return botVoiceRoute(
+          this.gate,
+          s?.phase === 'SHOWCASE' ? s.showcase?.status : null,
+          s?.players.find((p) => p.id === id),
+          !!v.peerMuted[id],
+          v.peerVolume[id],
+        );
+      },
+      onChange: () => {
+        this.container.dataset.botVoices = String(this.bots.played);
+        this.meter();
+      },
+    });
     this.unsubs.push(
       useRoomStore.subscribe((s) => this.syncFrom(s.snapshot)),
       useVoice.subscribe((s, prev) => {
@@ -64,6 +98,7 @@ export class VoiceMesh {
         if (s.status !== prev.status) this.refreshTrack();
       }),
       onServerMessage('rtc', (m) => void this.onSignal(m.from, m.data)),
+      onServerMessage('botVoice', (m) => void this.bots.play(m)),
       onAudioStateChange((st) => st === 'running' && this.retryPlayback()),
     );
     this.meterTimer = setInterval(() => this.meter(), 100);
@@ -72,6 +107,7 @@ export class VoiceMesh {
   }
 
   private syncFrom(s: RoomSnapshot | null): void {
+    this.snapshot = s;
     this.publicRoom = !!s?.public;
     this.sync(s?.you.playerId ?? null, s?.players ?? [], s?.phase ?? null);
   }
@@ -103,6 +139,7 @@ export class VoiceMesh {
       r.audio.muted = remoteMuted(this.gate, !!v.peerMuted[id], this.hostMuted.has(id));
       r.audio.volume = peerVolume(v.peerVolume[id]);
     }
+    this.bots?.apply();
     if (v.allowed !== this.gate.play) useVoice.setState({ allowed: this.gate.play });
   }
 
@@ -224,6 +261,12 @@ export class VoiceMesh {
       speaking[id] = on;
       if (!!v.speaking[id] !== on) changed = true;
     }
+    // v1.2 #47: bots "speak" while one of their lines plays (and is audible).
+    for (const id of this.bots.speaking()) speaking[id] = true;
+    for (const id of Object.keys(v.speaking)) {
+      if (!this.remotes.has(id) && !!v.speaking[id] !== !!speaking[id]) changed = true;
+    }
+    for (const id of Object.keys(speaking)) if (!v.speaking[id] && speaking[id]) changed = true;
     const self = this.gate.send && getMicLevelDb() > SPEAKING_DB;
     if (changed || self !== v.selfSpeaking) useVoice.setState({ speaking, selfSpeaking: self });
   }
@@ -231,6 +274,7 @@ export class VoiceMesh {
   dispose(): void {
     clearInterval(this.meterTimer);
     for (const u of this.unsubs) u();
+    this.bots.dispose();
     for (const id of [...this.remotes.keys()]) this.closePeer(id);
     this.voiceTrack?.stop();
     this.voiceTrack = null;

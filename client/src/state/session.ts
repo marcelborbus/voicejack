@@ -75,7 +75,16 @@ export function joinRoom(code: RoomCode, opts: JoinOptions = {}): RoomSocket {
     }),
   ];
   // Fan out every message type to global listeners (they survive socket re-creation).
-  for (const type of ['welcome', 'state', 'pong', 'rtc', 'voteAck', 'error', 'kicked'] as const) {
+  for (const type of [
+    'welcome',
+    'state',
+    'pong',
+    'rtc',
+    'voteAck',
+    'error',
+    'kicked',
+    'botVoice',
+  ] as const) {
     unsubs.push(
       s.on(type, (m) => {
         const set = globalListeners.get(type);

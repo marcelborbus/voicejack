@@ -33,6 +33,7 @@ import type { Matchmaker } from '../match/Matchmaker.js';
 import type { Friends } from '../friends/Friends.js';
 import * as friendsRoutes from '../routes/friends.js';
 import * as testRoomRoutes from '../routes/testRoom.js';
+import * as botSoundRoutes from '../routes/botSounds.js';
 import * as eloRoutes from '../routes/elo.js';
 import type { Ratings } from '../elo/Ratings.js';
 import * as costsRoutes from '../routes/costs.js';
@@ -129,6 +130,7 @@ export async function buildApp(
     clipsRoutes.register,
     adminRoutes.register,
     testRoomRoutes.register,
+    botSoundRoutes.register,
     myLibrariesRoutes.register,
     roomsRoutes.register,
     chunksRoutes.register,

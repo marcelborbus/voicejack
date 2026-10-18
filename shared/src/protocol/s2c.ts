@@ -54,7 +54,13 @@ export type S2C =
   | { t: 'error'; code: ErrorCode; message: string; fatal?: boolean } // fatal → client stops reconnecting
   | { t: 'kicked'; by?: 'host' | 'vote' }
   /** V08: public ready check missed; you are back in the matchmaking queue (see /ws/presence). */
-  | { t: 'requeued' };
+  | { t: 'requeued' }
+  /**
+   * v1.2 #47: a server bot "says" something in a voice phase (never DUBBING, never over a
+   * playing showcase dub). Clients play `soundUrl` (`routes.botSound`, `/api/bot-sounds/<key>`) like that player's voice:
+   * per-peer mute/volume and the host's mute apply. Additive: older clients ignore it.
+   */
+  | { t: 'botVoice'; playerId: PlayerId; soundUrl: string; durationMs: number };
 
 export type S2CType = S2C['t'];
 export type S2COf<T extends S2CType> = Extract<S2C, { t: T }>;

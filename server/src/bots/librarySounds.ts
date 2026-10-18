@@ -5,29 +5,29 @@ import path from 'node:path';
 import type { JobOptions } from '../clips/normalize.js';
 import type { BotSound } from './BotPlayer.js';
 import { loadBotSounds, loadSoundDir } from './sounds.js';
+import { SNIPPET_RECIPE, cutClipSnippets, type CutSnippet } from './snippets.js';
 
 /**
  * v1.2 #46: the bot sound pool cut from the official library's own clips, so admin test games
  * in prod (no `scripts/make-bot-sounds.mjs` run, no DEV_BOTS) still have bots that "speak".
  *
- * Same recipe as the script: 0.5–3 s pieces at random offsets of each enabled clip of every
- * official library, mono opus webm, short fades, near-silent pieces dropped. ffmpeg always gets
+ * Same recipe as the script (`snippets.ts`, v1.2 #47): 3–8 s pieces of the enabled clips of every
+ * official library that are at least 70 % voiced (silencedetect) and not too quiet (mean
+ * > −35 dBFS), trimmed to their voice, loudness-normalised, mono opus webm. ffmpeg always gets
  * an argument array (never a shell), runs under `nice`, and the whole generation is one `low`
  * priority job on the shared clip `JobQueue`, so uploads always go first.
  *
- * Cached in `<LIBRARY_DIR>/.bot-sounds/` with the clip set's signature in its manifest. `get()`
- * reuses the cache while the signature matches; when the library changed it regenerates, at
- * most once per `minRegenMs` (1 h; until then the old pool keeps playing). Without ffmpeg or
+ * Cached in `<LIBRARY_DIR>/.bot-sounds/` with the clip set's signature (which includes
+ * `SNIPPET_RECIPE`) in its manifest. `get()` reuses the cache while the signature matches; when
+ * the library changed it regenerates, at most once per `minRegenMs` (1 h; until then the old
+ * pool keeps playing). A cache made with another recipe regenerates right away. Without ffmpeg or
  * clips it falls back to the dev pool / synthetic tones (`loadBotSounds`).
  */
 
 export const BOT_SOUNDS_CACHE_DIR = '.bot-sounds';
-const MIN_MS = 500;
-const MAX_MS = 3000;
-/** Mean volume (dBFS) below which a piece is discarded. */
-const SILENCE_DB = -40;
-const TARGET_SNIPPETS = 40;
-const MAX_PER_CLIP = 4;
+/** Pool size aim (30–80); per clip at most `MAX_PER_CLIP`, from at most `MAX_SOURCE_CLIPS`. */
+const TARGET_SNIPPETS = 60;
+const MAX_PER_CLIP = 8;
 const MAX_SOURCE_CLIPS = 30;
 const FFMPEG_TIMEOUT_MS = 30_000;
 
@@ -61,6 +61,7 @@ interface Source {
 
 interface CacheManifest {
   source?: string;
+  recipe?: string;
   generatedAt?: number;
   sounds?: unknown;
 }
@@ -116,6 +117,7 @@ export class LibraryBotSounds {
 
   private static signature(sources: Source[]): string {
     const h = createHash('sha256');
+    h.update(`${SNIPPET_RECIPE}\n`);
     for (const s of sources) h.update(`${s.clipId}\u0000${s.file}\u0000${s.durationMs}\n`);
     return h.digest('hex').slice(0, 32);
   }
@@ -152,7 +154,12 @@ export class LibraryBotSounds {
       if (cached.length > 0) {
         this.pool = cached;
         this.poolSig = typeof cache?.source === 'string' ? cache.source : 'unknown';
-        this.lastGenAt = typeof cache?.generatedAt === 'number' ? cache.generatedAt : 0;
+        // Another recipe (older, shorter snippets): regenerate now, not after the hourly limit.
+        const sameRecipe = cache?.recipe === SNIPPET_RECIPE;
+        this.lastGenAt =
+          sameRecipe && typeof cache?.generatedAt === 'number'
+            ? cache.generatedAt
+            : Number.NEGATIVE_INFINITY;
         if (this.poolSig === sig) return this.pool;
       }
     }
@@ -194,38 +201,17 @@ export class LibraryBotSounds {
     const tmp = `${this.dir}.tmp`;
     fs.rmSync(tmp, { recursive: true, force: true });
     fs.mkdirSync(tmp, { recursive: true });
-    const sounds: { file: string; durationMs: number; clipId: string; startMs: number }[] = [];
+    const sounds: (CutSnippet & { clipId: string })[] = [];
     for (const [n, src] of sources.entries()) {
-      let made = 0;
-      for (let attempt = 0; made < perClip && attempt < perClip * 3; attempt++) {
-        const len = Math.round(MIN_MS + this.rng() * (MAX_MS - MIN_MS));
-        if (src.durationMs < len) continue;
-        const startMs = Math.floor(this.rng() * (src.durationMs - len));
-        const file = `s${String(n).padStart(2, '0')}-${made}.webm`;
-        const dest = path.join(tmp, file);
-        const r = await exec('ffmpeg', [
-          ...['-hide_banner', '-nostats', '-nostdin', '-y'],
-          ...['-protocol_whitelist', 'file'],
-          ...['-ss', (startMs / 1000).toFixed(3), '-t', (len / 1000).toFixed(3), '-i', src.file],
-          ...['-vn', '-ac', '1', '-ar', '48000'],
-          ...['-af', 'afade=t=in:d=0.03,areverse,afade=t=in:d=0.05,areverse,volumedetect'],
-          ...['-c:a', 'libopus', '-b:a', '32k', '-f', 'webm', dest],
-        ]);
-        if (!r.ok || !fs.existsSync(dest) || fs.statSync(dest).size === 0) {
-          fs.rmSync(dest, { force: true });
-          continue;
-        }
-        const m = /mean_volume:\s*(-?[\d.]+|-inf) dB/.exec(r.stderr);
-        const mean = m && m[1] !== '-inf' ? Number(m[1]) : Number.NEGATIVE_INFINITY;
-        if (mean < SILENCE_DB) {
-          fs.rmSync(dest, { force: true });
-          continue;
-        }
-        sounds.push({ file, durationMs: len, clipId: src.clipId, startMs });
-        made++;
-      }
+      const made = await cutClipSnippets(exec, src, {
+        count: perClip,
+        outDir: tmp,
+        prefix: `s${String(n).padStart(2, '0')}`,
+        rng: this.rng,
+      });
+      for (const m of made) sounds.push({ ...m, clipId: src.clipId });
     }
-    const manifest = { source: sig, generatedAt: t0, sounds };
+    const manifest = { source: sig, recipe: SNIPPET_RECIPE, generatedAt: t0, sounds };
     fs.writeFileSync(path.join(tmp, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
     fs.rmSync(this.dir, { recursive: true, force: true });
     fs.renameSync(tmp, this.dir);

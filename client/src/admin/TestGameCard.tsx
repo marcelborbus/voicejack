@@ -2,6 +2,7 @@ import { Bot, Play } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import {
+  NORMAL_SETTINGS,
   DUBBING_SECONDS_RANGE,
   MAX_BOTS,
   ROUNDS_RANGE,
@@ -18,6 +19,8 @@ import { setToken } from '@/state/storage';
 import { adminApi } from './api';
 
 const FIELD = 'flex flex-col gap-1 text-sm font-semibold';
+/** v1.2 #47: quick picks; the field takes any value from 5 s (quick runs) up. */
+const PRESETS = [30, 90, NORMAL_SETTINGS.dubbingSeconds] as const;
 const SELECT =
   'h-12 rounded-2xl border-[1.5px] border-white/12 bg-ink-950/70 px-3 text-base text-zinc-50';
 
@@ -31,7 +34,7 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
   const [bots, setBots] = useState(3);
   const [libraryId, setLibraryId] = useState('');
   const [rounds, setRounds] = useState(1);
-  const [secs, setSecs] = useState(20);
+  const [secs, setSecs] = useState<number>(NORMAL_SETTINGS.dubbingSeconds);
   const [busy, setBusy] = useState(false);
   const usable = libraries.filter((l) => !l.disabled && l.clipCount > 0);
 
@@ -70,7 +73,10 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
         </p>
       </CardHeader>
       <CardContent>
-        <form className="grid gap-3 sm:grid-cols-[repeat(4,minmax(0,1fr))_auto]" onSubmit={submit}>
+        <form
+          className="grid items-start gap-3 sm:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
+          onSubmit={submit}
+        >
           <label className={FIELD}>
             Bots
             <Input
@@ -109,9 +115,10 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
               data-testid="test-game-rounds"
             />
           </label>
-          <label className={FIELD}>
-            Dubbing time (s)
+          <div className={FIELD}>
+            <label htmlFor="test-game-seconds">Dubbing time (s)</label>
             <Input
+              id="test-game-seconds"
               type="number"
               min={SHORT_DUBBING_MIN_SECONDS}
               max={DUBBING_SECONDS_RANGE.max}
@@ -119,8 +126,29 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
               onChange={(e) => setSecs(Number(e.target.value))}
               data-testid="test-game-seconds"
             />
-          </label>
-          <Button type="submit" className="self-end" disabled={busy} data-testid="test-game-start">
+            <div className="flex gap-1" role="group" aria-label="Dubbing time presets">
+              {PRESETS.map((p) => (
+                <Button
+                  key={p}
+                  type="button"
+                  size="sm"
+                  variant={secs === p ? 'secondary' : 'ghost'}
+                  aria-pressed={secs === p}
+                  onClick={() => setSecs(p)}
+                  data-testid={`test-game-seconds-${p}`}
+                  className="h-7 flex-1 px-2 text-xs"
+                >
+                  {p} s
+                </Button>
+              ))}
+            </div>
+          </div>
+          <Button
+            type="submit"
+            className="self-start sm:mt-6"
+            disabled={busy}
+            data-testid="test-game-start"
+          >
             {busy ? <Spinner className="text-white" /> : <Play />} Start
           </Button>
         </form>

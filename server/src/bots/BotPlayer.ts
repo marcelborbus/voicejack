@@ -49,9 +49,15 @@ export interface BotPlayerDeps {
 export const BOT = {
   micDelayMs: [150, 600],
   readyDelayMs: [300, 1200],
-  chunks: [2, 5],
-  /** Chunk "recordings" land in this fraction of the remaining dubbing time. */
-  dubWindow: [0.1, 0.6],
+  /** v1.2 #47: 3–6 snippets (3–8 s each), spread over the clip, some overlap allowed. */
+  chunks: [3, 6],
+  /** Chunk "recordings" land between `dubStartMs` and `min(dubEndFrac × time left, dubEndMs)`. */
+  dubStartMs: 500,
+  dubEndFrac: 0.5,
+  /** v1.2 #47: bots are done within ~15 s, so a test game never waits out a long timer. */
+  dubEndMs: 12_000,
+  /** Each chunk's centre jitters by this fraction of its slot (clip length / chunks). */
+  slotJitter: 0.6,
   doneDelayMs: [300, 1500],
   preloadDelayMs: [20, 150],
   /** Vote lands at this fraction of the clip's playback. */
@@ -62,13 +68,16 @@ export const BOT = {
 /**
  * Server-side player for dev/test mode (V01). Implements `Connection`, so the room's normal
  * per-recipient snapshots arrive in `send`; it reacts by calling the Room API on a timer
- * (never synchronously: `send` runs inside a room mutation). Never takes part in voice.
+ * (never synchronously: `send` runs inside a room mutation). Has no WebRTC; it "talks" in voice
+ * phases through `BotVoiceScheduler` (v1.2 #47).
  */
 export class BotPlayer implements Connection {
   private readonly timers: Timers;
   private readonly rng: () => number;
   private closed = false;
   private dubRound = -1;
+  /** Chunk recordings not yet started this round (run early once every human is done). */
+  private readonly pendingChunks = new Map<string, () => void>();
   private readonly preloaded = new Set<SubmissionId>();
   private readonly voted = new Set<SubmissionId>();
 
@@ -85,6 +94,7 @@ export class BotPlayer implements Connection {
   close(): void {
     this.closed = true;
     this.timers.clearAll();
+    this.pendingChunks.clear();
   }
 
   private between([lo, hi]: readonly [number, number]): number {
@@ -120,6 +130,8 @@ export class BotPlayer implements Connection {
         if (s.round !== this.dubRound) {
           this.dubRound = s.round;
           this.planDub(s);
+        } else if (this.pendingChunks.size > 0 && this.humansDone(s)) {
+          this.hurry();
         }
         return;
       case 'SHOWCASE':
@@ -130,17 +142,37 @@ export class BotPlayer implements Connection {
     }
   }
 
-  /** 2–5 snippets at random clip positions, "recorded" over the first part of the phase. */
+  /** Every connected human pressed Done (bots then record what is left right away). */
+  private humansDone(s: RoomSnapshot): boolean {
+    const humans = s.players.filter((p) => !p.isBot && p.connected);
+    return humans.length > 0 && humans.every((p) => p.dubDone);
+  }
+
+  /** Re-times every pending chunk to (almost) now; asynchronous like every bot action. */
+  private hurry(): void {
+    const jobs = [...this.pendingChunks];
+    this.pendingChunks.clear();
+    for (const [key, run] of jobs) this.timers.set(key, this.between(BOT.preloadDelayMs), run);
+  }
+
+  /**
+   * 3–6 snippets "recorded" over the first seconds of the phase (at most ~12 s in, sooner when
+   * every human is done). Placement: the clip is split into one slot per chunk and each chunk is
+   * centred in its slot with some jitter, so the dub covers the clip; long snippets may overlap.
+   */
   private planDub(s: RoomSnapshot): void {
     const round = s.round;
     const clipMs = s.you.clip?.durationMs ?? 0; // V14: own clip
     const now = this.deps.clock.now();
     const left = Math.max(1000, (s.phaseEndsAt ?? now + 10_000) - now);
     const sounds = this.deps.sounds;
-    const n = sounds.length > 0 ? this.int(BOT.chunks) : 0;
-    const times = Array.from({ length: n }, () => left * this.between(BOT.dubWindow)).sort(
+    this.pendingChunks.clear();
+    const n = sounds.length > 0 && clipMs >= LIMITS.minChunkMs ? this.int(BOT.chunks) : 0;
+    const end = Math.max(BOT.dubStartMs, Math.min(left * BOT.dubEndFrac, BOT.dubEndMs));
+    const times = Array.from({ length: n }, () => this.between([BOT.dubStartMs, end])).sort(
       (a, b) => a - b,
     );
+    const plan = Array.from({ length: n }, (_, i) => this.placeChunk(i, n, clipMs));
     const manifest: ChunkMeta[] = [];
     let pending = n;
     const finish = (): void => {
@@ -153,25 +185,48 @@ export class BotPlayer implements Connection {
       return;
     }
     times.forEach((at, i) => {
-      this.timers.set(`chunk:${round}:${i}`, at, () => {
-        void this.recordChunk(round, clipMs, manifest)
+      const key = `chunk:${round}:${i}`;
+      const run = (): void => {
+        this.pendingChunks.delete(key);
+        if (this.closed) return;
+        void this.recordChunk(round, plan[i]!, manifest)
           .catch((e: unknown) => this.deps.onError?.(e))
           .finally(() => {
             if (--pending === 0 && !this.closed) finish();
           });
-      });
+      };
+      this.pendingChunks.set(key, run);
+      this.timers.set(key, at, run);
     });
+    if (this.humansDone(s)) this.hurry();
   }
 
-  private async recordChunk(round: number, clipMs: number, manifest: ChunkMeta[]): Promise<void> {
+  /** Chunk `i` of `n`: a random snippet centred (with jitter) in its slot of the clip. */
+  private placeChunk(
+    i: number,
+    n: number,
+    clipMs: number,
+  ): { sound: BotSound; startMs: number; durationMs: number } {
     const sound = this.deps.sounds[Math.floor(this.rng() * this.deps.sounds.length)]!;
     const durationMs = Math.min(sound.durationMs, clipMs);
+    const slot = clipMs / n;
+    const centre = (i + 0.5) * slot + (this.rng() - 0.5) * slot * BOT.slotJitter;
+    const startMs = Math.round(Math.min(clipMs - durationMs, Math.max(0, centre - durationMs / 2)));
+    return { sound, startMs, durationMs };
+  }
+
+  private async recordChunk(
+    round: number,
+    chunk: { sound: BotSound; startMs: number; durationMs: number },
+    manifest: ChunkMeta[],
+  ): Promise<void> {
+    const { sound, startMs, durationMs } = chunk;
     if (durationMs < LIMITS.minChunkMs) return;
     const target = this.deps.room.uploadTarget(this.deps.playerId, round);
     if ('code' in target) return; // phase moved on
     const meta: ChunkMeta = {
       id: randomUUID(),
-      startMs: Math.floor(this.rng() * (clipMs - durationMs + 1)),
+      startMs,
       offsetMs: 0,
       durationMs,
       mime: sound.mime,
@@ -206,9 +261,7 @@ export class BotPlayer implements Connection {
       const at = sc.startAt + clipMs * this.between(BOT.voteAt);
       const delay = Math.max(0, Math.min(at, sc.lockAt - 50) - now);
       const score = this.int(BOT.score);
-      this.timers.set(`vote:${id}`, delay, () =>
-        this.act({ t: 'vote', submissionId: id, score }),
-      );
+      this.timers.set(`vote:${id}`, delay, () => this.act({ t: 'vote', submissionId: id, score }));
     }
   }
 }

@@ -82,7 +82,8 @@ export function PlayerCard({
               you
             </span>
           )}
-          {player.isBot ? <BotBadge /> : <VoiceStatus playerId={player.id} isSelf={isSelf} />}
+          {player.isBot && <BotBadge />}
+          <VoiceStatus playerId={player.id} isSelf={isSelf} bot={!!player.isBot} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {offline ? (
@@ -104,7 +105,7 @@ export function PlayerCard({
         </div>
       </div>
 
-      {!isSelf && !player.isBot && (
+      {!isSelf && (
         <div className="flex shrink-0 flex-col items-center gap-1">
           <PeerMuteButton player={player} />
           <PeerVoiceMenu player={player} />

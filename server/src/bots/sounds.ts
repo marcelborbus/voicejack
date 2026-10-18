@@ -69,12 +69,13 @@ function ffmpegToBuffer(args: string[]): Promise<Buffer> {
 
 /** A few synthetic beeps/warbles (opus webm, in memory). `[]` if ffmpeg is unavailable. */
 export async function synthesizeSounds(): Promise<BotSound[]> {
+  // v1.2 #47: 3–5 s like the library snippets (3–8 s), so fallback dubs cover the clip too.
   const specs = [
-    { freq: 440, ms: 600, af: 'tremolo=f=8:d=0.8' },
-    { freq: 660, ms: 900, af: 'vibrato=f=6:d=0.5' },
-    { freq: 330, ms: 1400, af: 'tremolo=f=4:d=0.6' },
-    { freq: 880, ms: 500, af: 'tremolo=f=12:d=0.9' },
-    { freq: 520, ms: 2000, af: 'vibrato=f=3:d=0.7' },
+    { freq: 440, ms: 3000, af: 'tremolo=f=8:d=0.8' },
+    { freq: 660, ms: 3600, af: 'vibrato=f=6:d=0.5' },
+    { freq: 330, ms: 4200, af: 'tremolo=f=4:d=0.6' },
+    { freq: 880, ms: 3300, af: 'tremolo=f=12:d=0.9' },
+    { freq: 520, ms: 5000, af: 'vibrato=f=3:d=0.7' },
   ];
   const out: BotSound[] = [];
   for (const s of specs) {

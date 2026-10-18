@@ -1,4 +1,10 @@
-import { voiceAllowed, type Phase, type PlayerId, type PlayerPublic } from '@dub/shared';
+import {
+  voiceAllowed,
+  type Phase,
+  type PlayerId,
+  type PlayerPublic,
+  type ShowcaseStatus,
+} from '@dub/shared';
 
 export interface VoiceGate {
   /** Outgoing (cloned) mic track `enabled`. */
@@ -71,4 +77,20 @@ export function diffPeers(
     open: [...want].filter((id) => !have.has(id)).sort(),
     close: [...have].filter((id) => !want.has(id)).sort(),
   };
+}
+
+/**
+ * v1.2 #47: how one server bot's `botVoice` line is routed, like a peer's voice: null when it
+ * must not play at all (voice gated, a showcase dub is PLAYING, not a bot), else muted (our
+ * own per-peer mute, or the host muted it for everyone) and the per-peer volume.
+ */
+export function botVoiceRoute(
+  gate: VoiceGate,
+  showcaseStatus: ShowcaseStatus | null | undefined,
+  player: PlayerPublic | undefined,
+  peerMuted: boolean,
+  volume: number | undefined,
+): { muted: boolean; volume: number } | null {
+  if (!gate.play || !player?.isBot || showcaseStatus === 'PLAYING') return null;
+  return { muted: peerMuted || !!player.mutedByHost, volume: peerVolume(volume) };
 }

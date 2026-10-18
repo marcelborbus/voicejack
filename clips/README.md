@@ -18,9 +18,11 @@ The poster is a JPEG of at most 640x360.
 
 ## Bot sounds (dev test mode, V01)
 
-`node scripts/make-bot-sounds.mjs` cuts 4 random 0.5–3 s pieces from each clip's audio (near-silent
-pieces skipped) into `clips/bot-sounds/*.webm` + `manifest.json` (gitignored, ~0.5 MB). Bots
-(`DEV_BOTS=1`) "record" these. Without the pool the server synthesizes a few tones with ffmpeg at
+`node scripts/make-bot-sounds.mjs` cuts up to 6 pieces of 3–8 s from each clip's audio into
+`clips/bot-sounds/*.webm` + `manifest.json` (gitignored). Same recipe as the server's runtime pool
+(`server/src/bots/snippets.ts`, v1.2 #47): windows at least 70 % voiced (`silencedetect` at −40 dB),
+trimmed to their voice, source mean volume above −35 dBFS, normalised with `loudnorm`. Bots (`DEV_BOTS=1`)
+"record" these and "say" them in voice phases (`botVoice`). Without the pool the server synthesizes a few tones with ffmpeg at
 startup, or bots submit empty dubs if ffmpeg is missing.
 
 ## Licences

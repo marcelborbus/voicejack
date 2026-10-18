@@ -3,6 +3,7 @@ import {
   DUBBING_SECONDS_RANGE,
   MAX_BOTS,
   NAME_MAX_LENGTH,
+  NORMAL_SETTINGS,
   ROUNDS_RANGE,
   SHORT_DUBBING_MIN_SECONDS,
 } from '../constants.js';
@@ -26,7 +27,7 @@ export const TestRoomBodySchema = z.object({
     .int()
     .min(SHORT_DUBBING_MIN_SECONDS)
     .max(DUBBING_SECONDS_RANGE.max)
-    .default(30),
+    .default(NORMAL_SETTINGS.dubbingSeconds), // v1.2 #47: the normal 210 s
   /** Host name shown in the room (default: the account name, else "Admin"). */
   name: z.string().trim().min(1).max(NAME_MAX_LENGTH).optional(),
 });

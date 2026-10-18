@@ -23,6 +23,7 @@ import {
   type FinalResult,
   type GameSettings,
   type Phase,
+  type ShowcaseStatus,
   type PlayerId,
   type PlayerPublic,
   type PublicRoomState,
@@ -213,6 +214,26 @@ export class Room {
   voicePeers(a: PlayerId, b: PlayerId): boolean {
     if (this.kind !== 'public') return true;
     return !!this.players.get(a)?.voiceOptIn && !!this.players.get(b)?.voiceOptIn;
+  }
+
+  /** v1.2 #47: does this player hear voice at all (private: everyone; public: opted in)? */
+  inVoice(id: PlayerId): boolean {
+    const p = this.players.get(id);
+    return !!p && (this.kind !== 'public' || p.voiceOptIn);
+  }
+
+  /** v1.2 #47: what the bot voice scheduler needs (phase, showcase status, bots). */
+  botVoiceState(): {
+    phase: Phase;
+    showcaseStatus: ShowcaseStatus | null;
+    bots: { id: PlayerId; mutedByHost: boolean }[];
+  } {
+    const bots: { id: PlayerId; mutedByHost: boolean }[] = [];
+    for (const q of this.players.values()) {
+      if (q.isBot) bots.push({ id: q.id, mutedByHost: this.kind === 'private' && !!q.mutedByHost });
+    }
+    const showcaseStatus = this.phase === 'SHOWCASE' ? (this.showcase?.status ?? null) : null;
+    return { phase: this.phase, showcaseStatus, bots };
   }
 
   private setVoiceOptIn(p: PlayerState, on: boolean): Outcome {
@@ -524,7 +545,8 @@ export class Room {
     if (this.kind !== 'private') return err('INVALID', 'public games have no host');
     if (p.id !== this.hostId) return err('NOT_HOST', 'only the host can mute players');
     const t = this.players.get(target);
-    if (!t || t.id === p.id || t.isBot) return err('INVALID', 'cannot mute that player');
+    // v1.2 #47: bots talk in voice too, so the host may mute them like anyone else.
+    if (!t || t.id === p.id) return err('INVALID', 'cannot mute that player');
     if (!!t.mutedByHost === muted) return null;
     t.mutedByHost = muted;
     this.changed();
