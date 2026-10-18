@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { LegalLayout, Loading, NotConfigured } from './LegalLayout';
+import { ContactEmail, LegalLayout, Loading, NotConfigured } from './LegalLayout';
 import { lines, useLegal } from './useLegal';
 
 /** §5 DDG / §18 MStV. The details come from the server's `legal.json`, never from the repo. */
@@ -27,7 +27,7 @@ export default function Impressum() {
           <section>
             <h2>Kontakt</h2>
             <p>
-              E-Mail: <a href={`mailto:${legal.email}`}>{legal.email}</a>
+              E-Mail: <ContactEmail legal={legal} />
               {legal.phone && (
                 <>
                   <br />

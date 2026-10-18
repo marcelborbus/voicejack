@@ -23,5 +23,21 @@ export const LegalInfoSchema = z.object({
 });
 export type LegalInfo = z.infer<typeof LegalInfoSchema>;
 
+/**
+ * What `GET /api/legal` sends (V13, anti-scraping): the email split into its two parts, so the
+ * JSON holds no plain address; the client joins them for display (no `mailto:` link).
+ */
+export type LegalPublic = Omit<LegalInfo, 'email'> & { emailUser: string; emailDomain: string };
+
+export function toLegalPublic({ email, ...rest }: LegalInfo): LegalPublic {
+  const at = email.lastIndexOf('@');
+  return { ...rest, emailUser: email.slice(0, at), emailDomain: email.slice(at + 1) };
+}
+
+/** Joins the parts back together, client-side only. */
+export function legalEmail(l: Pick<LegalPublic, 'emailUser' | 'emailDomain'>): string {
+  return [l.emailUser, l.emailDomain].join(String.fromCharCode(64));
+}
+
 // GET /api/legal
-export type LegalResponse = { configured: true; legal: LegalInfo } | { configured: false };
+export type LegalResponse = { configured: true; legal: LegalPublic } | { configured: false };

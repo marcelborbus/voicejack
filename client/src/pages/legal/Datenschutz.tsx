@@ -1,4 +1,4 @@
-import { DM_RETENTION_DAYS, type LegalInfo } from '@dub/shared';
+import { DM_RETENTION_DAYS, type LegalPublic } from '@dub/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import {
@@ -40,13 +40,13 @@ export default function Datenschutz() {
   );
 }
 
-function Controller({ legal }: { legal: LegalInfo | null | undefined }) {
+function Controller({ legal }: { legal: LegalPublic | null | undefined }) {
   if (legal === undefined) return <Loading />;
   if (legal === null) return <NotConfigured />;
   return <Operator legal={legal} />;
 }
 
-function German({ legal }: { legal: LegalInfo | null | undefined }) {
+function German({ legal }: { legal: LegalPublic | null | undefined }) {
   return (
     <div className="flex flex-col gap-3" lang="de">
       <p className="text-zinc-500">Stand: {PRIVACY_STAND.de}</p>
@@ -270,7 +270,7 @@ function German({ legal }: { legal: LegalInfo | null | undefined }) {
   );
 }
 
-function English({ legal }: { legal: LegalInfo | null | undefined }) {
+function English({ legal }: { legal: LegalPublic | null | undefined }) {
   return (
     <div className="flex flex-col gap-3" lang="en">
       <p className="text-zinc-500">

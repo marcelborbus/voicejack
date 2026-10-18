@@ -40,12 +40,18 @@ describe('legal pages', () => {
   it('shows the operator, or the banner when not configured', () => {
     const op = renderToString(
       createElement(Operator, {
-        legal: { name: 'Erika Mustermann', address: 'Str. 1\n12345 Ort', email: 'e@example.org' },
+        legal: {
+          name: 'Erika Mustermann',
+          address: 'Str. 1\n12345 Ort',
+          emailUser: 'e',
+          emailDomain: 'example.org',
+        },
       }),
     );
     expect(op).toContain('Erika Mustermann');
     expect(op).toContain('12345 Ort');
-    expect(op).toContain('mailto:e@example.org');
+    expect(op).toContain('e@example.org');
+    expect(op).not.toContain('mailto:');
     expect(renderToString(createElement(NotConfigured))).toContain('Impressum not configured');
   });
 });

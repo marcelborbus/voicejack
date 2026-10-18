@@ -1,9 +1,9 @@
-import { LEGAL_ROUTE, type LegalInfo, type LegalResponse } from '@dub/shared';
+import { LEGAL_ROUTE, type LegalPublic, type LegalResponse } from '@dub/shared';
 import { useEffect, useState } from 'react';
 
 /** `undefined` while loading, `null` when not configured (or unreachable). */
-export function useLegal(): LegalInfo | null | undefined {
-  const [legal, setLegal] = useState<LegalInfo | null | undefined>(undefined);
+export function useLegal(): LegalPublic | null | undefined {
+  const [legal, setLegal] = useState<LegalPublic | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
     fetch(LEGAL_ROUTE, { cache: 'no-cache' })

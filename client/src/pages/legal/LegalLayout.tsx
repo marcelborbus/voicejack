@@ -1,6 +1,6 @@
-import type { LegalInfo } from '@dub/shared';
-import { AlertTriangle, ArrowLeft } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { legalEmail, type LegalPublic } from '@dub/shared';
+import { AlertTriangle, ArrowLeft, Check, Copy } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -27,6 +27,7 @@ export function LegalLayout({
       document.title = prev;
     };
   }, [title]);
+  useNoindex();
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4" data-testid={testId}>
       <Link
@@ -95,7 +96,7 @@ export function NotConfigured() {
 }
 
 /** Name + address block of the operator. */
-export function Operator({ legal }: { legal: LegalInfo }) {
+export function Operator({ legal }: { legal: LegalPublic }) {
   return (
     <address className="not-italic" data-testid="legal-operator">
       <strong>{legal.name}</strong>
@@ -105,7 +106,7 @@ export function Operator({ legal }: { legal: LegalInfo }) {
         </span>
       ))}
       <span className="block">
-        E-Mail: <a href={`mailto:${legal.email}`}>{legal.email}</a>
+        E-Mail: <ContactEmail legal={legal} />
       </span>
     </address>
   );
@@ -113,4 +114,51 @@ export function Operator({ legal }: { legal: LegalInfo }) {
 
 export function Loading() {
   return <p className="text-zinc-500">…</p>;
+}
+
+/**
+ * `<meta name="robots" content="noindex">` while a legal page is shown (V13). The server also
+ * puts it into the HTML of a direct load; this covers in-app navigation.
+ */
+function useNoindex(): void {
+  useEffect(() => {
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const added = !meta;
+    meta ??= document.head.appendChild(document.createElement('meta'));
+    meta.name = 'robots';
+    const prev = meta.content;
+    meta.content = 'noindex';
+    return () => {
+      if (added) meta.remove();
+      else meta.content = prev;
+    };
+  }, []);
+}
+
+/**
+ * The operator's address, joined in the browser from the parts `/api/legal` sends (V13,
+ * anti-scraping): no `mailto:` link and no plain address in the JSON. Visible to every visitor,
+ * with a copy button instead of the link.
+ */
+export function ContactEmail({ legal }: { legal: LegalPublic }) {
+  const [copied, setCopied] = useState(false);
+  const email = legalEmail(legal);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span data-testid="legal-email" className="select-all font-semibold text-zinc-100">
+        {email}
+      </span>
+      <button
+        type="button"
+        aria-label="Copy email address"
+        data-testid="legal-email-copy"
+        className="rounded-md p-0.5 text-zinc-400 hover:bg-white/10 hover:text-zinc-100"
+        onClick={() => {
+          void navigator.clipboard?.writeText(email).then(() => setCopied(true));
+        }}
+      >
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      </button>
+    </span>
+  );
 }

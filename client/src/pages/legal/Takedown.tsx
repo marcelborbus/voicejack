@@ -1,7 +1,14 @@
 import { Flag } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { LangToggle, LegalLayout, Loading, NotConfigured, type Lang } from './LegalLayout';
+import {
+  ContactEmail,
+  LangToggle,
+  LegalLayout,
+  Loading,
+  NotConfigured,
+  type Lang,
+} from './LegalLayout';
 import { useLegal } from './useLegal';
 
 /**
@@ -12,7 +19,7 @@ export default function Takedown() {
   const legal = useLegal();
   const [lang, setLang] = useState<Lang>('de');
   const de = lang === 'de';
-  const subject = encodeURIComponent('Voicejack: Meldung / Notice');
+  const subject = 'Voicejack: Meldung / Notice';
   const contact =
     legal === undefined ? (
       <Loading />
@@ -20,7 +27,8 @@ export default function Takedown() {
       <NotConfigured />
     ) : (
       <p data-testid="takedown-email">
-        <a href={`mailto:${legal.email}?subject=${subject}`}>{legal.email}</a>
+        <ContactEmail legal={legal} />
+        <span className="block text-zinc-500">Betreff / subject: „{subject}“</span>
       </p>
     );
   return (
