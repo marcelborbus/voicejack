@@ -7,6 +7,7 @@ import {
   type UpdateClipBody,
 } from '@dub/shared';
 import {
+  BarChart3,
   Film,
   FolderPlus,
   Library,
@@ -19,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -106,6 +108,11 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" asChild>
+            <Link to="/admin/analytics" data-testid="admin-analytics-link">
+              <BarChart3 /> Analytics
+            </Link>
+          </Button>
           <Button
             size="sm"
             variant={view === 'official' ? 'secondary' : 'ghost'}

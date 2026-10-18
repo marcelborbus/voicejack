@@ -16,7 +16,7 @@ import { useLegal } from './useLegal';
  * host config on the date below. When the data handling changes, update this page and the date.
  * Open points for the owner are marked `TODO(owner)` (source comments, not shown to visitors).
  */
-export const PRIVACY_STAND = { de: '17. Oktober 2026', en: '17 October 2026' } as const;
+export const PRIVACY_STAND = { de: '18. Oktober 2026', en: '18 October 2026' } as const;
 
 // Facts the text relies on (keep in sync with the code / host).
 const NGINX_LOG_DAYS = 14; // /etc/logrotate.d/nginx: daily, rotate 14
@@ -24,6 +24,8 @@ const MAIL_LOG_WEEKS = 5; // /etc/logrotate.d/rsyslog: weekly, rotate 4 (+ the c
 const GUEST_RETENTION_DAYS = 180; // server Accounts GUEST_RETENTION_MS
 const SESSION_DAYS = 30; // server Accounts SESSION_TTL_MS
 const STUN_HOST = 'stun.nextcloud.com'; // server config DEFAULT_ICE (no ICE_SERVERS override in prod)
+const AGGREGATE_YEARS = 2; // server analytics AGGREGATE_RETENTION_DAYS (730)
+const FEEDBACK_YEARS = 1; // server analytics FEEDBACK_RETENTION_DAYS (365)
 
 export default function Datenschutz() {
   const legal = useLegal();
@@ -52,8 +54,9 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
       <p className="text-zinc-500">Stand: {PRIVACY_STAND.de}</p>
       <p>
         Voicejack ist ein kostenloses Partyspiel, das eine Einzelperson als Hobbyprojekt betreibt.
-        Es gibt <strong>keine Werbung, keine Analyse- oder Tracking-Dienste</strong> und keine
-        Skripte, Schriften oder Bilder von fremden Servern. Hier steht, welche Daten trotzdem
+        Es gibt <strong>keine Werbung, kein Tracking und keine Analysedienste Dritter</strong> und
+        keine Skripte, Schriften oder Bilder von fremden Servern. Wir zählen nur selbst, ohne
+        Cookies und ohne Profile, wie das Spiel genutzt wird (siehe 12). Hier steht, welche Daten
         anfallen, wofür und wie lange.
       </p>
 
@@ -118,7 +121,10 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
           gezeigt wurde.
         </li>
       </ul>
-      <p>Nichts davon dient der Verfolgung über andere Websites hinweg.</p>
+      <p>
+        Nichts davon dient der Verfolgung über andere Websites hinweg. Für die Analyse (siehe 12)
+        wird nichts im Browser gespeichert oder ausgelesen.
+      </p>
 
       <h2>5. Gastprofil und Konto</h2>
       <p>
@@ -127,9 +133,13 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
         Erstellungs- und letzter Nutzungszeitpunkt. Gastprofile, die {GUEST_RETENTION_DAYS} Tage
         nicht genutzt wurden, werden automatisch gelöscht.
       </p>
-      {/* TODO(owner): V09 (Elo + game history, migration 006_games) was not committed when this
-          was written. Once it ships, check what `games` / `game_players` keep (place, score, Elo
-          before/after, room code?) and for how long, and describe it here. */}
+      <p>
+        Für <strong>öffentliche Spiele</strong> („Zufälliges Spiel“) speichern wir außerdem einen
+        Spielverlauf für die Elo-Wertung: Zeitpunkt, Raumcode und Art des Spiels sowie je Spieler
+        Platz, Punkte und Elo vorher/nachher. Die Einträge je Spieler werden mit dem Gastprofil
+        gelöscht (bei gelöschten Konten nach {GUEST_RETENTION_DAYS} Tagen, siehe 15). Private Räume
+        werden nicht gespeichert.
+      </p>
       <p>
         Mit einem optionalen <strong>Konto</strong> kommt deine E-Mail-Adresse hinzu; Wertung und
         Spiele des Gastprofils bleiben erhalten. Dein Anzeigename ist für die Mitspieler im selben
@@ -217,23 +227,88 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
         <Link to="/takedown">Inhalte melden</Link>).
       </p>
 
-      <h2>12. Backups</h2>
+      <h2>12. Analyse / Produktverbesserung</h2>
+      <p>
+        Damit wir sehen, was am Spiel funktioniert und was nicht, zählen wir auf unserem eigenen
+        Server, wie Voicejack genutzt wird. Es gibt dafür <strong>keine Cookies</strong>, nichts
+        wird im Browser gespeichert, <strong>keine IP-Adresse</strong>, keine vollständige
+        Browserkennung, keine Profil-, Spieler- oder Raumkennung und kein Fingerprinting.
+        Gespeichert werden nur <strong>Tagessummen</strong> („am 18.10. wurden 12 Spiele
+        gestartet“), aus denen sich keine einzelne Person ablesen lässt:
+      </p>
+      <ul>
+        <li>
+          Seitenaufrufe: nur die Art der Seite (z. B. „Startseite“, „Raum“, nie der Raumcode) sowie
+          Browserfamilie (z. B. Chrome) und Geräteklasse (Desktop, Mobil, Tablet). Beides leitet der
+          Server aus der Browserkennung ab; die Kennung selbst wird danach verworfen.
+        </li>
+        <li>
+          Spielverlauf: erstellte und betretene Räume (privat/öffentlich), gestartete und beendete
+          Spiele, Runden, Spielerzahl, in welcher Spielphase Spieler ein Spiel verlassen, Anzahl der
+          Aufnahmen und Neuaufnahmen je Dub, abgegebene Bewertungen, welche Clips wie oft gespielt
+          und wie bewertet wurden, Zustimmungen zum Sprachchat in öffentlichen Spielen,
+          Registrierungen und die Wartezeit in der Warteschlange (in groben Stufen). Bots zählen
+          nicht.
+        </li>
+        <li>
+          Fehler im Browser: ein kurzer Prüfwert (Hash) der vereinfachten Fehlermeldung, die Art der
+          Seite und die Anzahl. Der Meldungstext selbst wird nicht übertragen. Die Prüfwerte der
+          letzten Fehler merkt sich der Tab nur im Arbeitsspeicher, um sie einem Fehlerbericht
+          beizufügen.
+        </li>
+      </ul>
+      <p>
+        Wie viele Profile täglich, wöchentlich und monatlich aktiv sind und wie viele in den Wochen
+        nach dem ersten Besuch wiederkommen, zählen wir aus den ohnehin vorhandenen Zeitpunkten der
+        Gastprofile und Konten (erstellt, zuletzt genutzt, siehe 5) und dem Spielverlauf
+        öffentlicher Spiele. Dafür wird nichts zusätzlich gespeichert; angezeigt werden nur Summen.
+      </p>
+      <p>
+        <strong>Feedback:</strong> Nach einem Spiel kannst du mit einem Tipp angeben, wie es dir
+        gefallen hat, und einen kurzen Kommentar (bis 200 Zeichen) schreiben; über „Report a bug“
+        kannst du einen Fehler melden. Gespeichert werden Zeitpunkt, deine Bewertung bzw. dein Text
+        und als Kontext die Art der Seite, die Spielphase, die App-Version und die Prüfwerte der
+        letzten Fehler, <strong>ohne Verbindung zu deinem Profil, Konto oder Raum</strong>. Bitte
+        schreib keine persönlichen Daten hinein.
+      </p>
+      <p>
+        Die Übermittlung an unseren Server erfolgt ohne Cookie. Die IP-Adresse wird dabei nur
+        kurzzeitig im Arbeitsspeicher für die Ratenbegrenzung verwendet; wie jeder Aufruf erscheint
+        die Anfrage aber im Webserver-Log (siehe 3). Da für die Analyse nichts auf deinem Gerät
+        gespeichert oder von dort ausgelesen wird, ist keine Einwilligung nach § 25 Abs. 1 TDDDG
+        nötig. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse daran, das Spiel
+        zu verbessern und Fehler zu finden; ohne Kennungen ist der Eingriff gering).
+      </p>
+      <p>
+        Speicherdauer: Tagessummen {AGGREGATE_YEARS} Jahre, Feedback und Fehlerberichte{' '}
+        {FEEDBACK_YEARS} Jahr; danach werden sie automatisch gelöscht.
+      </p>
+      <p>
+        <strong>Widerspruch:</strong> Du kannst dieser Verarbeitung jederzeit widersprechen (Art. 21
+        DSGVO), formlos per E-Mail an die Adresse unter 1. Weil die Zählungen keiner Person
+        zugeordnet sind, können wir bereits gezählte Werte nicht dir zuordnen und herausnehmen. Du
+        kannst die Zählung aber auch selbst verhindern, indem du Anfragen an <code>/api/t</code>{' '}
+        blockierst (z. B. mit einem Inhaltsblocker); das Spiel funktioniert dann ganz normal.
+      </p>
+
+      <h2>13. Backups</h2>
       {/* TODO(owner): state where the backups of /opt/voicejack/data/db and data/library go
           (/opt/backups, any off-site copy?) and how long they are kept. */}
       <p>
-        Die Datenbank (Profile, Konten, Freunde, Nachrichten, Meldungen) und hochgeladene Clips
-        werden regelmäßig gesichert. Gelöschte Daten können daher noch für die Aufbewahrungsdauer
-        der Backups in diesen enthalten sein.
+        Die Datenbank (Profile, Konten, Freunde, Nachrichten, Meldungen, Spielverlauf,
+        Nutzungsstatistik und Feedback) und hochgeladene Clips werden regelmäßig gesichert.
+        Gelöschte Daten können daher noch für die Aufbewahrungsdauer der Backups in diesen enthalten
+        sein.
       </p>
 
-      <h2>13. Unterstützen (Liberapay)</h2>
+      <h2>14. Unterstützen (Liberapay)</h2>
       <p>
         Der Button „Chip in“ / „Support“ ist ein einfacher Link zu liberapay.com. Auf Voicejack wird
         nichts von Liberapay geladen; erst wenn du den Link öffnest, gilt die Datenschutzerklärung
         von Liberapay.
       </p>
 
-      <h2>14. Konto löschen</h2>
+      <h2>15. Konto löschen</h2>
       <p>
         Im Kontomenü (oben rechts) unter <strong>„Delete account“</strong>. Dabei werden sofort
         E-Mail-Adresse und Name entfernt, alle Sitzungen beendet, Freundschaften, Blockierungen und
@@ -243,7 +318,7 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
         loswerden, indem du das Cookie löschst; es verfällt dann nach {GUEST_RETENTION_DAYS} Tagen.
       </p>
 
-      <h2>15. Deine Rechte</h2>
+      <h2>16. Deine Rechte</h2>
       {/* TODO(owner): name the competent supervisory authority (the data protection authority of
           the German state you live in) with its address/website. */}
       <p>Du hast das Recht auf</p>
@@ -255,7 +330,7 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
         <li>Datenübertragbarkeit (Art. 20 DSGVO),</li>
         <li>
           <strong>Widerspruch</strong> gegen Verarbeitungen, die auf unserem berechtigten Interesse
-          beruhen (Art. 21 DSGVO),
+          beruhen (Art. 21 DSGVO), etwa der Analyse (siehe 12),
         </li>
         <li>
           Beschwerde bei einer Datenschutz-Aufsichtsbehörde (Art. 77 DSGVO), zum Beispiel in dem
@@ -279,8 +354,10 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
       </p>
       <p>
         Voicejack is a free party game run by one person as a hobby project. There are{' '}
-        <strong>no ads, no analytics and no tracking</strong>, and no scripts, fonts or images from
-        other servers. This page says which data still comes up, what for, and for how long.
+        <strong>no ads, no tracking and no third-party analytics</strong>, and no scripts, fonts or
+        images from other servers. We only count ourselves, without cookies and without profiles,
+        how the game is used (see 12). This page says which data comes up, what for, and for how
+        long.
       </p>
 
       <h2>1. Controller</h2>
@@ -337,13 +414,22 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
           <code>vj.supportShown</code> (session only): whether the support note was shown already.
         </li>
       </ul>
-      <p>None of this is used to follow you across other websites.</p>
+      <p>
+        None of this is used to follow you across other websites. Nothing is stored in or read from
+        your browser for analytics (see 12).
+      </p>
 
       <h2>5. Guest profile and account</h2>
       <p>
         Every browser automatically gets a <strong>guest profile</strong>: a random id, the display
         name used last, Elo rating, number of public games, and when it was created and last used.
         Guest profiles unused for {GUEST_RETENTION_DAYS} days are deleted automatically.
+      </p>
+      <p>
+        For <strong>public games</strong> ("Join a random game") we also keep a game history for the
+        Elo rating: time, room code and game type, and per player the place, points and Elo
+        before/after. The per-player entries are deleted with the guest profile (for deleted
+        accounts after {GUEST_RETENTION_DAYS} days, see 15). Private rooms are not recorded.
       </p>
       <p>
         An optional <strong>account</strong> adds your email address; the guest's rating and games
@@ -421,20 +507,78 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
         (see <Link to="/takedown">report content</Link>).
       </p>
 
-      <h2>12. Backups</h2>
+      <h2>12. Analytics / product improvement</h2>
       <p>
-        The database (profiles, accounts, friends, messages, reports) and uploaded clips are backed
-        up regularly. Deleted data may therefore remain in the backups for as long as those are
-        kept.
+        To see what works in the game and what doesn't, we count on our own server how Voicejack is
+        used. There are <strong>no cookies</strong> for this, nothing is stored in your browser,{' '}
+        <strong>no IP address</strong>, no full browser identifier, no profile, player or room id
+        and no fingerprinting. Only <strong>daily totals</strong> are stored ("12 games were started
+        on 18 Oct"), from which no individual can be read:
+      </p>
+      <ul>
+        <li>
+          Page views: only the kind of page (e.g. "home", "room", never the room code) plus browser
+          family (e.g. Chrome) and device class (desktop, mobile, tablet). The server derives both
+          from the user agent and then discards it.
+        </li>
+        <li>
+          Gameplay: rooms created and joined (private/public), games started and finished, rounds,
+          number of players, in which game phase players leave, number of takes and re-records per
+          dub, votes cast, which clips were played how often and how they scored, voice opt-ins in
+          public games, sign-ups, and queue waiting time (in coarse steps). Bots do not count.
+        </li>
+        <li>
+          Browser errors: a short hash of the simplified error message, the kind of page and the
+          count. The message text itself is not sent. The tab keeps the hashes of recent errors in
+          memory only, to attach them to a bug report.
+        </li>
+      </ul>
+      <p>
+        How many profiles are active per day, week and month, and how many come back in the weeks
+        after their first visit, we count from the timestamps guest profiles and accounts already
+        have (created, last used, see 5) and the public game history. Nothing extra is stored for
+        this; only totals are shown.
+      </p>
+      <p>
+        <strong>Feedback:</strong> after a game you can say with one tap how you liked it and add a
+        short comment (up to 200 characters); "Report a bug" lets you report a problem. We store the
+        time, your rating or text, and as context the kind of page, game phase, app version and the
+        hashes of recent errors, <strong>without any link to your profile, account or room</strong>.
+        Please don't put personal data in it.
+      </p>
+      <p>
+        These requests are sent to our server without a cookie. The IP address is only used briefly
+        in memory for rate limiting; like every request, though, it appears in the web server log
+        (see 3). Since nothing is stored on or read from your device for analytics, no consent under
+        § 25(1) TDDDG is needed. Legal basis: Art. 6(1)(f) GDPR (legitimate interest in improving
+        the game and finding bugs; without identifiers the impact is minimal).
+      </p>
+      <p>
+        Retention: daily totals {AGGREGATE_YEARS} years, feedback and bug reports {FEEDBACK_YEARS}{' '}
+        year; then they are deleted automatically.
+      </p>
+      <p>
+        <strong>Objection:</strong> you can object to this processing at any time (Art. 21 GDPR),
+        informally by email to the address in section 1. Because the counts are not linked to
+        anyone, we cannot single out values already counted for you. You can also prevent the
+        counting yourself by blocking requests to <code>/api/t</code> (e.g. with a content blocker);
+        the game keeps working normally.
       </p>
 
-      <h2>13. Support (Liberapay)</h2>
+      <h2>13. Backups</h2>
+      <p>
+        The database (profiles, accounts, friends, messages, reports, game history, usage statistics
+        and feedback) and uploaded clips are backed up regularly. Deleted data may therefore remain
+        in the backups for as long as those are kept.
+      </p>
+
+      <h2>14. Support (Liberapay)</h2>
       <p>
         The "Chip in" / "Support" button is a plain link to liberapay.com. Nothing from Liberapay is
         loaded on Voicejack; Liberapay's privacy policy only applies once you open the link.
       </p>
 
-      <h2>14. Deleting your account</h2>
+      <h2>15. Deleting your account</h2>
       <p>
         In the account menu (top right), <strong>"Delete account"</strong>. This immediately removes
         your email address and name, ends all sessions, deletes friendships, blocks and direct
@@ -444,7 +588,7 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
         then expires after {GUEST_RETENTION_DAYS} days.
       </p>
 
-      <h2>15. Your rights</h2>
+      <h2>16. Your rights</h2>
       <p>You have the right to</p>
       <ul>
         <li>access your data (Art. 15 GDPR),</li>
@@ -454,6 +598,7 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
         <li>data portability (Art. 20 GDPR),</li>
         <li>
           <strong>object</strong> to processing based on our legitimate interest (Art. 21 GDPR),
+          such as analytics (see 12),
         </li>
         <li>
           lodge a complaint with a data protection supervisory authority (Art. 77 GDPR), for example

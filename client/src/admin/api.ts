@@ -1,5 +1,8 @@
 import {
+  analyticsPaths,
   libraryPaths,
+  type AdminAnalyticsResponse,
+  type FeedbackStatus,
   type AdminClip,
   type AdminClipsResponse,
   type AdminLibrariesResponse,
@@ -76,6 +79,12 @@ export const adminApi = {
   setUploadBan: (userId: string, banned: boolean) =>
     call<{ uploadBanned: boolean }>(libraryPaths.adminUploadBan(userId), json('POST', { banned })),
   resolveReport: (id: number) => call<void>(libraryPaths.adminReportResolve(id), json('POST')),
+  // V15 analytics + feedback inbox.
+  analytics: (q: { from?: string; to?: string; page?: number; status?: FeedbackStatus }) =>
+    call<AdminAnalyticsResponse>(analyticsPaths.admin(q)),
+  resolveFeedback: (id: number, resolved: boolean) =>
+    call<void>(analyticsPaths.feedbackResolve(id), json('POST', { resolved })),
+  deleteFeedback: (id: number) => call<void>(analyticsPaths.feedback(id), json('DELETE')),
 };
 
 /** Raw-body upload with progress (fetch has no upload progress). Resolves with the new clip. */

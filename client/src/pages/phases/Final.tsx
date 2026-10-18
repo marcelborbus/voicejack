@@ -8,6 +8,7 @@ import { BestDubReplay, useDubChunks } from '@/components/results/BestDubReplay'
 import { Confetti, CountUp } from '@/components/results/motion';
 import { SaveVideo } from '@/components/results/SaveVideo';
 import { SupportPrompt } from '@/components/support';
+import { MoodPrompt } from '@/components/feedback';
 import { PublicFinalActions } from '@/components/match';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -106,6 +107,10 @@ export function Final() {
           </Card>
         </div>
       </div>
+      {/* V15 mood row first; V11's support card appears later (7 s) below it. */}
+      <MoodPrompt
+        gameKey={`${snap.code}:${final.standings.map((s) => `${s.playerId}=${s.total}`).join(',')}`}
+      />
       <SupportPrompt />
     </div>
   );

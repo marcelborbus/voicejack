@@ -1,15 +1,21 @@
+import { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
 import { AccountMenu } from '@/components/account';
 import { FriendsOverlay } from '@/components/friends';
 import { Logo } from '@/components/Logo';
 import { SoundToggle } from '@/components/SoundToggle';
+import { BugReportDialog } from '@/components/feedback';
+import { trackPageView } from '@/lib/analytics';
 import { HomeSupport, SupportLink } from '@/components/support';
 import { Backdrop } from './Backdrop';
 import { CreditsDialog } from './CreditsDialog';
 
 /** App frame: logo header, page outlet, attribution footer.  */
 export function Shell() {
-  const isHome = useLocation().pathname === '/';
+  const { pathname } = useLocation();
+  const isHome = pathname === '/';
+  // V15: aggregate page view (route name only, no cookie / id).
+  useEffect(() => trackPageView(pathname), [pathname]);
   return (
     <div className="relative flex min-h-dvh flex-col">
       <Backdrop />
@@ -34,6 +40,7 @@ export function Shell() {
           <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <SupportLink />
             <CreditsDialog />
+            <BugReportDialog />
             <Link to="/impressum" className="hover:text-zinc-200" data-testid="footer-impressum">
               Impressum
             </Link>

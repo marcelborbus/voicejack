@@ -35,6 +35,27 @@ test('solo host + 2 bots: lobby → dub → vote → final', async ({ browser })
 
     await expect(page.getByTestId('final')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('final-standings').locator('li')).toHaveCount(3);
+
+    // V15: one-tap mood + optional comment on Final, visible in the admin analytics (ADMIN_DEV).
+    const comment = `bots e2e ${Date.now()}`;
+    await expect(page.getByTestId('mood-prompt')).toBeVisible();
+    await page.getByTestId('mood-2').click();
+    await page.getByTestId('mood-comment').fill(comment);
+    await page.getByTestId('mood-send').click();
+    await expect(page.getByTestId('mood-thanks')).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get('/api/admin/analytics?status=all');
+          expect(res.ok()).toBe(true);
+          const body = (await res.json()) as {
+            feedback: { items: { comment: string; mood: number; context: { phase?: string } }[] };
+          };
+          return body.feedback.items.find((f) => f.comment === comment) ?? null;
+        },
+        { timeout: 10_000 },
+      )
+      .toMatchObject({ mood: 2, context: { phase: 'FINAL' } });
   } finally {
     await closeAll([host]);
   }

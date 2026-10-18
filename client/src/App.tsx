@@ -9,6 +9,8 @@ import { Room } from '@/pages/Room';
 
 // Admin (V05): own chunk, only fetched on /admin.
 const AdminPage = lazy(() => import('@/admin/AdminPage'));
+// V15 analytics dashboard (admin chunk).
+const AnalyticsPage = lazy(() => import('@/admin/AnalyticsPage'));
 // V06 "My clips" (registered users' private libraries).
 const LibraryPage = lazy(() => import('@/pages/library/LibraryPage'));
 // V12 legal pages: own chunk each.
@@ -26,6 +28,14 @@ export function App() {
           <Route element={<Shell />}>
             <Route index element={<Home />} />
             <Route path="r/:code" element={<Room />} />
+            <Route
+              path="admin/analytics"
+              element={
+                <Suspense>
+                  <AnalyticsPage />
+                </Suspense>
+              }
+            />
             <Route
               path="admin/*"
               element={
