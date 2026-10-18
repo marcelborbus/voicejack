@@ -43,7 +43,9 @@ export function PlayerAvatar({
       aria-hidden
       className={cn(
         'mug inline-flex shrink-0 select-none overflow-hidden border-2 border-[#1a1027]',
-        'shadow-[0_3px_0_rgb(0_0_0/0.45)] [&>svg]:block',
+        // `!`: buttons size every descendant svg as an icon (`[&_svg]:size-4`), which shrank
+        // the face into the mug's top-left corner (#40).
+        'shadow-[0_3px_0_rgb(0_0_0/0.45)] [&>svg]:block [&>svg]:size-full!',
         SIZE[size],
         dimmed && 'opacity-40 grayscale',
         className,
