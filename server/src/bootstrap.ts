@@ -13,6 +13,7 @@ import { Presence } from './presence/Presence.js';
 import { Matchmaker } from './match/Matchmaker.js';
 import { Reports } from './match/Reports.js';
 import { Friends } from './friends/Friends.js';
+import { Ratings } from './elo/Ratings.js';
 
 /** Expired sessions / idle guests are purged this often (and once at startup). */
 export const DB_CLEANUP_MS = 3600_000;
@@ -27,6 +28,7 @@ export interface RunningServer {
   matchmaker: Matchmaker;
   reports: Reports;
   friends: Friends;
+  ratings: Ratings;
   /** e.g. `http://127.0.0.1:3000` */
   url: string;
   port: number;
@@ -51,13 +53,23 @@ export async function startServer(
   const mig = migrate(db);
   const clips = ClipLibrary.open(db, { clipsDir: config.clipsDir, libraryDir: config.libraryDir });
   const accounts = new Accounts(db);
-  const rooms = new RoomManager({ config, clips: clips.clips.map(toClipInfo), store, library: clips });
+  const ratings = new Ratings(db);
+  const rooms = new RoomManager({
+    config,
+    clips: clips.clips.map(toClipInfo),
+    store,
+    library: clips,
+    ratings,
+  });
   clips.onChange(() => rooms.libraryChanged());
   const presence = new Presence({ rooms });
   const reports = new Reports(db);
-  const matchmaker = new Matchmaker({ rooms, presence, reports, timings: config.timings });
+  const matchmaker = new Matchmaker({ rooms, presence, reports, ratings, timings: config.timings });
   const friends = new Friends({ db, presence, rooms });
-  const app = await buildApp({ config, clips, rooms, store, accounts, presence, matchmaker, friends }, opts);
+  const app = await buildApp(
+    { config, clips, rooms, store, accounts, presence, matchmaker, friends, ratings },
+    opts,
+  );
   const cleanup = () => {
     try {
       const n = accounts.cleanup();
@@ -102,6 +114,7 @@ export async function startServer(
     matchmaker,
     reports,
     friends,
+    ratings,
     url: `http://${host}:${port}`,
     port,
     close: () => app.close(),

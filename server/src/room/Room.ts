@@ -802,6 +802,12 @@ export class Room {
     this.phase = 'FINAL';
     this.phaseEndsAt = null;
     this.showcase = null;
+    this.deps.onFinal?.(
+      this.final.standings.map((s) => {
+        const q = this.players.get(s.playerId);
+        return { ...s, userId: q?.userId ?? null, isBot: q?.isBot ?? false };
+      }),
+    );
     this.changed();
   }
 

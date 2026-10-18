@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { QueueMode } from '@dub/shared';
 import { presence } from '@/net/presence';
 import { setToken } from '@/state/storage';
 
@@ -6,6 +7,8 @@ export type QueueStatus = 'idle' | 'joining' | 'queued';
 
 export interface QueueState {
   status: QueueStatus;
+  /** V09: which queue (casual or ranked). */
+  mode: QueueMode;
   position: number | null;
   size: number;
   /** Local `Date.now()` at which the wait started (from the server's `waitedMs`). */
@@ -17,6 +20,7 @@ export interface QueueState {
 
 const initial: QueueState = {
   status: 'idle',
+  mode: 'casual',
   position: null,
   size: 0,
   since: null,
@@ -29,6 +33,7 @@ export const useQueue = create<QueueState>(() => ({ ...initial }));
 
 let wired = false;
 let lastName = '';
+let lastMode: QueueMode = 'casual';
 
 function wire(): void {
   if (wired) return;
@@ -36,6 +41,7 @@ function wire(): void {
   presence.on('queue', (m) =>
     useQueue.setState({
       status: 'queued',
+      mode: lastMode,
       position: m.position ?? null,
       size: m.size,
       since: Date.now() - m.waitedMs,
@@ -60,14 +66,18 @@ export function wireQueue(): void {
   presence.start();
 }
 
-/** `queueJoin`. Retries once the presence socket is open. */
-export function joinQueue(name: string): void {
+/**
+ * `queueJoin`. Retries once the presence socket is open. `mode` defaults to the last one used
+ * (so "Play again" after a ranked game queues ranked again).
+ */
+export function joinQueue(name: string, mode: QueueMode = lastMode): void {
   wireQueue();
   lastName = name;
-  useQueue.setState({ ...initial, status: 'joining', since: Date.now() });
+  lastMode = mode;
+  useQueue.setState({ ...initial, status: 'joining', mode, since: Date.now() });
   const trySend = (left: number) => {
     if (useQueue.getState().status !== 'joining') return;
-    if (presence.send({ t: 'queueJoin', name: lastName })) return;
+    if (presence.send({ t: 'queueJoin', name: lastName, mode: lastMode })) return;
     if (left <= 0) {
       useQueue.setState({ ...initial, error: 'Could not reach the server. Try again.' });
       return;

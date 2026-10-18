@@ -1,11 +1,20 @@
-import type { PlayerId, PresenceS2C, RoomCode } from '@dub/shared';
+import {
+  ELO_START,
+  rankedUnlocked,
+  RANKED_MIN_GAMES,
+  type PlayerId,
+  type PresenceS2C,
+  type QueueMode,
+  type RoomCode,
+} from '@dub/shared';
 import type { Timings } from '../config.js';
 import type { Presence } from '../presence/Presence.js';
 import { Room } from '../room/Room.js';
 import type { RoomManager } from '../room/RoomManager.js';
 import { realScheduler } from '../room/timers.js';
 import type { Clock, PlayerReport, Scheduler } from '../room/types.js';
-import { Matcher, type MatcherRules, type QueueEntry } from './Matcher.js';
+import { Matcher, type MatcherRules } from './Matcher.js';
+import { eloMatchRules, type RatedEntry } from './ranked.js';
 import type { Reports } from './Reports.js';
 
 /** A vote-kicked player cannot queue again for this long. */
@@ -24,9 +33,16 @@ export interface Seeker {
   socketKey: string;
   ip: string | null;
   name: string;
+  /** V09: casual (default) or ranked. */
+  mode?: QueueMode;
 }
 
-export interface QueuedPlayer extends QueueEntry {
+/** V09: where the matchmaker reads a user's rating (implemented by `Ratings`). */
+export interface RatingSource {
+  ratingOf(userId: string): { elo: number; publicGamesPlayed: number } | null;
+}
+
+export interface QueuedPlayer extends RatedEntry {
   client: QueueClient;
   userId: string | null;
   ip: string | null;
@@ -40,13 +56,16 @@ export interface MatchmakerDeps {
   reports?: Reports;
   clock?: Clock;
   scheduler?: Scheduler;
-  /** V09: Elo `compatible` / `score` hooks (and any rule override). */
+  /** V09 ratings: ranked eligibility + the Elo the matcher compares. */
+  ratings?: RatingSource;
+  /** Rule overrides (default: V09 casual/ranked `compatible` / `score`, `ranked.ts`). */
   rules?: Partial<MatcherRules<QueuedPlayer>>;
   blockMs?: number;
   log?: { warn(obj: unknown, msg?: string): void };
 }
 
-export type JoinOutcome = { ok: true } | { ok: false; code: 'BLOCKED'; message: string };
+export type JoinOutcome =
+  { ok: true } | { ok: false; code: 'BLOCKED' | 'INVALID'; message: string };
 
 /**
  * Public matchmaking (V08): the queue over `/ws/presence`, match forming on a tick, public
@@ -77,6 +96,7 @@ export class Matchmaker {
     this.matcher = new Matcher<QueuedPlayer>({
       fullWaitMs: deps.timings.matchFullWaitMs,
       pairWaitMs: deps.timings.matchPairWaitMs,
+      ...eloMatchRules<QueuedPlayer>(),
       ...deps.rules,
     });
     deps.rooms.setPublicHooks({
@@ -105,7 +125,11 @@ export class Matchmaker {
     this.leave(client, false);
   }
 
-  /** `queueJoin`. Re-joining while queued only updates the name (position and wait kept). */
+  /**
+   * `queueJoin`. Re-joining while queued only updates the name (position and wait kept);
+   * switching between casual and ranked restarts the wait. Ranked needs an account with
+   * `RANKED_MIN_GAMES` public games.
+   */
   join(client: QueueClient, s: Seeker): JoinOutcome {
     if (this.disposed) return { ok: true };
     this.open.add(client);
@@ -116,6 +140,15 @@ export class Matchmaker {
         ok: false,
         code: 'BLOCKED',
         message: `You were voted out of a public game. Try again in ${min} min.`,
+      };
+    }
+    const mode: QueueMode = s.mode ?? 'casual';
+    const rating = s.userId ? (this.deps.ratings?.ratingOf(s.userId) ?? null) : null;
+    if (mode === 'ranked' && !rankedUnlocked(rating)) {
+      return {
+        ok: false,
+        code: 'INVALID',
+        message: `Ranked unlocks after ${RANKED_MIN_GAMES} public games.`,
       };
     }
     const key = s.userId ? `u:${s.userId}` : `s:${s.socketKey}`;
@@ -129,7 +162,9 @@ export class Matchmaker {
     if (oldKey && oldKey !== key) this.leave(client, false);
     const entry: QueuedPlayer = {
       key,
-      joinedAt: prev?.joinedAt ?? this.clock.now(),
+      joinedAt: (prev?.mode === mode ? prev.joinedAt : undefined) ?? this.clock.now(),
+      mode,
+      elo: rating?.elo ?? ELO_START,
       client,
       userId: s.userId,
       ip: s.ip,
@@ -198,7 +233,7 @@ export class Matchmaker {
   }
 
   private startMatch(group: QueuedPlayer[]): boolean {
-    const room = this.deps.rooms.createPublic();
+    const room = this.deps.rooms.createPublic(group[0]?.mode ?? 'casual');
     if (!(room instanceof Room)) return false;
     for (const e of group) {
       const seat = room.seat(e.name, e.userId ?? undefined);

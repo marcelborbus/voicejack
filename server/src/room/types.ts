@@ -55,6 +55,15 @@ export interface PlayerReport {
   reason: string;
 }
 
+/** V09: one player at FINAL, as reported to `onFinal`. */
+export interface FinalSeat {
+  playerId: PlayerId;
+  userId: string | null;
+  isBot: boolean;
+  total: number;
+  roundWins: number;
+}
+
 export interface RoomDeps {
   code: RoomCode;
   /** V08: `public` = matchmade, server-hosted (default `private`). */
@@ -79,6 +88,12 @@ export interface RoomDeps {
   onVoteKicked?(playerId: PlayerId, userId: string | null): void;
   /** V08 public: a player reported another one. */
   onReport?(report: PlayerReport): void;
+  /**
+   * V09: the game reached FINAL. `seats` = everyone still on the roster (disconnected players
+   * included; vote-kicked ones are gone), in final standings order. The room's Elo is
+   * recorded here (synchronously, before the FINAL snapshot goes out).
+   */
+  onFinal?(seats: FinalSeat[]): void;
   /** A bot player was created (connected) by the room; attach its BotPlayer connection here. */
   onBotAdded?(playerId: PlayerId): void;
   /**

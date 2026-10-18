@@ -108,6 +108,7 @@ class PresenceSession implements PresenceClient {
           socketKey: this.socketKey,
           ip: this.ip,
           name: msg.name,
+          mode: msg.mode,
         });
         if (!r.ok) this.send({ t: 'error', code: r.code, message: r.message });
         return;

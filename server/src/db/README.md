@@ -50,8 +50,10 @@ more than 15 min (kept that long so the rate limit still sees them), guests idle
   existing account, which keeps its own `elo` / `public_games_played`, except when it has
   `public_games_played = 0` and the guest has played: then it takes the guest's values
   (nothing to lose, and the guest's rating is the only real one). An empty `display_name`
-  takes the guest's. The guest row stays a guest (purged by the 180-day cleanup). V09: game
-  history rows of that guest are **not** moved; reassign them there if it matters.
+  takes the guest's. The guest row stays a guest (purged by the 180-day cleanup).
+  V09 game history follows the rating: when the account takes the guest's values (it had 0
+  public games), the guest's `game_players` rows are reassigned to it and the guest is reset
+  to 1000 / 0 games; otherwise the history stays on the guest with the guest's rating.
 - **Rotation:** verify deletes every session of the claimed guest and the browser's current
   session, then issues a new one. So a link requested by someone else can't leave their
   browser signed in to your address.
@@ -112,17 +114,29 @@ side's id is not revealed until both sides accept. A room player is only ever ad
 
 The SQL below was the V10 plan; `004_friends.sql` is what shipped.
 
+## Elo + game history (V09, `006_games.sql`, `elo/Ratings.ts`)
+
+Only **public** games are recorded (casual and ranked alike); private games never touch Elo.
+At FINAL the room reports every seat still on its roster (`Room` → `RoomManager.onFinal` →
+`Ratings.recordGame`, synchronously before the FINAL snapshot goes out):
+
+- `games` — `kind` casual|ranked (the queue the room was matched from), `room_code`,
+  `created_at`.
+- `game_players` — one row per rated player: `place` (1-based, ties share it: same total and
+  round wins), `total`, `elo_before`, `elo_after`. Cascades with the user row (guest purge).
+- Rated = humans with a live account row (every browser has a guest row, so guests are rated
+  too). Bots and account-less seats are skipped; vote-kicked players are off the roster;
+  players who disconnected (or left mid-game, which the room treats as a disconnect) still
+  count with their score, so rage-quitting does not dodge a loss.
+- Pairwise Elo (`elo/elo.ts`): each pair is a match (better place wins, equal = draw),
+  `K = 32 / (n − 1)`, `Δ = round(K · Σ (S − E))`. `users.elo` is updated and
+  `public_games_played` incremented in the same transaction, also for a lone rated player
+  (Δ = 0). Ranked unlocks at 3 public games (`RANKED_MIN_GAMES`).
+- `GET /api/me/last-game?room=CODE` returns the caller's row for Final.
+
 ## Planned migrations (not built yet)
 
 ```sql
--- V09 Elo: users.elo / public_games_played exist already. Add a history for audits:
--- CREATE TABLE games (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('public','ranked','private')),
---   started_at INTEGER NOT NULL, ended_at INTEGER, player_count INTEGER NOT NULL);
--- CREATE TABLE game_players (game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
---   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, place INTEGER NOT NULL,
---   score INTEGER NOT NULL, elo_before INTEGER NOT NULL, elo_after INTEGER NOT NULL,
---   PRIMARY KEY (game_id, user_id));
--- Room players carry `userId` (Room.userIdOf) for exactly this; bots never have one.
 
 -- V10 friends + DMs (registered users only):
 -- CREATE TABLE friendships (

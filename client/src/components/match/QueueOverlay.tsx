@@ -21,6 +21,7 @@ export function QueueOverlay() {
   const status = useQueue((s) => s.status);
   const since = useQueue((s) => s.since);
   const size = useQueue((s) => s.size);
+  const ranked = useQueue((s) => s.mode === 'ranked');
   const counts = usePresenceCounts();
   const [now, setNow] = useState(() => Date.now());
   const open = status !== 'idle';
@@ -36,7 +37,7 @@ export function QueueOverlay() {
       <DialogContent data-testid="queue-overlay" className="max-w-sm">
         <DialogHeader className="items-center text-center">
           <Loader2 className="size-10 animate-spin text-brand" aria-hidden />
-          <DialogTitle>Finding players…</DialogTitle>
+          <DialogTitle>{ranked ? 'Finding a ranked match…' : 'Finding players…'}</DialogTitle>
           <DialogDescription>
             <span data-testid="queue-looking" className="tabular-nums">
               {looking} looking
@@ -48,7 +49,10 @@ export function QueueOverlay() {
           </DialogDescription>
         </DialogHeader>
         <p className="text-center text-sm text-zinc-400">
-          Games start with 3–6 players. Voice chat with strangers is off until you turn it on.
+          {ranked
+            ? 'Ranked looks for players near your rating first and widens the search the longer you wait.'
+            : 'Games start with 3–6 players.'}{' '}
+          Voice chat with strangers is off until you turn it on.
         </p>
         <Button variant="secondary" data-testid="queue-cancel" onClick={leaveQueue}>
           <X /> Cancel

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { NAME_MAX_LENGTH, NAME_MIN_LENGTH, ROOM_CODE_REGEX } from '../constants.js';
 import { RoomCodeSchema } from './common.js';
+import { QueueModeSchema } from './elo.js';
 import { DirectMessageSchema, FriendStatusSchema } from './friends.js';
 
 /**
@@ -41,10 +42,13 @@ export const PresencePingSchema = z.object({ t: z.literal('ping'), c: z.number()
 /**
  * V08: enter the public matchmaking queue under `name` (the room player name once matched).
  * Re-sending while queued only updates the name. Anonymous sockets queue per socket.
+ * V09 `mode` (default casual): `ranked` needs an account with 3+ public games (else `error`
+ * INVALID) and matches by Elo; switching mode while queued restarts the wait.
  */
 export const PresenceQueueJoinSchema = z.object({
   t: z.literal('queueJoin'),
   name: z.string().trim().min(NAME_MIN_LENGTH).max(NAME_MAX_LENGTH),
+  mode: QueueModeSchema.optional(),
 });
 /** V08: leave the queue (also implied by closing the presence socket). */
 export const PresenceQueueLeaveSchema = z.object({ t: z.literal('queueLeave') });

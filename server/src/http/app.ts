@@ -31,6 +31,8 @@ import * as statsRoutes from '../routes/stats.js';
 import type { Presence } from '../presence/Presence.js';
 import type { Friends } from '../friends/Friends.js';
 import * as friendsRoutes from '../routes/friends.js';
+import * as eloRoutes from '../routes/elo.js';
+import type { Ratings } from '../elo/Ratings.js';
 import * as costsRoutes from '../routes/costs.js';
 import * as legalRoutes from '../routes/legal.js';
 import type { Matchmaker } from '../match/Matchmaker.js';
@@ -56,6 +58,8 @@ export interface AppDeps {
   friends?: Friends;
   /** V08 public matchmaking over `/ws/presence` (queueJoin / queueLeave). */
   matchmaker?: Matchmaker;
+  /** V09 Elo + game history (`/api/me/last-game`). Needs `accounts`. */
+  ratings?: Ratings;
   /** Epoch ms the process started (health uptime). */
   startedAt?: number;
 }
@@ -124,6 +128,7 @@ export async function buildApp(
     presenceGateway.register,
     statsRoutes.register,
     friendsRoutes.register,
+    eloRoutes.register,
     costsRoutes.register,
     legalRoutes.register,
   ];

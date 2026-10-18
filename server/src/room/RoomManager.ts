@@ -6,6 +6,7 @@ import {
   type ClipInfo,
   type Phase,
   type PlayerId,
+  type QueueMode,
   type RoomCode,
   type RoomKind,
   type S2C,
@@ -16,7 +17,8 @@ import { BotPlayer, type BotSound } from '../bots/BotPlayer.js';
 import { loadBotSounds } from '../bots/sounds.js';
 import { Room, type JoinResult } from './Room.js';
 import { realScheduler } from './timers.js';
-import type { Clock, PlayerReport, RoomError, RoomLibrary, Scheduler } from './types.js';
+import type { FinishedGame } from '../elo/Ratings.js';
+import type { Clock, FinalSeat, PlayerReport, RoomError, RoomLibrary, Scheduler } from './types.js';
 
 /** Upload storage as seen by rooms (implemented by ChunkStore). */
 export interface RoomStore {
@@ -68,6 +70,8 @@ export interface RoomManagerDeps {
   clock?: Clock;
   scheduler?: Scheduler;
   rng?: () => number;
+  /** V09: rates finished public games (`Ratings`); private games never reach it. */
+  ratings?: { recordGame(game: FinishedGame): unknown };
 }
 
 /** V08: public-room events, routed to the matchmaker. */
@@ -94,6 +98,8 @@ export class RoomManager {
   private readonly scheduler: Scheduler;
   private sweepHandle: ReturnType<typeof setInterval> | null = null;
   private publicHooks: PublicRoomHooks | null = null;
+  /** V09: queue mode each public room was matched from (its games' `kind`). */
+  private readonly modes = new Map<RoomCode, QueueMode>();
   private readonly bots: BotEnv | null;
   /** Resolves once the bot sound pool is loaded (immediately without DEV_BOTS). */
   readonly botsReady: Promise<void>;
@@ -157,10 +163,11 @@ export class RoomManager {
   }
 
   /** V08: an empty, server-hosted public room; the matchmaker seats the players. */
-  createPublic(): Room | RoomError {
+  createPublic(mode: QueueMode = 'casual'): Room | RoomError {
     const room = this.newRoom('public');
     if (!(room instanceof Room)) return room;
     this.register(room);
+    this.modes.set(room.code, mode);
     return room;
   }
 
@@ -214,10 +221,25 @@ export class RoomManager {
       onRequeue: (pid, uid) => this.publicHooks?.onRequeue(code, pid, uid),
       onVoteKicked: (pid, uid) => this.publicHooks?.onVoteKicked(code, pid, uid),
       onReport: (r) => this.publicHooks?.onReport(r),
+      onFinal: (seats) => this.gameOver(code, kind, seats),
       isAdmin: () => false, // V05: admin users may add bots without DEV_BOTS
       rng: this.deps.rng,
     });
     return room;
+  }
+
+  /** V09: public games are rated; private ones never touch Elo. */
+  private gameOver(code: RoomCode, kind: RoomKind, seats: FinalSeat[]): void {
+    if (kind !== 'public' || !this.deps.ratings) return;
+    try {
+      this.deps.ratings.recordGame({
+        kind: this.modes.get(code) ?? 'casual',
+        roomCode: code,
+        seats,
+      });
+    } catch (e) {
+      console.error('[elo] recording game failed', e);
+    }
   }
 
   private newBot(room: Room, playerId: PlayerId): BotPlayer {
@@ -288,6 +310,7 @@ export class RoomManager {
     if (!room) return;
     room.dispose();
     this.rooms.delete(code);
+    this.modes.delete(code);
     const map = this.conns.get(code);
     this.conns.delete(code);
     this.changed();

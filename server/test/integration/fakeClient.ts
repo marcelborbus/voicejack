@@ -23,6 +23,8 @@ export class FakeClient {
   received: S2C[] = [];
   token: string | undefined;
   playerId = '';
+  /** Session cookie sent on the WS upgrade (links the player to an account, V03/V09). */
+  cookie: string | undefined;
   private waiters: { pred: (m: S2C) => boolean; resolve: (m: S2C) => void }[] = [];
 
   constructor(
@@ -36,7 +38,10 @@ export class FakeClient {
 
   /** Opens the socket and completes `hello` (by token if known, else by name). */
   async connect(): Promise<Welcome> {
-    const ws = new WebSocket(this.baseUrl.replace(/^http/, 'ws') + '/ws');
+    const ws = new WebSocket(
+      this.baseUrl.replace(/^http/, 'ws') + '/ws',
+      this.cookie ? { headers: { cookie: this.cookie } } : {},
+    );
     this.ws = ws;
     ws.on('message', (d) => this.onMessage(JSON.parse(d.toString()) as S2C));
     await new Promise<void>((res, rej) => {

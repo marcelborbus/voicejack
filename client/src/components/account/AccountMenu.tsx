@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Library, LogIn, LogOut, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 import { NAME_MAX_LENGTH } from '@dub/shared';
+import { EloBadge } from '@/components/elo/EloBadge';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,7 +49,8 @@ export function AccountMenu({ className }: { className?: string }) {
   if (!user) return null;
   if (user.kind === 'guest') {
     return (
-      <div className={cn('ml-auto', className)}>
+      <div className={cn('ml-auto flex items-center gap-2', className)}>
+        <EloBadge />
         <SignInDialog
           trigger={
             <Button variant="outline" size="sm" data-testid="signin-button">
@@ -107,6 +109,7 @@ function AccountDialog({ className }: { className?: string }) {
           >
             <PlayerAvatar name={user.displayName || '?'} size="xs" />
             <span className="truncate">{label}</span>
+            <EloBadge />
           </Button>
         </DialogTrigger>
         <DialogContent data-testid="account-dialog">

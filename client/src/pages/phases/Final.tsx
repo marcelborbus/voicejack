@@ -1,6 +1,7 @@
 import { Crown, Medal, MicOff, RotateCcw, Share2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Sparkle } from '@/components/doodles';
+import { EloResult } from '@/components/elo';
 import { AddFriendButton } from '@/components/friends';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { BestDubReplay, useDubChunks } from '@/components/results/BestDubReplay';
@@ -79,6 +80,7 @@ export function Final() {
         <BestDubCard final={final} />
         <div className="flex flex-col gap-5">
           <Standings final={final} youId={youId} />
+          <EloResult />
           <Card>
             <CardContent className="flex flex-col gap-3">
               {snap.kind === 'public' ? (

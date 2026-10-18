@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { nanoid } from 'nanoid';
-import { DM_RETENTION_DAYS } from '@dub/shared';
+import { DM_RETENTION_DAYS, ELO_START } from '@dub/shared';
 import { tx, type Db } from '../db/index.js';
 import { readCookie, SESSION_COOKIE } from './cookies.js';
 
@@ -180,6 +180,8 @@ export class Accounts {
    *   db/README.md): its Elo / public_games_played are kept, except when it has never played a
    *   public game and the guest has, then it takes the guest's; its empty display name takes
    *   the guest's. The guest row is left as an orphan guest (purged by the 180-day cleanup).
+   *   V09: when the account takes the guest's rating it also takes its `game_players` rows
+   *   (the guest is reset to 1000 / 0 games); otherwise the history stays on the guest.
    *
    * All sessions of the claimed/merged guest end (the caller then issues a fresh one), so a
    * link someone else requested can't leave their browser signed in to your address.
@@ -209,6 +211,13 @@ export class Accounts {
             this.db
               .prepare('UPDATE users SET elo = ?, public_games_played = ? WHERE id = ?')
               .run(guest.elo, guest.publicGamesPlayed, existing.id);
+            // V09: the guest's game history moves with its rating (the account had none).
+            this.db
+              .prepare('UPDATE game_players SET user_id = ? WHERE user_id = ?')
+              .run(existing.id, guest.id);
+            this.db
+              .prepare('UPDATE users SET elo = ?, public_games_played = 0 WHERE id = ?')
+              .run(ELO_START, guest.id);
           }
           if (!existing.display_name && guest.displayName) {
             this.db
