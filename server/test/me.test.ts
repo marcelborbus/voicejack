@@ -202,9 +202,7 @@ describe('room join links the cookie user', () => {
 
   // #41: a per-room name never overwrites a registered account's name; guests keep the last one.
   it('remembers a guest name, but keeps a registered account name', async () => {
-    const [g, r, empty] = await Promise.all(
-      [0, 1, 2].map(() => srv.app.inject('/api/me')),
-    );
+    const [g, r, empty] = await Promise.all([0, 1, 2].map(() => srv.app.inject('/api/me')));
     const id = (x: typeof g) => x.json<MeResponse>().user.id;
     srv.db
       .prepare("UPDATE users SET kind = 'registered', email = ?, display_name = ? WHERE id = ?")

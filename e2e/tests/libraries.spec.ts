@@ -104,9 +104,9 @@ test('libraries: admin upload, host upload, lobby pick, game uses it', async ({ 
       await markTrim(page, 'admin-upload');
     });
     // The server got ss=1, t=3 from "Start here" at 1 s and "End here" at 4 s.
-    await expect(
-      page.getByTestId('admin-clip').filter({ hasText: 'Official Tiny' }),
-    ).toContainText(/0:0[23]/);
+    await expect(page.getByTestId('admin-clip').filter({ hasText: 'Official Tiny' })).toContainText(
+      /0:0[23]/,
+    );
 
     // ---- registered host: two clips in "My clips" (host + 1 bot need 2 different scenes) ----
     await page.goto('/');
