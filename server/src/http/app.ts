@@ -36,6 +36,7 @@ import * as eloRoutes from '../routes/elo.js';
 import type { Ratings } from '../elo/Ratings.js';
 import * as costsRoutes from '../routes/costs.js';
 import * as legalRoutes from '../routes/legal.js';
+import { loggerOptions } from './logger.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
 export const BODY_LIMIT = Math.floor(2.5 * 1024 * 1024);
@@ -78,7 +79,10 @@ export async function buildApp(
   const { config } = deps;
   const startedAt = deps.startedAt ?? Date.now();
   const app = Fastify({
-    logger: opts.logger ?? false,
+    // Never log client IPs (V13): only method, path and status; see http/logger.ts.
+    logger: opts.logger
+      ? loggerOptions(typeof opts.logger === 'object' ? opts.logger.level : 'info')
+      : false,
     trustProxy: config.trustProxy,
     bodyLimit: BODY_LIMIT,
   });

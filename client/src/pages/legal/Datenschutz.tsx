@@ -80,15 +80,12 @@ function German({ legal }: { legal: LegalInfo | null | undefined }) {
         und die Browserkennung (User-Agent). Die Logs werden täglich rotiert und nach{' '}
         {NGINX_LOG_DAYS} Tagen gelöscht.
       </p>
-      {/* TODO(owner): the app's own log (Fastify request logging at LOG_LEVEL=info) records the
-          client IP and URL of every request into the Docker json-file log (max-size 10m,
-          max-file 3), so there is no fixed time limit. Either disable request logging / drop the
-          IP, or state a retention here. */}
       <p>
-        Die Anwendung selbst protokolliert ebenfalls Anfragen (IP-Adresse, aufgerufene Adresse,
-        Zeitpunkt) und Fehler. Dieses Protokoll ist auf 30 MB begrenzt; ältere Einträge werden
-        überschrieben. Für Ratenbegrenzungen (Schutz vor Missbrauch) wird die IP-Adresse kurzzeitig
-        im Arbeitsspeicher gehalten und nicht gespeichert.
+        Die Anwendung selbst protokolliert Anfragen nur mit Methode, Pfad (ohne Parameter),
+        Statuscode und Zeitpunkt sowie Fehler, <strong>ohne IP-Adresse</strong>, Browserkennung oder
+        andere Kopfzeilen. Dieses Protokoll ist auf 30 MB begrenzt; ältere Einträge werden
+        überschrieben. Für Ratenbegrenzungen und Sperren nach Meldungen (Schutz vor Missbrauch) wird
+        die IP-Adresse kurzzeitig im Arbeitsspeicher gehalten und nicht gespeichert.
       </p>
       <p>
         Zweck: Betrieb, Fehlersuche und Abwehr von Angriffen. Rechtsgrundlage: Art. 6 Abs. 1 lit. f
@@ -308,9 +305,10 @@ function English({ legal }: { legal: LegalInfo | null | undefined }) {
         agent). The logs are rotated daily and deleted after {NGINX_LOG_DAYS} days.
       </p>
       <p>
-        The app itself also logs requests (IP address, requested address, time) and errors. This log
-        is capped at 30 MB; older entries are overwritten. For rate limits (abuse protection) the IP
-        address is held briefly in memory and not stored.
+        The app itself logs requests only with method, path (without parameters), status code and
+        time, plus errors, <strong>without IP address</strong>, user agent or other headers. This
+        log is capped at 30 MB; older entries are overwritten. For rate limits and blocks after
+        reports (abuse protection) the IP address is held briefly in memory and not stored.
       </p>
       <p>
         Purpose: operation, debugging and fending off attacks. Legal basis: Art. 6(1)(f) GDPR
