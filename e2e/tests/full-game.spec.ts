@@ -6,6 +6,7 @@ import {
   newPlayer,
   readyUp,
   recordOneTake,
+  roundResultsSeen,
   setExtendedSettings,
   type Player,
 } from './helpers';
@@ -35,6 +36,11 @@ test('three players: create → dub → showcase → results → final', async (
       await expect(p.page.getByTestId('voice-dock')).toHaveAttribute('data-allowed', 'false');
       await expect(p.page.getByTestId('countdown')).toBeVisible();
     }
+    // V14: every player dubs a different scene.
+    const titles = await Promise.all(
+      players.map((p) => p.page.getByTestId('clip-title').textContent()),
+    );
+    expect(new Set(titles).size, titles.join(' | ')).toBe(3);
     await Promise.all(
       players.map(async (p) => {
         await recordOneTake(p);
@@ -47,6 +53,7 @@ test('three players: create → dub → showcase → results → final', async (
     );
 
     // ---- showcase: 3 dubs, each voted by the two others ----
+    const sources: string[] = [];
     for (let i = 0; i < 3; i++) {
       for (const p of players) {
         await expect(p.page.locator('[data-testid=showcase] h2')).toContainText(
@@ -66,6 +73,11 @@ test('three players: create → dub → showcase → results → final', async (
       );
       expect(own.filter(Boolean)).toHaveLength(1);
       const author = own.indexOf(true);
+      // Each item plays its author's own clip.
+      sources.push((await host.page.getByTestId('showcase-video').getAttribute('src')) ?? '');
+      await expect(host.page.locator('[data-testid=showcase] .tape')).toContainText(
+        titles[author]!,
+      );
       const score = SCORE_FOR_AUTHOR[author]!;
       const voters = players.filter((_, k) => k !== author);
       await Promise.all(
@@ -78,9 +90,12 @@ test('three players: create → dub → showcase → results → final', async (
     }
 
     // ---- round results (TIMINGS=fast: auto-advances after 1 s) ----
-    // Only the host is checked here; the phase is too short to visit all three pages.
-    await expect(host.page.getByTestId('results-list')).toBeVisible();
-    await expect(host.page.getByTestId('result-entry')).toHaveCount(3);
+    // The phase is too short to poll for: an init script records what each page showed.
+    for (const p of players) {
+      const seen = await roundResultsSeen(p, 3);
+      // Results name each dub's clip (V14).
+      expect(seen.clips.sort(), p.name).toEqual([...titles].sort());
+    }
 
     // Every page saw each dub play and lock, in order.
     for (const p of players) {
@@ -92,6 +107,8 @@ test('three players: create → dub → showcase → results → final', async (
         [1, 2, 3].flatMap((n) => [`Dub ${n} of 3:PLAYING`, `Dub ${n} of 3:LOCKED`]),
       );
     }
+
+    expect(new Set(sources).size, sources.join(' | ')).toBe(3);
 
     // ---- final ----
     for (const p of players) {

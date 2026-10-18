@@ -356,9 +356,9 @@ describe('room library selection', () => {
     room.handle(j.playerId, { t: 'micStatus', ok: true });
     room.handle(j.playerId, { t: 'setReady', ready: true });
     expect(room.handle(j.playerId, { t: 'startGame' })).toBeNull();
-    expect(snap().clip?.id).toBe(up.id);
-    expect(snap().clip?.url).toBe(`/clips/${other.id}/${up.id}.mp4`);
-    expect(snap().clip).not.toHaveProperty('file');
+    expect(snap().you.clip?.id).toBe(up.id);
+    expect(snap().you.clip?.url).toBe(`/clips/${other.id}/${up.id}.mp4`);
+    expect(snap().you.clip).not.toHaveProperty('file');
     room.dispose();
   });
 });

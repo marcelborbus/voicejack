@@ -23,6 +23,11 @@ export function RoundResults() {
     () => (snap && result ? buildStandings(snap.players, result.entries) : []),
     [snap, result],
   );
+  // V14: every player dubbed a different clip; credit each one once.
+  const clips = useMemo(
+    () => [...new Map((result?.entries ?? []).map((e) => [e.clip.id, e.clip])).values()],
+    [result],
+  );
   if (!snap || !result) return null;
 
   const isLast = snap.round + 1 >= snap.totalRounds;
@@ -34,8 +39,7 @@ export function RoundResults() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="tape max-w-full">
-            <Flag className="size-3.5" /> Round {result.round + 1} of {snap.totalRounds} ·{' '}
-            {result.clip.title}
+            <Flag className="size-3.5" /> Round {result.round + 1} of {snap.totalRounds}
           </p>
           <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
             The votes are <span className="text-brand">in</span>
@@ -61,7 +65,9 @@ export function RoundResults() {
               round={result.round}
               youId={youId}
             />
-            <ClipAttribution clip={result.clip} />
+            {clips.map((c) => (
+              <ClipAttribution key={c.id} clip={c} />
+            ))}
           </CardContent>
         </Card>
 

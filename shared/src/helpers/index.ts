@@ -2,6 +2,7 @@ export * from './rng.js';
 export * from './roomCode.js';
 export * from './scoring.js';
 export * from './clips.js';
+export * from './assignClips.js';
 export * from './lanes.js';
 export * from './schedule.js';
 export * from './clock.js';

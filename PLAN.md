@@ -80,15 +80,15 @@ dubbing-game/
 ### 2.2 State machine
 
 ```
-LOBBY --startGame(host; all ready & micOk; >=2 players or ALLOW_SOLO; enough clips)--> DUBBING(round r)
+LOBBY --startGame(host; all ready & micOk; >=2 players or ALLOW_SOLO; clips >= players)--> DUBBING(round r)
 DUBBING --(phaseEndsAt reached | all connected players dubDone) + uploadGraceMs--> SHOWCASE
 SHOWCASE: for each non-empty submission in random order:
      LOADING --(all connected preloaded | preloadMaxMs)--> PLAYING(startAt = now+playLeadMs,
-              lockAt = startAt + clip.durationMs + voteGraceMs) --lockAt--> LOCKED --betweenItemsMs--> next item
+              lockAt = startAt + item.clip.durationMs + voteGraceMs) --lockAt--> LOCKED --betweenItemsMs--> next item
      (no non-empty submissions → straight to ROUND_RESULTS)
 SHOWCASE(done) --> ROUND_RESULTS (phaseEndsAt = now+roundResultsMs; host 'advance' skips)
 ROUND_RESULTS --> DUBBING(r+1) | FINAL (after last round)
-FINAL --backToLobby(host)--> LOBBY (scores reset; usedClipIds kept so clips don't repeat in the room)
+FINAL --backToLobby(host)--> LOBBY (scores reset; clip history kept so clips don't repeat in the room)
 ```
 
 **Rules the domain enforces:**
@@ -97,7 +97,8 @@ FINAL --backToLobby(host)--> LOBBY (scores reset; usedClipIds kept so clips don'
 - **Settings reset readiness.** Any settings change clears all ready flags.
 - **Host migration.** If the host has been disconnected for more than `hostMigrateMs`, the earliest-joined connected player becomes host.
 - **Lobby drop.** A player disconnected in LOBBY for more than `lobbyDropMs` is removed. During a game they stay in the room, marked `connected:false`.
-- **Clip choice.** Each round picks a random clip from the library filtered by tags (`[]` = all), minus `usedClipIds`. `startGame` is blocked if `available < rounds`. The reason is shown in `you.startBlockers`.
+- **Clip choice (V14: every player dubs a different scene).** Each round, `assignClips` (shared) deals one clip per player from the library filtered by tags (`[]` = all): distinct within the round; clips nobody in the room has had yet first, then least recently used; never a clip that player already had (bipartite matching). Last resorts, should the library be too small: a repeat for that player (still distinct in the round), and with fewer clips than players, repeats within the round. The room's clip history survives `backToLobby`. `startGame` is blocked only if the filtered library has fewer clips than players. The reason is shown in `you.startBlockers`.
+- *Changelog (V14, protocol v2):* the room-wide `RoomSnapshot.clip` and `RoundResult.clip` are gone; the clip now travels as `you.clip`, `ShowcaseItem.clip` and `RoundResultEntry.clip` (`bestDub.clip` is the winner's own clip). `clipCount` is the filtered library size.
 - **Submissions.** Each player gets a fresh random `SubmissionId` per round. During dubbing the server stores the latest `manifest` per player. At finalization: `chunks = manifest ∩ uploaded`, sorted by `startMs`. A submission with no chunks counts as empty: it gets 0 points and is not showcased.
 - **Voting.** Only allowed while the item is `PLAYING`. Scores are integers 0–10. Voting on your own item fails with `SELF_VOTE`. The last vote before `lockAt` counts. The slider starts untouched, and no vote means not counted.
 
@@ -160,7 +161,7 @@ FINAL --backToLobby(host)--> LOBBY (scores reset; usedClipIds kept so clips don'
 
 ```ts
 // ---------- common.ts ----------
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;  // v2 = V14 per-player clips
 export type PlayerId = string;       // nanoid(12)
 export type RoomCode = string;       // /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/
 export type SubmissionId = string;   // nanoid(12), per player per round, unlinkable
@@ -203,6 +204,7 @@ export interface ChunkRef extends ChunkMeta { url: string } // GET path, see RES
 export interface ShowcaseItem {
   submissionId: SubmissionId;
   index: number; total: number;
+  clip: ClipInfo;               // V14: the clip this dub was made for
   chunks: ChunkRef[];
   status: 'LOADING' | 'PLAYING' | 'LOCKED';
   startAt: ServerTime | null;   // set when PLAYING
@@ -212,9 +214,10 @@ export interface ShowcaseItem {
 
 export interface RoundResultEntry {
   submissionId: SubmissionId; playerId: PlayerId; name: string;
+  clip: ClipInfo;                     // V14: the clip this player dubbed
   avg: number | null; votes: number; points: number; empty: boolean;
 }
-export interface RoundResult { round: number; clip: ClipInfo; entries: RoundResultEntry[] } // sorted desc
+export interface RoundResult { round: number; entries: RoundResultEntry[] } // sorted desc
 
 export interface FinalResult {
   winners: PlayerId[];
@@ -232,6 +235,7 @@ export interface Limits {
 export interface YouState {
   playerId: PlayerId;
   submissionId: SubmissionId | null;   // own, current round
+  clip: ClipInfo | null;               // V14: own clip, current round (not in LOBBY/FINAL)
   manifest: ChunkMeta[];               // server's view of own manifest (restore after reload)
   uploaded: ChunkId[];
   vote: number | null;                 // own vote on current showcase item
@@ -241,12 +245,12 @@ export interface YouState {
 
 export interface RoomSnapshot {
   rev: number; code: RoomCode; phase: Phase; hostId: PlayerId;
-  settings: GameSettings; availableTags: string[]; clipCount: number;
+  settings: GameSettings; availableTags: string[];
+  clipCount: number;                   // filtered library size (V14: start needs >= players)
   players: PlayerPublic[];             // join order
   round: number;                       // 0-based; -1 in LOBBY
   totalRounds: number;
   phaseEndsAt: ServerTime | null;      // DUBBING deadline, ROUND_RESULTS auto-advance
-  clip: ClipInfo | null;               // current round clip
   showcase: ShowcaseItem | null;
   roundResult: RoundResult | null;
   final: FinalResult | null;

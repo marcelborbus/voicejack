@@ -38,10 +38,44 @@ function trackShowcaseStatus() {
   }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
 }
 
+/** What the round-results screen showed (it only lasts 1 s with TIMINGS=fast). */
+export interface ResultsSeen {
+  entries: number;
+  clips: string[];
+}
+
+/**
+ * Records the last state of the round-results list in `window.__resultsSeen`: the entry count
+ * and the clip title of each entry (V14). Survives the move on to FINAL.
+ */
+function trackRoundResults() {
+  const w = window as unknown as { __resultsSeen: ResultsSeen | null };
+  w.__resultsSeen = null;
+  new MutationObserver(() => {
+    const list = document.querySelector('[data-testid=results-list]');
+    if (!list) return;
+    const entries = list.querySelectorAll('[data-testid=result-entry]').length;
+    const clips = [...list.querySelectorAll('[data-testid=result-clip]')].map(
+      (e) => e.textContent ?? '',
+    );
+    w.__resultsSeen = { entries, clips };
+  }).observe(document, { subtree: true, childList: true, characterData: true });
+}
+
+/** Waits until the round-results screen has been seen with `entries` entries. */
+export async function roundResultsSeen(p: Player, entries: number): Promise<ResultsSeen> {
+  const handle = await p.page.waitForFunction((n) => {
+    const r = (window as unknown as { __resultsSeen: ResultsSeen | null }).__resultsSeen;
+    return r && r.entries === n ? r : null;
+  }, entries);
+  return (await handle.jsonValue()) as ResultsSeen;
+}
+
 export async function newPlayer(browser: Browser, name: string): Promise<Player> {
   const context = await browser.newContext();
   await context.addInitScript(trackPeerConnections);
   await context.addInitScript(trackShowcaseStatus);
+  await context.addInitScript(trackRoundResults);
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log(`[${name}] pageerror: ${e.message}`));
   return { name, context, page };

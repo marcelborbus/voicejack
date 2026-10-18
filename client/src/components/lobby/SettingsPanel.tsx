@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { useRoom } from '@/state/room';
 import { send } from '@/state/session';
 
 function update(settings: Partial<GameSettings>) {
@@ -32,6 +33,8 @@ export function SettingsPanel({
   isHost: boolean;
 }) {
   const extended = settings.mode === 'extended';
+  // V14: every player dubs a different clip, so the library needs one clip per player.
+  const players = useRoom((s) => s.snapshot?.players.length ?? 0);
   return (
     <Card data-testid="settings-panel">
       <CardHeader className="flex-row items-center justify-between gap-3">
@@ -84,7 +87,7 @@ export function SettingsPanel({
             label="Clips"
             value={String(clipCount)}
             testId="setting-clips"
-            warn={clipCount < settings.rounds}
+            warn={clipCount < players}
           />
         </div>
 

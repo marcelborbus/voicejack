@@ -201,8 +201,12 @@ describe('lobby', () => {
     expect(you.canStart).toBe(false);
     expect(you.startBlockers.join('|')).toMatch(/at least 2 players/);
     expect(you.startBlockers.join('|')).toMatch(/mic check/);
-    expect(you.startBlockers.join('|')).toMatch(/only 2 clips available for 3 rounds/);
+    // V14: 2 clips are enough for 1 player over 3 rounds (clips are reused when they run out).
+    expect(you.startBlockers.join('|')).not.toMatch(/clip/);
     expect(h.room.handle(a, { t: 'startGame' })?.code).toBe('START_BLOCKED');
+    h.add('Bob');
+    h.add('Cid');
+    expect(h.snap(a).you.startBlockers.join('|')).toMatch(/only 2 clips for 3 players/);
 
     const solo = setup({ allowSolo: true });
     const s = solo.add('Solo');
@@ -335,6 +339,7 @@ describe('full 3-player game', () => {
     const ids = start3(h);
     const [a, b, c] = ids;
     const clipsSeen: string[] = [];
+    const clipsOf = new Map<string, string[]>(ids.map((id) => [id, []]));
 
     for (let round = 0; round < 3; round++) {
       let s = h.snap(a);
@@ -342,7 +347,12 @@ describe('full 3-player game', () => {
       expect(s.round).toBe(round);
       expect(s.totalRounds).toBe(3);
       expect(s.phaseEndsAt).toBe(Date.now() + 210_000);
-      clipsSeen.push(s.clip!.id);
+      // V14: every player dubs a different clip, and never one they already had.
+      expect(s).not.toHaveProperty('clip');
+      const dealt = ids.map((id) => h.snap(id).you.clip!.id);
+      expect(new Set(dealt).size).toBe(3);
+      ids.forEach((id, i) => clipsOf.get(id)!.push(dealt[i]!));
+      clipsSeen.push(...dealt);
       const subs = Object.fromEntries(ids.map((id) => [id, h.snap(id).you.submissionId!]));
       expect(new Set(Object.values(subs)).size).toBe(3);
 
@@ -383,6 +393,8 @@ describe('full 3-player game', () => {
       expect(h.snap(author1).you.isOwnItem).toBe(true);
       expect(h.snap(other1).you.isOwnItem).toBe(false);
       expect(first.chunks.map((x) => x.id)).toEqual([`${author1}-0`, `${author1}-1`]);
+      expect(first.clip).toEqual(h.snap(author1).you.clip);
+      expect(h.snap(author1).you.clip).not.toEqual(h.snap(other1).you.clip);
       expect(first.chunks[0]!.url).toBe(
         `/api/rooms/ABCDEF/rounds/${round}/subs/${first.submissionId}/chunks/${author1}-0`,
       );
@@ -401,6 +413,7 @@ describe('full 3-player game', () => {
       expect(by[author1]).toMatchObject({ points: 70, votes: 2, avg: 7, empty: false });
       expect(by[other1]).toMatchObject({ points: 50, votes: 0, avg: null });
       expect(by[c]).toMatchObject({ points: 0, empty: true });
+      for (const id of ids) expect(by[id]!.clip).toEqual(h.snap(id).you.clip);
       expect(s.phaseEndsAt).toBe(Date.now() + T.roundResultsMs);
 
       if (round === 0) {
@@ -412,7 +425,8 @@ describe('full 3-player game', () => {
       }
     }
 
-    expect(new Set(clipsSeen).size).toBe(3);
+    for (const mine of clipsOf.values()) expect(new Set(mine).size).toBe(3);
+    expect(new Set(clipsSeen).size).toBe(4); // every clip of the library got used
     const s = h.snap(c);
     expect(s.phase).toBe('FINAL');
     const f = s.final!;
@@ -422,6 +436,7 @@ describe('full 3-player game', () => {
     expect(f.standings).toHaveLength(3);
     expect(f.winners.length).toBeGreaterThanOrEqual(1);
     expect(f.bestDub?.chunks.length).toBe(2);
+    expect(clipsOf.get(f.bestDub!.playerId)![f.bestDub!.round]).toBe(f.bestDub!.clip.id);
     expect(f.winners).not.toContain(c);
 
     // back to lobby: scores reset, used clips kept
@@ -431,16 +446,46 @@ describe('full 3-player game', () => {
     expect(lobby.phase).toBe('LOBBY');
     expect(lobby.round).toBe(-1);
     expect(lobby.players.every((p) => p.totalScore === 0 && !p.ready)).toBe(true);
-    expect(lobby.clipCount).toBe(1); // 4 clips, 3 used
-    expect(lobby.you.startBlockers.join()).toMatch(/only 1 clip available for 3 rounds/);
+    expect(lobby.clipCount).toBe(4); // V14: the whole library; history only steers the deal
+    expect(lobby.you.startBlockers.join()).not.toMatch(/clip/);
     h.room.handle(a, { t: 'updateSettings', settings: { mode: 'extended', rounds: 1 } });
     h.readyAll();
     expect(h.room.handle(a, { t: 'startGame' })).toBeNull();
-    expect(clipsSeen).not.toContain(h.snap(a).clip!.id);
+    // History survives backToLobby: the least recently used clips come first, still distinct.
+    const again = ids.map((id) => h.snap(id).you.clip!.id);
+    expect(new Set(again).size).toBe(3);
   });
 });
 
 describe('dubbing rules', () => {
+  it("V14: manifests and lockAt use each player's own clip duration", () => {
+    const short = { ...clip('s'), durationMs: 3000 };
+    const long = { ...clip('l'), durationMs: 9000 };
+    const h = setup({}, [short, long]);
+    const a = h.add('Ann');
+    const b = h.add('Bob');
+    h.readyAll();
+    h.room.handle(a, { t: 'updateSettings', settings: { mode: 'extended', rounds: 1 } });
+    h.readyAll();
+    expect(h.room.handle(a, { t: 'startGame' })).toBeNull();
+    const [s, l] = [a, b].sort(
+      (x, y) => h.snap(x).you.clip!.durationMs - h.snap(y).you.clip!.durationMs,
+    );
+    expect(h.snap(s!).you.clip!.id).toBe('s');
+    expect(h.snap(l!).you.clip!.id).toBe('l');
+    const late = [chunk('late', 5000)];
+    expect(h.room.handle(s!, { t: 'manifest', round: 0, chunks: late })?.code).toBe('INVALID');
+    expect(h.room.handle(l!, { t: 'manifest', round: 0, chunks: late })).toBeNull();
+    h.upload(l!, 'late');
+    for (const id of [a, b]) h.room.handle(id, { t: 'dubDone', round: 0, done: true });
+    vi.advanceTimersByTime(T.uploadGraceMs);
+    const item = h.snap(a).showcase!;
+    expect(item.clip.id).toBe('l');
+    for (const id of [a, b]) h.room.handle(id, { t: 'preloaded', submissionId: item.submissionId });
+    const playing = h.snap(a).showcase!;
+    expect(playing.lockAt! - playing.startAt!).toBe(9000 + T.voteGraceMs);
+  });
+
   it('deadline closes dubbing, then grace, then showcase', () => {
     const h = setup();
     const [a, b] = start3(h);

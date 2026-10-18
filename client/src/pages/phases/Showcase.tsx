@@ -16,7 +16,8 @@ import { useRoom, useSnapshot } from '@/state/room';
 export function Showcase() {
   const snap = useSnapshot();
   const item = snap?.showcase ?? null;
-  const clip = snap?.clip ?? null;
+  // V14: every dub has its own clip; the <video> switches source per item while LOADING.
+  const clip = item?.clip ?? null;
   const videoRef = useRef<HTMLVideoElement>(null);
   const { load } = useShowcasePlayback(videoRef, clip, item);
   const myVote = snap?.you.vote ?? null;

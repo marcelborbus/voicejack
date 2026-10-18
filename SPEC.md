@@ -5,7 +5,8 @@ decision taken is marked **(decision)**.
 
 ## Concept
 A browser multiplayer party game. Friends join a lobby, chat by voice, then every player
-dubs the same short, well-known clip (movie scene / meme, ≤ 60 s) alone against a timer.
+dubs a short, well-known clip (movie scene / meme, ≤ 60 s) alone against a timer, each player
+a different one.
 Afterwards all dubs are played back anonymously, everyone rates each one 0–10, and points
 add up over the rounds.
 
@@ -16,7 +17,9 @@ add up over the rounds.
      marked ready. The host can only start when all players pass the mic check.
    - Normal mode: **3 rounds**. Extended mode (host setting): number of rounds, dubbing
      time, and similar knobs.
-2. **Dubbing phase** (per round) — everyone gets the same clip. Voice chat is cut: you do
+2. **Dubbing phase** (per round) — every player gets a different clip (owner, 2026-10-17;
+   V14). Clips nobody in the room has had yet come first; when the library runs out they are
+   reused, but never for a player who already dubbed that clip. Voice chat is cut: you do
    not hear the others. Time limit 3–4 min (default 3:30 **(decision)**, configurable in
    extended mode).
    - Editor: play/pause, seek (move the cursor), scroll back and forward, preview at faster

@@ -60,12 +60,17 @@ describe('full game over WS + REST', () => {
     ann.send({ t: 'startGame' });
 
     const clipIds: string[] = [];
+    const clipsOf = new Map<string, string[]>(all.map((c) => [c.playerId, []]));
     for (let round = 0; round < ROUNDS; round++) {
       // --- DUBBING
       const states = await Promise.all(
         all.map((c) => c.state((s) => s.phase === 'DUBBING' && s.round === round)),
       );
-      clipIds.push(states[0]!.clip!.id);
+      // V14: every player dubs a different clip and never gets one twice.
+      const dealt = states.map((s) => s.you.clip!.id);
+      expect(new Set(dealt).size).toBe(3);
+      all.forEach((c, i) => clipsOf.get(c.playerId)!.push(dealt[i]!));
+      clipIds.push(...dealt);
       const subs = new Map(all.map((c, i) => [c.playerId, states[i]!.you.submissionId!]));
       expect(new Set(subs.values()).size).toBe(3);
 
@@ -123,6 +128,9 @@ describe('full game over WS + REST', () => {
         const item = loading[0]!.showcase!;
         expect(item.total).toBe(3);
         expect(item.chunks).toHaveLength(2);
+        // The item carries its author's clip (chunk ids are prefixed with the author's name).
+        const author = all.find((c) => item.chunks[0]!.id.startsWith(`${c.name}-`))!;
+        expect(item.clip.id).toBe(clipsOf.get(author.playerId)![round]);
         // members can fetch every chunk once finalized
         for (const ch of item.chunks) {
           const r = await cid.download(ch.url);
@@ -167,6 +175,7 @@ describe('full game over WS + REST', () => {
       const pts = Object.fromEntries(entries.map((e) => [e.name, e.points]));
       expect(pts).toEqual({ Ann: 50, Bob: 40, Cid: 30 });
       expect(entries.map((e) => e.name)).toEqual(['Ann', 'Bob', 'Cid']);
+      for (const e of entries) expect(e.clip.id).toBe(clipsOf.get(e.playerId)![round]);
       if (round === 0) ann.send({ t: 'advance' }); // host skip; round 1 auto-advances
     }
 
@@ -183,7 +192,9 @@ describe('full game over WS + REST', () => {
     expect(f.bestDub!.chunks.map((c) => c.id)).toEqual(['Ann-1-a', 'Ann-1-b']);
     const best = await bob.download(f.bestDub!.chunks[0]!.url);
     expect(best.status).toBe(200);
-    expect(new Set(clipIds).size).toBe(ROUNDS);
+    expect(f.bestDub!.clip.id).toBe(clipsOf.get(ann.playerId)![1]);
+    expect(new Set(clipIds).size).toBe(3);
+    for (const mine of clipsOf.values()) expect(new Set(mine).size).toBe(ROUNDS);
     expect(
       fin.every(
         (s: RoomSnapshot) => s.players.find((p) => p.id === ann.playerId)!.totalScore === 100,
@@ -197,6 +208,6 @@ describe('full game over WS + REST', () => {
     ann.send({ t: 'backToLobby' });
     const lobby = await cid.state((s) => s.phase === 'LOBBY');
     expect(lobby.players.every((p) => p.totalScore === 0)).toBe(true);
-    expect(lobby.clipCount).toBe(1);
+    expect(lobby.clipCount).toBe(3);
   });
 });

@@ -96,33 +96,33 @@ describe('scoreSubmission', () => {
 
 describe('buildRoundResult', () => {
   it('empty submission → 0 points and sorted last', () => {
-    const r = buildRoundResult(0, clip, [
-      { submissionId: 's1', playerId: 'p1', name: 'A', empty: true, votes: [] },
-      { submissionId: 's2', playerId: 'p2', name: 'B', empty: false, votes: [0] },
+    const r = buildRoundResult(0, [
+      { submissionId: 's1', playerId: 'p1', name: 'A', clip, empty: true, votes: [] },
+      { submissionId: 's2', playerId: 'p2', name: 'B', clip, empty: false, votes: [0] },
     ]);
     expect(r.entries.map((e) => e.submissionId)).toEqual(['s2', 's1']);
     expect(r.entries[1]).toMatchObject({ points: 0, empty: true, avg: null, votes: 0 });
   });
   it('sorts desc by points and non-empty zero-vote gets 50', () => {
-    const r = buildRoundResult(1, clip, [
-      { submissionId: 'a', playerId: 'p1', name: 'A', empty: false, votes: [3] },
-      { submissionId: 'b', playerId: 'p2', name: 'B', empty: false, votes: [] },
-      { submissionId: 'c', playerId: 'p3', name: 'C', empty: false, votes: [9, 10] },
+    const r = buildRoundResult(1, [
+      { submissionId: 'a', playerId: 'p1', name: 'A', clip, empty: false, votes: [3] },
+      { submissionId: 'b', playerId: 'p2', name: 'B', clip, empty: false, votes: [] },
+      { submissionId: 'c', playerId: 'p3', name: 'C', clip, empty: false, votes: [9, 10] },
     ]);
     expect(r.entries.map((e) => e.points)).toEqual([95, 50, 30]);
     expect(r.round).toBe(1);
   });
   it('roundWinners includes ties and ignores empties', () => {
-    const r = buildRoundResult(0, clip, [
-      { submissionId: 'a', playerId: 'p1', name: 'A', empty: false, votes: [8] },
-      { submissionId: 'b', playerId: 'p2', name: 'B', empty: false, votes: [8] },
-      { submissionId: 'c', playerId: 'p3', name: 'C', empty: true, votes: [] },
+    const r = buildRoundResult(0, [
+      { submissionId: 'a', playerId: 'p1', name: 'A', clip, empty: false, votes: [8] },
+      { submissionId: 'b', playerId: 'p2', name: 'B', clip, empty: false, votes: [8] },
+      { submissionId: 'c', playerId: 'p3', name: 'C', clip, empty: true, votes: [] },
     ]);
     expect(roundWinners(r).sort()).toEqual(['p1', 'p2']);
   });
   it('roundWinners empty when all empty', () => {
-    const r = buildRoundResult(0, clip, [
-      { submissionId: 'a', playerId: 'p1', name: 'A', empty: true, votes: [] },
+    const r = buildRoundResult(0, [
+      { submissionId: 'a', playerId: 'p1', name: 'A', clip, empty: true, votes: [] },
     ]);
     expect(roundWinners(r)).toEqual([]);
   });
@@ -136,12 +136,12 @@ describe('buildFinal', () => {
   ];
   const rr = (round: number, pts: Record<string, number | null>): RoundResult => ({
     round,
-    clip: { ...clip, id: `c${round}` },
     entries: Object.entries(pts)
       .map(([pid, p]) => ({
         submissionId: `${pid}-r${round}`,
         playerId: pid,
         name: pid,
+        clip: { ...clip, id: `c${round}-${pid}` },
         avg: p === null ? null : p / 10,
         votes: p === null ? 0 : 1,
         points: p ?? 0,
@@ -172,6 +172,7 @@ describe('buildFinal', () => {
       playerId: 'p2',
     });
     expect(f.bestDub!.chunks[0]!.url).toBe('/u/1/p2-r1');
+    expect(f.bestDub!.clip.id).toBe('c1-p2'); // V14: the winner's own clip of that round
   });
   it('tie on total → more round wins wins', () => {
     // p1: 90 + 10 = 100 (1 win); p2: 50 + 50 = 100 (1 win in r1?) make p2 win 2 rounds

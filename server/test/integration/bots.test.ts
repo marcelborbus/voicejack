@@ -14,7 +14,7 @@ beforeAll(async () => {
     DEV_BOTS: '1',
     PORT: '0',
     HOST: '127.0.0.1',
-    CLIPS_DIR: makeFixtureClips(2, 1000),
+    CLIPS_DIR: makeFixtureClips(4, 1000), // V14: one clip per player (1 human + 3 bots)
     DATA_DIR: tmpDir('dub-bots-data-'),
     CLIENT_DIST: tmpDir('dub-bots-noclient-'),
     DB_PATH: ':memory:',

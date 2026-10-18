@@ -133,7 +133,7 @@ export class BotPlayer implements Connection {
   /** 2–5 snippets at random clip positions, "recorded" over the first part of the phase. */
   private planDub(s: RoomSnapshot): void {
     const round = s.round;
-    const clipMs = s.clip?.durationMs ?? 0;
+    const clipMs = s.you.clip?.durationMs ?? 0; // V14: own clip
     const now = this.deps.clock.now();
     const left = Math.max(1000, (s.phaseEndsAt ?? now + 10_000) - now);
     const sounds = this.deps.sounds;
@@ -202,7 +202,7 @@ export class BotPlayer implements Connection {
     ) {
       this.voted.add(id);
       const now = this.deps.clock.now();
-      const clipMs = s.clip?.durationMs ?? sc.lockAt - sc.startAt;
+      const clipMs = sc.clip.durationMs;
       const at = sc.startAt + clipMs * this.between(BOT.voteAt);
       const delay = Math.max(0, Math.min(at, sc.lockAt - 50) - now);
       const score = this.int(BOT.score);

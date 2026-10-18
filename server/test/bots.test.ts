@@ -77,7 +77,7 @@ function setup(opts: Partial<RoomOptions> = { devBots: true }, sounds = SOUNDS) 
         human.get(id)!.push(m);
       }
     },
-    clips: [clip('a'), clip('b'), clip('c')],
+    clips: [clip('a'), clip('b'), clip('c'), clip('d')], // V14: one clip per player
     timings: { ...T },
     options: { allowSolo: false, allowShortDubbing: true, maxPlayers: 8, limits: LIMITS, ...opts },
     isUploaded: (s, c) => uploaded.has(`${s}/${c}`),
@@ -203,6 +203,8 @@ describe('bot game', () => {
 
     for (let round = 0; round < 2; round++) {
       expect(h.snap(a)).toMatchObject({ phase: 'DUBBING', round });
+      // V14: bots get their own clips too, distinct from everyone else's.
+      expect(new Set([a, ...botIds].map((id) => h.snap(id).you.clip!.id)).size).toBe(4);
       // Bots record within the first 60 % of the phase, then press Done.
       await vi.advanceTimersByTimeAsync(60_000 * BOT.dubWindow[1] + BOT.doneDelayMs[1] + 10);
       expect(h.snap(a).players.filter((p) => p.isBot).every((p) => p.dubDone)).toBe(true);

@@ -105,6 +105,8 @@ export interface Submission {
   id: SubmissionId;
   playerId: PlayerId;
   round: number;
+  /** V14: the clip this player was dealt for the round. */
+  clip: ClipInfo;
   /** Latest manifest the player sent (sorted by startMs). */
   manifest: ChunkMeta[];
   /** `manifest ∩ uploaded`, set at finalize. */

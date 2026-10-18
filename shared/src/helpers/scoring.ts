@@ -30,23 +30,22 @@ export interface SubmissionVotes {
   submissionId: SubmissionId;
   playerId: PlayerId;
   name: string;
+  /** V14: the clip this player was dealt this round. */
+  clip: ClipInfo;
   /** No chunks → 0 points, not showcased. */
   empty: boolean;
   votes: readonly number[];
 }
 
 /** Scores every submission; entries sorted by points desc (stable for ties, empties last). */
-export function buildRoundResult(
-  round: number,
-  clip: ClipInfo,
-  subs: readonly SubmissionVotes[],
-): RoundResult {
+export function buildRoundResult(round: number, subs: readonly SubmissionVotes[]): RoundResult {
   const entries: RoundResultEntry[] = subs.map((s) => {
     if (s.empty) {
       return {
         submissionId: s.submissionId,
         playerId: s.playerId,
         name: s.name,
+        clip: s.clip,
         avg: null,
         votes: 0,
         points: 0,
@@ -58,12 +57,13 @@ export function buildRoundResult(
       submissionId: s.submissionId,
       playerId: s.playerId,
       name: s.name,
+      clip: s.clip,
       ...sc,
       empty: false,
     };
   });
   entries.sort((a, b) => b.points - a.points || Number(a.empty) - Number(b.empty));
-  return { round, clip, entries };
+  return { round, entries };
 }
 
 /** Player ids holding the highest points of a round (non-empty, > 0 points). Ties all win. */
@@ -126,7 +126,7 @@ export function buildFinal(
         if (!bestDub || e.points >= bestDub.points) {
           bestDub = {
             round: r.round,
-            clip: r.clip,
+            clip: e.clip,
             submissionId: e.submissionId,
             playerId: e.playerId,
             chunks: [],

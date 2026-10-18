@@ -45,7 +45,7 @@ describe('C2S schema', () => {
 
   it('accepts hello with name and trims it', () => {
     const r = C2SSchema.parse({ t: 'hello', v: PROTOCOL_VERSION, code: 'ABC234', name: '  Ann ' });
-    expect(r).toEqual({ t: 'hello', v: 1, code: 'ABC234', name: 'Ann' });
+    expect(r).toEqual({ t: 'hello', v: PROTOCOL_VERSION, code: 'ABC234', name: 'Ann' });
   });
 
   it('rejects hello with a bad room code or overlong name', () => {

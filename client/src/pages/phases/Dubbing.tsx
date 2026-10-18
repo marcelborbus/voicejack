@@ -45,7 +45,7 @@ const restoredKeys = new Set<string>();
 
 export function Dubbing() {
   const code = useRoom((s) => s.snapshot?.code ?? '');
-  const clip = useRoom((s) => s.snapshot?.clip ?? null);
+  const clip = useRoom((s) => s.snapshot?.you.clip ?? null);
   const round = useRoom((s) => s.snapshot?.round ?? -1);
   const submissionId = useRoom((s) => s.snapshot?.you.submissionId ?? null);
 
@@ -71,7 +71,8 @@ function DubbingRound({
   round: number;
   submissionId: string | null;
 }) {
-  const clip = useRoom((s) => s.snapshot!.clip!);
+  // V14: every player dubs their own clip.
+  const clip = useRoom((s) => s.snapshot!.you.clip!);
   const totalRounds = useRoom((s) => s.snapshot?.totalRounds ?? 0);
   const phaseEndsAt = useRoom((s) => s.snapshot?.phaseEndsAt ?? null);
   const limits = useRoom((s) => s.limits);

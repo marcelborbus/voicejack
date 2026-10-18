@@ -1,5 +1,5 @@
-import type { RoundResultEntry } from '@dub/shared';
-import { Crown, HelpCircle, MicOff, Star } from 'lucide-react';
+import type { ClipInfo, RoundResultEntry } from '@dub/shared';
+import { Crown, Film, HelpCircle, MicOff, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { seenItem } from '@/components/showcase/showcaseHistory';
@@ -53,7 +53,7 @@ export function RevealList({
                 myVote={seen?.myVote ?? null}
               />
             ) : (
-              <HiddenRow rank={i + 1} dubNo={seen ? seen.index + 1 : null} />
+              <HiddenRow rank={i + 1} dubNo={seen ? seen.index + 1 : null} clip={e.clip} />
             )}
           </li>
         );
@@ -69,6 +69,9 @@ export function RevealList({
           <span className="min-w-0 flex-1 truncate">
             <span className="font-semibold text-zinc-400">{e.name}</span>
             {e.playerId === youId && ' (you)'}
+            <span className="block truncate text-xs" data-testid="result-clip">
+              {e.clip.title}
+            </span>
           </span>
           <span className="flex items-center gap-1.5 text-xs">
             <MicOff className="size-3.5" /> no dub · 0 pts
@@ -79,7 +82,29 @@ export function RevealList({
   );
 }
 
-function HiddenRow({ rank, dubNo }: { rank: number; dubNo: number | null }) {
+/** V14: every dub has its own clip; a small poster + title says which one. */
+function ClipTag({ clip }: { clip: ClipInfo }) {
+  return (
+    <span
+      className="flex min-w-0 items-center gap-1.5 text-zinc-400"
+      data-testid="result-clip"
+      title={clip.title}
+    >
+      {clip.posterUrl ? (
+        <img
+          src={clip.posterUrl}
+          alt=""
+          className="h-4 w-7 shrink-0 rounded-sm border border-white/10 object-cover"
+        />
+      ) : (
+        <Film className="size-3.5 shrink-0" />
+      )}
+      <span className="truncate">{clip.title}</span>
+    </span>
+  );
+}
+
+function HiddenRow({ rank, dubNo, clip }: { rank: number; dubNo: number | null; clip: ClipInfo }) {
   return (
     <div className="flex items-center gap-3 rounded-3xl border border-white/[0.06] bg-white/[0.02] px-3 py-3.5 sm:gap-4 sm:px-4">
       <span className="w-6 text-center font-display text-lg font-bold text-zinc-600">{rank}</span>
@@ -88,7 +113,9 @@ function HiddenRow({ rank, dubNo }: { rank: number; dubNo: number | null }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-zinc-400">{dubNo ? `Dub #${dubNo}` : 'A dub'}</p>
-        <p className="mt-1 h-3 w-28 animate-pulse rounded-full bg-zinc-800" />
+        <p className="mt-1 text-xs">
+          <ClipTag clip={clip} />
+        </p>
       </div>
       <span className="h-8 w-14 animate-pulse rounded-xl bg-zinc-800" />
     </div>
@@ -148,6 +175,7 @@ function RevealedRow({
           )}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-400">
+          <ClipTag clip={entry.clip} />
           {dubNo && <span>Dub #{dubNo}</span>}
           <span className="flex items-center gap-1">
             <Star className="size-3.5 fill-amber-300/80 text-amber-300" />

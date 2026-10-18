@@ -6,12 +6,14 @@ import {
   NORMAL_SETTINGS,
   ROUNDS_RANGE,
   SHORT_DUBBING_MIN_SECONDS,
-  availableClipCount,
+  assignClips,
   buildFinal,
   buildRoundResult,
   collectTags,
+  emptyClipHistory,
+  filterClips,
   paths,
-  pickClip,
+  recordClips,
   shuffle,
   validateManifest,
   type C2S,
@@ -58,7 +60,6 @@ interface PlayerState {
 
 interface RoundState {
   round: number;
-  clip: ClipInfo;
   subs: Map<SubmissionId, Submission>;
   byPlayer: Map<PlayerId, Submission>;
   finalized: boolean;
@@ -103,7 +104,8 @@ export class Room {
   private settings: GameSettings = { ...NORMAL_SETTINGS, tags: [] };
   private readonly players = new Map<PlayerId, PlayerState>();
   private readonly tokens = new Map<string, PlayerId>();
-  private readonly usedClipIds = new Set<string>();
+  /** V14: which clips were dealt to whom; kept across backToLobby (clips don't repeat). */
+  private readonly clipHistory = emptyClipHistory();
   private round = -1;
   private phaseEndsAt: number | null = null;
   private rounds: RoundState[] = [];
@@ -546,17 +548,18 @@ export class Room {
       else if (!q.micOk) out.push(`${q.name} has not passed the mic check`);
       else if (!q.ready) out.push(`${q.name} is not ready`);
     }
-    const avail = this.availableClips();
-    if (avail < this.settings.rounds) {
-      out.push(
-        `only ${avail} clip${avail === 1 ? '' : 's'} available for ${this.settings.rounds} rounds`,
-      );
+    // V14: every player dubs a different clip, so a round needs one clip per player. Once the
+    // library runs out over the rounds, clips are reused (assignClips), so rounds don't count.
+    const avail = this.playableClips().length;
+    if (avail < list.length) {
+      out.push(`only ${avail} clip${avail === 1 ? '' : 's'} for ${list.length} players`);
     }
     return out;
   }
 
-  private availableClips(): number {
-    return availableClipCount(this.clips, this.settings.tags, this.usedClipIds);
+  /** The selected library filtered by the tag setting. */
+  private playableClips(): ClipInfo[] {
+    return filterClips(this.clips, this.settings.tags, []);
   }
 
   private startGame(p: PlayerState): Outcome {
@@ -582,15 +585,16 @@ export class Room {
   // ---------------------------------------------------------------- dubbing
 
   private startRound(r: number): void {
-    const clip = pickClip(this.clips, this.settings.tags, this.usedClipIds, this.rng);
-    if (!clip) {
+    // V14: one clip per player, distinct within the round, new to each player where possible.
+    const ids = [...this.players.values()].sort((a, b) => a.seq - b.seq).map((q) => q.id);
+    const dealt = assignClips(ids, this.playableClips(), this.clipHistory, this.rng);
+    if (!dealt) {
       this.enterFinal();
       return;
     }
-    this.usedClipIds.add(clip.id);
+    recordClips(this.clipHistory, dealt);
     const state: RoundState = {
       round: r,
-      clip,
       subs: new Map(),
       byPlayer: new Map(),
       finalized: false,
@@ -600,6 +604,7 @@ export class Room {
         id: this.newId(),
         playerId: q.id,
         round: r,
+        clip: dealt.get(q.id)!,
         manifest: [],
         chunks: null,
         votes: [],
@@ -625,7 +630,7 @@ export class Room {
     const r = this.rounds[round]!;
     const sub = r.byPlayer.get(p.id);
     if (!sub) return err('BAD_PHASE', 'no submission this round');
-    const check = validateManifest(chunks, r.clip.durationMs, this.deps.options.limits);
+    const check = validateManifest(chunks, sub.clip.durationMs, this.deps.options.limits);
     if (!check.ok) return err('INVALID', check.reason);
     sub.manifest = check.chunks;
     this.changedFor(p.id);
@@ -707,7 +712,7 @@ export class Room {
     const sc = this.showcase;
     if (this.phase !== 'SHOWCASE' || !sc || sc.status !== 'LOADING') return;
     const now = this.deps.clock.now();
-    const clip = this.rounds[this.round]!.clip;
+    const clip = sc.order[sc.index]!.clip; // V14: this item's own clip
     sc.status = 'PLAYING';
     sc.startAt = now + this.deps.timings.playLeadMs;
     sc.lockAt = sc.startAt + clip.durationMs + this.deps.timings.voteGraceMs;
@@ -750,11 +755,11 @@ export class Room {
     const r = this.rounds[this.round]!;
     const result = buildRoundResult(
       r.round,
-      r.clip,
       [...r.subs.values()].map((s) => ({
         submissionId: s.id,
         playerId: s.playerId,
         name: this.players.get(s.playerId)?.name ?? '?',
+        clip: s.clip,
         empty: (s.chunks?.length ?? 0) === 0,
         votes: s.votes,
       })),
@@ -1092,6 +1097,7 @@ export class Room {
       submissionId: item.id,
       index: sc.index,
       total: sc.order.length,
+      clip: item.clip,
       chunks: this.chunkRefs(this.round, item),
       status: sc.status,
       startAt: sc.startAt,
@@ -1120,18 +1126,18 @@ export class Room {
       hostId: this.hostId,
       settings: { ...this.settings, tags: [...this.settings.tags] },
       availableTags: collectTags(this.clips),
-      clipCount: this.availableClips(),
+      clipCount: this.playableClips().length,
       players: this.publicPlayers(),
       round: this.round,
       totalRounds: this.settings.rounds,
       phaseEndsAt: this.phaseEndsAt,
-      clip: r && this.phase !== 'LOBBY' && this.phase !== 'FINAL' ? r.clip : null,
       showcase: this.showcaseItem(),
       roundResult: this.phase === 'ROUND_RESULTS' ? (this.results[this.round] ?? null) : null,
       final: this.phase === 'FINAL' ? this.final : null,
       you: {
         playerId: id,
         submissionId: sub && this.phase !== 'LOBBY' && this.phase !== 'FINAL' ? sub.id : null,
+        clip: sub && this.phase !== 'LOBBY' && this.phase !== 'FINAL' ? sub.clip : null,
         manifest: sub && this.phase === 'DUBBING' ? sub.manifest : [],
         uploaded:
           sub && this.phase === 'DUBBING'

@@ -12,7 +12,8 @@ import {
   SHORT_DUBBING_MIN_SECONDS,
 } from '../constants.js';
 
-export const PROTOCOL_VERSION = 1;
+/** v2 (V14): per-player clips (`you.clip`, `ShowcaseItem.clip`, `RoundResultEntry.clip`). */
+export const PROTOCOL_VERSION = 2;
 
 export type PlayerId = string; // nanoid(12)
 export type RoomCode = string; // /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/
@@ -162,6 +163,8 @@ export interface ShowcaseItem {
   submissionId: SubmissionId;
   index: number;
   total: number;
+  /** V14: the clip this dub was made for (each player dubs a different one). */
+  clip: ClipInfo;
   chunks: ChunkRef[];
   status: 'LOADING' | 'PLAYING' | 'LOCKED';
   startAt: ServerTime | null; // set when PLAYING
@@ -175,6 +178,8 @@ export interface RoundResultEntry {
   submissionId: SubmissionId;
   playerId: PlayerId;
   name: string;
+  /** V14: the clip this player dubbed this round. */
+  clip: ClipInfo;
   avg: number | null;
   votes: number;
   points: number;
@@ -182,7 +187,6 @@ export interface RoundResultEntry {
 }
 export interface RoundResult {
   round: number;
-  clip: ClipInfo;
   entries: RoundResultEntry[]; // sorted desc
 }
 
@@ -217,6 +221,8 @@ export interface Limits {
 export interface YouState {
   playerId: PlayerId;
   submissionId: SubmissionId | null; // own, current round
+  /** V14: own clip of the current round (DUBBING, SHOWCASE, ROUND_RESULTS), else null. */
+  clip: ClipInfo | null;
   manifest: ChunkMeta[]; // server's view of own manifest (restore after reload)
   uploaded: ChunkId[];
   vote: number | null; // own vote on current showcase item
@@ -254,12 +260,12 @@ export interface RoomSnapshot {
   hostId: PlayerId;
   settings: GameSettings;
   availableTags: string[];
+  /** Clips in the selected library matching `settings.tags` (V14: start needs >= players). */
   clipCount: number;
   players: PlayerPublic[]; // join order
   round: number; // 0-based; -1 in LOBBY
   totalRounds: number;
   phaseEndsAt: ServerTime | null; // DUBBING deadline, ROUND_RESULTS auto-advance
-  clip: ClipInfo | null; // current round clip
   showcase: ShowcaseItem | null;
   roundResult: RoundResult | null;
   final: FinalResult | null;
