@@ -292,13 +292,13 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
       </p>
 
       <h2>13. Backups</h2>
-      {/* TODO(owner): state where the backups of /opt/voicejack/data/db and data/library go
-          (/opt/backups, any off-site copy?) and how long they are kept. */}
       <p>
         Die Datenbank (Profile, Konten, Freunde, Nachrichten, Meldungen, Spielverlauf,
-        Nutzungsstatistik und Feedback) und hochgeladene Clips werden regelmäßig gesichert.
-        Gelöschte Daten können daher noch für die Aufbewahrungsdauer der Backups in diesen enthalten
-        sein.
+        Nutzungsstatistik und Feedback) und hochgeladene Clips werden täglich gesichert. Die
+        Sicherungen bleiben 14 Tage auf demselben Server und werden verschlüsselt (SSH) als Kopie
+        auf einen eigenen Server des Betreibers in Deutschland übertragen, wo sie 90 Tage aufbewahrt
+        werden. Gelöschte Daten können daher bis zu 90 Tage in diesen Sicherungen enthalten sein;
+        sie werden nur zur Wiederherstellung nach einem Ausfall verwendet.
       </p>
 
       <h2>14. Unterstützen (Liberapay)</h2>
@@ -319,8 +319,6 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
       </p>
 
       <h2>16. Deine Rechte</h2>
-      {/* TODO(owner): name the competent supervisory authority (the data protection authority of
-          the German state you live in) with its address/website. */}
       <p>Du hast das Recht auf</p>
       <ul>
         <li>Auskunft über deine Daten (Art. 15 DSGVO),</li>
@@ -334,7 +332,9 @@ function German({ legal }: { legal: LegalPublic | null | undefined }) {
         </li>
         <li>
           Beschwerde bei einer Datenschutz-Aufsichtsbehörde (Art. 77 DSGVO), zum Beispiel in dem
-          Bundesland oder EU-Staat, in dem du wohnst.
+          Bundesland oder EU-Staat, in dem du wohnst. Für uns zuständig ist der Landesbeauftragte
+          für den Datenschutz Sachsen-Anhalt, Otto-von-Guericke-Straße 34a, 39104 Magdeburg,
+          datenschutz.sachsen-anhalt.de.
         </li>
       </ul>
       <p>
@@ -568,8 +568,9 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
       <h2>13. Backups</h2>
       <p>
         The database (profiles, accounts, friends, messages, reports, game history, usage statistics
-        and feedback) and uploaded clips are backed up regularly. Deleted data may therefore remain
-        in the backups for as long as those are kept.
+        and feedback) and uploaded clips are backed up daily: on the same server for 14 days and as
+        a copy on the operator's own server in Germany for 90 days. Deleted data may therefore
+        remain in these backups for up to 90 days; they are only used to restore after a failure.
       </p>
 
       <h2>14. Support (Liberapay)</h2>
@@ -602,7 +603,9 @@ function English({ legal }: { legal: LegalPublic | null | undefined }) {
         </li>
         <li>
           lodge a complaint with a data protection supervisory authority (Art. 77 GDPR), for example
-          in the state or EU country where you live.
+          in the state or EU country where you live. The authority responsible for us is the
+          Landesbeauftragter für den Datenschutz Sachsen-Anhalt, Otto-von-Guericke-Straße 34a, 39104
+          Magdeburg, Germany (datenschutz.sachsen-anhalt.de).
         </li>
       </ul>
       <p>
