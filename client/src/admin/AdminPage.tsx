@@ -1,5 +1,4 @@
 import {
-  LIBRARY_CLIP_MAX_SECONDS,
   formatClock,
   type AdminClip,
   type AdminLibrary,
@@ -35,6 +34,8 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import { TrimControls } from '@/components/upload/TrimControls';
+import { INITIAL_TRIM, trimError, trimQuery, type TrimFields } from '@/lib/trim';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { AdminError, adminApi, uploadClip } from './api';
@@ -467,8 +468,7 @@ function UploadForm({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [ss, setSs] = useState('0');
-  const [t, setT] = useState(String(LIBRARY_CLIP_MAX_SECONDS));
+  const [trim, setTrim] = useState<TrimFields>(INITIAL_TRIM);
   const [tags, setTags] = useState('');
   const [author, setAuthor] = useState('');
   const [source, setSource] = useState('');
@@ -477,14 +477,15 @@ function UploadForm({
   const abortRef = useRef<(() => void) | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const badTrim = trimError(trim) !== null;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file || badTrim) return;
     setProgress(0);
     const job = uploadClip(
       libraryId,
       file,
-      { title: title.trim() || file.name, ss, t, tags, author, source, license },
+      { title: title.trim() || file.name, ...trimQuery(trim), tags, author, source, license },
       setProgress,
     );
     abortRef.current = job.abort;
@@ -493,6 +494,7 @@ function UploadForm({
       toast('Uploaded, normalizing…', { variant: 'success' });
       setFile(null);
       setTitle('');
+      setTrim(INITIAL_TRIM);
       if (fileInput.current) fileInput.current.value = '';
       await onUploaded();
     } catch (err) {
@@ -516,6 +518,7 @@ function UploadForm({
             onChange={(e) => {
               const f = e.target.files?.[0] ?? null;
               setFile(f);
+              setTrim(INITIAL_TRIM);
               if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ''));
             }}
             className="text-sm text-zinc-300 file:mr-3 file:rounded-xl file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-zinc-100"
@@ -529,22 +532,15 @@ function UploadForm({
             maxLength={120}
           />
         </Field>
-        <Field label="Start (s)">
-          <Input
-            className={small}
-            inputMode="decimal"
-            value={ss}
-            onChange={(e) => setSs(e.target.value)}
+        <div className="sm:col-span-2">
+          <TrimControls
+            file={file}
+            value={trim}
+            onChange={setTrim}
+            disabled={busy}
+            testId="admin-upload-trim"
           />
-        </Field>
-        <Field label={`Length (s, ≤ ${LIBRARY_CLIP_MAX_SECONDS})`}>
-          <Input
-            className={small}
-            inputMode="decimal"
-            value={t}
-            onChange={(e) => setT(e.target.value)}
-          />
-        </Field>
+        </div>
         <Field label="Tags (comma separated)">
           <Input className={small} value={tags} onChange={(e) => setTags(e.target.value)} />
         </Field>
@@ -564,7 +560,7 @@ function UploadForm({
         </Field>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={!file || busy}>
+        <Button type="submit" disabled={!file || busy || badTrim}>
           <Upload /> Upload
         </Button>
         {busy && (

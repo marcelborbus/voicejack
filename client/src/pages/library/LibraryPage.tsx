@@ -1,12 +1,11 @@
 import {
-  LIBRARY_CLIP_MAX_SECONDS,
   USER_UPLOAD_MAX_BYTES,
   type AdminClip,
   type AdminLibrary,
   type UserQuota,
 } from '@dub/shared';
-import { FolderPlus, Library, LogIn, Pencil, Scissors, Trash2, Upload, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { FolderPlus, Library, LogIn, Pencil, Trash2, Upload, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { ClipCard, ClipDialog, ConfirmDialog, Field, LibraryDialog } from '@/admin/AdminPage';
 import { SignInDialog } from '@/components/account/SignInDialog';
@@ -19,6 +18,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useMe } from '@/state/me';
+import { TrimControls } from '@/components/upload/TrimControls';
+import { INITIAL_TRIM, trimError, trimQuery, type TrimFields } from '@/lib/trim';
 import { myApi, uploadMyClip } from './api';
 
 const fail = (title: string) => (e: unknown) =>
@@ -350,7 +351,6 @@ function LibraryView({
 }
 
 const small = 'h-10 rounded-xl text-sm';
-const round1 = (n: number) => String(Math.round(n * 10) / 10);
 
 /** File + local preview to set the trim window, title/tags, rights checkbox, upload progress. */
 function UploadForm({
@@ -362,8 +362,7 @@ function UploadForm({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [ss, setSs] = useState('0');
-  const [t, setT] = useState(String(LIBRARY_CLIP_MAX_SECONDS));
+  const [trim, setTrim] = useState<TrimFields>(INITIAL_TRIM);
   const [tags, setTags] = useState('');
   const [author, setAuthor] = useState('');
   const [source, setSource] = useState('');
@@ -371,19 +370,17 @@ function UploadForm({
   const [progress, setProgress] = useState<number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const video = useRef<HTMLVideoElement>(null);
-  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
-  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
   const tooBig = !!file && file.size > USER_UPLOAD_MAX_BYTES;
+  const badTrim = trimError(trim) !== null;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!file || !rights || tooBig) return;
+    if (!file || !rights || tooBig || badTrim) return;
     setProgress(0);
     const job = uploadMyClip(
       libraryId,
       file,
-      { title: title.trim() || file.name, ss, t, tags, author, source, rights: '1' },
+      { title: title.trim() || file.name, ...trimQuery(trim), tags, author, source, rights: '1' },
       setProgress,
     );
     abortRef.current = job.abort;
@@ -392,8 +389,7 @@ function UploadForm({
       toast('Uploaded, preparing your clip…', { variant: 'success' });
       setFile(null);
       setTitle('');
-      setSs('0');
-      setT(String(LIBRARY_CLIP_MAX_SECONDS));
+      setTrim(INITIAL_TRIM);
       setRights(false);
       if (fileInput.current) fileInput.current.value = '';
       await onUploaded();
@@ -405,21 +401,10 @@ function UploadForm({
     }
   };
 
-  const markStart = () => {
-    const v = video.current;
-    if (v) setSs(round1(v.currentTime));
-  };
-  const markEnd = () => {
-    const v = video.current;
-    if (!v) return;
-    const len = v.currentTime - Number(ss || 0);
-    if (len >= 1) setT(round1(Math.min(len, LIBRARY_CLIP_MAX_SECONDS)));
-  };
-
   const busy = progress !== null;
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" data-testid="my-upload">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label={`Video file (≤ ${mb(USER_UPLOAD_MAX_BYTES)})`}>
           <input
             ref={fileInput}
@@ -429,6 +414,7 @@ function UploadForm({
             onChange={(e) => {
               const f = e.target.files?.[0] ?? null;
               setFile(f);
+              setTrim(INITIAL_TRIM);
               if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ''));
             }}
             className="text-sm text-zinc-300 file:mr-3 file:rounded-xl file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-zinc-100"
@@ -444,43 +430,14 @@ function UploadForm({
           />
         </Field>
       </div>
-      {preview && (
-        <div className="flex flex-col gap-2">
-          <video
-            ref={video}
-            src={preview}
-            controls
-            muted
-            playsInline
-            className="max-h-64 w-full rounded-xl bg-black object-contain"
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={markStart}>
-              <Scissors /> Start here
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={markEnd}>
-              <Scissors /> End here
-            </Button>
-          </div>
-        </div>
-      )}
+      <TrimControls
+        file={file}
+        value={trim}
+        onChange={setTrim}
+        disabled={busy}
+        testId="my-upload-trim"
+      />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Start (s)">
-          <Input
-            className={small}
-            inputMode="decimal"
-            value={ss}
-            onChange={(e) => setSs(e.target.value)}
-          />
-        </Field>
-        <Field label={`Length (s, ≤ ${LIBRARY_CLIP_MAX_SECONDS})`}>
-          <Input
-            className={small}
-            inputMode="decimal"
-            value={t}
-            onChange={(e) => setT(e.target.value)}
-          />
-        </Field>
         <Field label="Tags (comma separated)">
           <Input className={small} value={tags} onChange={(e) => setTags(e.target.value)} />
         </Field>
@@ -506,7 +463,7 @@ function UploadForm({
         </span>
       </label>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={!file || busy || !rights || tooBig}>
+        <Button type="submit" disabled={!file || busy || !rights || tooBig || badTrim}>
           <Upload /> Upload
         </Button>
         {busy && (
