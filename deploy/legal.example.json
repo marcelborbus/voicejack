@@ -1,0 +1,8 @@
+{
+  "name": "Vorname Nachname",
+  "address": "Musterstraße 1\n12345 Musterstadt\nDeutschland",
+  "email": "voicejack@example.org",
+  "phone": "+49 000 0000000",
+  "responsibleForContent": "Vorname Nachname\nMusterstraße 1\n12345 Musterstadt",
+  "vatId": "DE000000000"
+}

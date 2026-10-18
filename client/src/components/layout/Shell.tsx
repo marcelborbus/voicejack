@@ -34,6 +34,19 @@ export function Shell() {
           <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <SupportLink />
             <CreditsDialog />
+            <Link to="/impressum" className="hover:text-zinc-200" data-testid="footer-impressum">
+              Impressum
+            </Link>
+            <Link
+              to="/datenschutz"
+              className="hover:text-zinc-200"
+              data-testid="footer-datenschutz"
+            >
+              Datenschutz
+            </Link>
+            <Link to="/takedown" className="hover:text-zinc-200" data-testid="footer-takedown">
+              Report content
+            </Link>
           </nav>
         </div>
       </footer>

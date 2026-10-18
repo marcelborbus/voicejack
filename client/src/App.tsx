@@ -11,6 +11,10 @@ import { Room } from '@/pages/Room';
 const AdminPage = lazy(() => import('@/admin/AdminPage'));
 // V06 "My clips" (registered users' private libraries).
 const LibraryPage = lazy(() => import('@/pages/library/LibraryPage'));
+// V12 legal pages: own chunk each.
+const Impressum = lazy(() => import('@/pages/legal/Impressum'));
+const Datenschutz = lazy(() => import('@/pages/legal/Datenschutz'));
+const Takedown = lazy(() => import('@/pages/legal/Takedown'));
 // Dev-only pages (dead code in production builds).
 const DevPlayerPage = import.meta.env.DEV ? lazy(() => import('@/dub/DevPlayerPage')) : null;
 
@@ -38,6 +42,23 @@ export function App() {
                 </Suspense>
               }
             />
+            {(
+              [
+                ['impressum', Impressum],
+                ['datenschutz', Datenschutz],
+                ['takedown', Takedown],
+              ] as const
+            ).map(([path, Page]) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <Suspense>
+                    <Page />
+                  </Suspense>
+                }
+              />
+            ))}
             {DevPlayerPage && (
               <Route
                 path="dev/player"

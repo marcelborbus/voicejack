@@ -201,6 +201,16 @@ The "Chip in?" card after a game reads `/costs.json` (`{"monthlyEur": 5, "player
 `/opt/voicejack/data/costs.json` (`COSTS_PATH=/app/data/costs.json` in the image). It is read on
 every request; while it is missing or not valid JSON, the copy from `client/public/` is served.
 
+### Impressum details (V12)
+
+`/impressum` renders `GET /api/legal`, which reads `LEGAL_PATH` (`/app/data/legal.json` in the
+image, i.e. `/opt/voicejack/data/legal.json` on the host). Your name and address are personal
+data, so this file is **never committed**: copy `deploy/legal.example.json`, fill it in, and make
+it readable by uid 1000. Fields: `name`, `address` (lines separated by `\n`), `email`, optional
+`phone`, `responsibleForContent` (§18 MStV) and `vatId`. It is read per request (no restart).
+While it is missing or invalid the page shows "Impressum not configured" and the server logs a
+`legal:` warning at startup.
+
 ## 4. nginx (host)
 
 ```sh

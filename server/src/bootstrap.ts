@@ -7,6 +7,7 @@ import { ChunkStore } from './uploads/ChunkStore.js';
 import { buildApp } from './http/app.js';
 import { openDb, type Db } from './db/index.js';
 import { migrate } from './db/migrate.js';
+import { readLegal } from './legal/legal.js';
 import { Accounts } from './accounts/Accounts.js';
 import { Presence } from './presence/Presence.js';
 import { Matchmaker } from './match/Matchmaker.js';
@@ -82,6 +83,10 @@ export async function startServer(
   cleanup();
   rooms.start();
   for (const w of clips.warnings) app.log.warn(w);
+  const legal = await readLegal(config.legalPath);
+  if (!legal.ok) {
+    app.log.warn(`legal: Impressum not configured (${legal.reason}); /impressum shows a banner`);
+  }
   app.log.info(`clips: ${clips.size} from ${config.clipsDir}`);
   await app.listen({ port: config.port, host: config.host });
   const addr = app.server.address();

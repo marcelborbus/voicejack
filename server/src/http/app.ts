@@ -32,6 +32,7 @@ import type { Presence } from '../presence/Presence.js';
 import type { Friends } from '../friends/Friends.js';
 import * as friendsRoutes from '../routes/friends.js';
 import * as costsRoutes from '../routes/costs.js';
+import * as legalRoutes from '../routes/legal.js';
 import type { Matchmaker } from '../match/Matchmaker.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
@@ -124,6 +125,7 @@ export async function buildApp(
     statsRoutes.register,
     friendsRoutes.register,
     costsRoutes.register,
+    legalRoutes.register,
   ];
   for (const register of modules) await register(app, deps);
 

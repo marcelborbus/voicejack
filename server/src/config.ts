@@ -92,6 +92,8 @@ export interface Config {
    * shipped in `clientDist` (from client/public) is served. Prod: /app/data/costs.json.
    */
   costsPath: string | null;
+  /** V12: operator details for the Impressum (`GET /api/legal`), kept out of the repo. */
+  legalPath: string;
 }
 
 /** Repo root (server/src/config.ts → ../..). */
@@ -149,5 +151,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     mailFrom: env.MAIL_FROM ?? 'Voicejack <noreply@borbus.eu>',
     publicUrl: (env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
     costsPath: env.COSTS_PATH ? path.resolve(env.COSTS_PATH) : null,
+    legalPath: path.resolve(env.LEGAL_PATH ?? path.join(REPO_ROOT, '.cache/legal.json')),
   };
 }
