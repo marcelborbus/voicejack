@@ -4,9 +4,11 @@ import { sendError, type AppDeps } from '../http/app.js';
 import { SESSION_TTL_MS } from '../accounts/Accounts.js';
 import { readCookie, SESSION_COOKIE, sessionCookie } from '../accounts/cookies.js';
 import { GuestLimiter, type GuestLimits } from '../accounts/GuestLimiter.js';
-import { createMailer } from '../mail/Mailer.js';
+import { createMailer, LogMailer } from '../mail/Mailer.js';
 import { confirmPage, invalidLinkPage, loginMail } from '../mail/templates.js';
 import { toMe } from './me.js';
+
+export const TEST_OUTBOX_ROUTE = '/api/test/outbox';
 
 /** Magic-link requests per client IP per hour (plus a global brake for the goneo relay). */
 export const AUTH_IP_LIMITS: GuestLimits = { perIp: 10, global: 300, windowMs: 3600_000 };
@@ -34,6 +36,20 @@ export async function register(app: FastifyInstance, deps: AppDeps): Promise<voi
   const mailer = deps.mailer ?? createMailer(deps.config, (m) => app.log.info(m));
   const ipLimiter = deps.authLimiter ?? new GuestLimiter(AUTH_IP_LIMITS);
   const verifyUrl = `${deps.config.publicUrl}${routes.authVerify}`;
+
+  // e2e only (V13): the log transport's outbox, so a browser test can follow the magic link.
+  // Exists only with TIMINGS=fast and MAIL_TRANSPORT=log, never in production.
+  if (
+    deps.config.timingsName === 'fast' &&
+    mailer instanceof LogMailer &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    app.get<{ Querystring: { to?: string } }>(TEST_OUTBOX_ROUTE, async (req) => {
+      const to = String(req.query.to ?? '').toLowerCase();
+      const mail = mailer.outbox.findLast((m) => m.to.toLowerCase() === to);
+      return { text: mail?.text ?? null };
+    });
+  }
 
   await app.register(async (scope) => {
     scope.addContentTypeParser(

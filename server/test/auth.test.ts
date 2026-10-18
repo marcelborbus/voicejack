@@ -9,7 +9,7 @@ import { migrate } from '../src/db/migrate.js';
 import { Accounts, LOGIN_TOKEN_TTL_MS } from '../src/accounts/Accounts.js';
 import { readCookie, SESSION_COOKIE } from '../src/accounts/cookies.js';
 import { GuestLimiter } from '../src/accounts/GuestLimiter.js';
-import { AUTH_IP_LIMITS } from '../src/routes/auth.js';
+import { TEST_OUTBOX_ROUTE, AUTH_IP_LIMITS } from '../src/routes/auth.js';
 import { LogMailer } from '../src/mail/Mailer.js';
 import { buildMessage, sendSmtp } from '../src/mail/smtp.js';
 import { makeClipsDir, testConfig } from './helpers.js';
@@ -62,9 +62,9 @@ describe('magic-link auth (V04)', () => {
     return { cookie: cookieOf(r)!, me: r.json<MeResponse>().user };
   }
   async function me(cookie: string) {
-    return (await app.inject({ url: '/api/me', headers: { cookie }, remoteAddress: addr() })).json<
-      MeResponse
-    >().user;
+    return (
+      await app.inject({ url: '/api/me', headers: { cookie }, remoteAddress: addr() })
+    ).json<MeResponse>().user;
   }
   function request(email: string, cookie?: string, remoteAddress = addr()) {
     return app.inject({
@@ -172,9 +172,9 @@ describe('magic-link auth (V04)', () => {
     expect((await me(g.cookie)).kind).toBe('guest');
     now += LOGIN_TOKEN_TTL_MS;
     expect(accounts.cleanup().loginTokens).toBeGreaterThanOrEqual(1);
-    const left = db.prepare('SELECT COUNT(*) AS n FROM login_tokens WHERE email = ?').get(
-      'late@example.com',
-    ) as { n: number };
+    const left = db
+      .prepare('SELECT COUNT(*) AS n FROM login_tokens WHERE email = ?')
+      .get('late@example.com') as { n: number };
     expect(left.n).toBe(0);
   });
 
@@ -238,7 +238,11 @@ describe('magic-link auth (V04)', () => {
     expect(ok.json<MeResponse>().user.displayName).toBe('Dubster');
     expect((await patch('')).statusCode).toBe(400);
     expect((await patch('x'.repeat(21))).statusCode).toBe(400);
-    const anon = await app.inject({ method: 'PATCH', url: '/api/me', payload: { displayName: 'A' } });
+    const anon = await app.inject({
+      method: 'PATCH',
+      url: '/api/me',
+      payload: { displayName: 'A' },
+    });
     expect(anon.statusCode).toBe(401);
   });
 
@@ -283,9 +287,7 @@ describe('magic-link auth (V04)', () => {
 
     // A new browser's guest with its own games signs in to the same address.
     const other = await guest();
-    db.prepare('UPDATE users SET elo = 900, public_games_played = 2 WHERE id = ?').run(
-      other.me.id,
-    );
+    db.prepare('UPDATE users SET elo = 900, public_games_played = 2 WHERE id = ?').run(other.me.id);
     await request('merge@example.com', other.cookie);
     const c = cookieOf(await confirm(tokenOf(lastLink('merge@example.com'))))!;
     expect(await me(c)).toMatchObject({ id: first.me.id, elo: 1200, publicGamesPlayed: 5 });
@@ -329,7 +331,8 @@ describe('SMTP client', () => {
             }
             continue;
           }
-          if (line.startsWith('EHLO')) sock.write('250-relay\r\n250-PIPELINING\r\n250 8BITMIME\r\n');
+          if (line.startsWith('EHLO'))
+            sock.write('250-relay\r\n250-PIPELINING\r\n250 8BITMIME\r\n');
           else if (line === 'DATA') {
             inData = true;
             sock.write('354 go\r\n');
@@ -377,5 +380,40 @@ describe('SMTP client', () => {
       ),
     ).rejects.toThrow(/relay denied/);
     server.close();
+  });
+});
+
+describe('e2e test outbox (V13)', () => {
+  async function appWith(timings: 'fast' | 'prod') {
+    const db = openDb(':memory:');
+    migrate(db);
+    const config = testConfig({ publicUrl: PUBLIC, cookieSecure: false });
+    const app = await buildApp({
+      config: { ...config, timingsName: timings },
+      clips: ClipLibrary.load(makeClipsDir(1)),
+      accounts: new Accounts(db),
+      mailer: new LogMailer(),
+    });
+    return { app, close: async () => (await app.close(), db.close()) };
+  }
+
+  it('returns the last mail to an address with TIMINGS=fast', async () => {
+    const { app, close } = await appWith('fast');
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/request',
+      headers: { 'content-type': 'application/json' },
+      payload: { email: 'e2e@example.org' },
+    });
+    const r = await app.inject({ method: 'GET', url: `${TEST_OUTBOX_ROUTE}?to=e2e@example.org` });
+    expect(r.json<{ text: string }>().text).toContain('/api/auth/verify?t=');
+    await close();
+  });
+
+  it('does not exist with prod timings', async () => {
+    const { app, close } = await appWith('prod');
+    const r = await app.inject({ method: 'GET', url: `${TEST_OUTBOX_ROUTE}?to=x@example.org` });
+    expect(r.statusCode).toBe(404);
+    await close();
   });
 });

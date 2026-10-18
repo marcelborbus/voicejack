@@ -94,6 +94,8 @@ export interface Config {
   costsPath: string | null;
   /** V12: operator details for the Impressum (`GET /api/legal`), kept out of the repo. */
   legalPath: string;
+  /** New guest profiles per IP per hour (`GUEST_LIMIT_PER_IP`; null = GUEST_LIMITS). e2e. */
+  guestLimitPerIp: number | null;
 }
 
 /** Repo root (server/src/config.ts → ../..). */
@@ -133,7 +135,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     cookieSecure: bool(env.COOKIE_SECURE, env.NODE_ENV === 'production'),
     clientDist: path.resolve(env.CLIENT_DIST ?? path.join(REPO_ROOT, 'client/dist')),
     timingsName,
-    timings: { ...TIMINGS_PRESETS[timingsName] },
+    timings: {
+      ...TIMINGS_PRESETS[timingsName],
+      // e2e (V13): a public ready check long enough for a browser to pass the mic check.
+      ...(env.READY_CHECK_MS && { readyCheckMs: Number(env.READY_CHECK_MS) }),
+    },
     allowSolo: bool(env.ALLOW_SOLO),
     devBots: bool(env.DEV_BOTS),
     allowShortDubbing: bool(env.ALLOW_SHORT_DUBBING, timingsName === 'fast'),
@@ -152,5 +158,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     publicUrl: (env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
     costsPath: env.COSTS_PATH ? path.resolve(env.COSTS_PATH) : null,
     legalPath: path.resolve(env.LEGAL_PATH ?? path.join(REPO_ROOT, '.cache/legal.json')),
+    guestLimitPerIp: env.GUEST_LIMIT_PER_IP ? Number(env.GUEST_LIMIT_PER_IP) : null,
   };
 }

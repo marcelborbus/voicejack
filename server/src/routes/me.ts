@@ -3,7 +3,7 @@ import { routes, UpdateMeBodySchema, type MeResponse } from '@dub/shared';
 import { sendError, type AppDeps } from '../http/app.js';
 import { SESSION_TTL_MS, type User } from '../accounts/Accounts.js';
 import { readCookie, SESSION_COOKIE, sessionCookie } from '../accounts/cookies.js';
-import { GuestLimiter } from '../accounts/GuestLimiter.js';
+import { GUEST_LIMITS, GuestLimiter } from '../accounts/GuestLimiter.js';
 
 export function toMe(u: User): MeResponse {
   return {
@@ -25,7 +25,13 @@ export function toMe(u: User): MeResponse {
 export function register(app: FastifyInstance, deps: AppDeps): void {
   const accounts = deps.accounts;
   if (!accounts) return;
-  const limiter = deps.guestLimiter ?? new GuestLimiter();
+  const limiter =
+    deps.guestLimiter ??
+    new GuestLimiter(
+      deps.config.guestLimitPerIp
+        ? { ...GUEST_LIMITS, perIp: deps.config.guestLimitPerIp }
+        : undefined,
+    );
   const secure = deps.config.cookieSecure;
 
   app.get(
