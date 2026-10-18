@@ -29,16 +29,27 @@ export function VoiceStatus({ playerId, isSelf }: { playerId: PlayerId; isSelf: 
           style={speaking ? { animationDelay: `${i * 120}ms`, height: '100%' } : undefined}
         />
       ))}
-      <style>{'@keyframes voice-bar{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}'}</style>
+      <style>
+        {'@keyframes voice-bar{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}'}
+      </style>
     </span>
   );
 
-  if (isSelf) return muted ? <VolumeX className="size-3.5 text-rose-300" aria-label="you are muted" /> : bars;
+  if (isSelf)
+    return muted ? <VolumeX className="size-3.5 text-rose-300" aria-label="you are muted" /> : bars;
 
   const label =
-    state === 'connected' ? 'Voice connected' : state === 'failed' ? 'No direct route (voice unavailable)' : 'Connecting voice…';
+    state === 'connected'
+      ? 'Voice connected'
+      : state === 'failed'
+        ? 'No direct route (voice unavailable)'
+        : 'Connecting voice…';
   return (
-    <span className="inline-flex items-center gap-1.5" data-testid="voice-status" data-state={state ?? 'none'}>
+    <span
+      className="inline-flex items-center gap-1.5"
+      data-testid="voice-status"
+      data-state={state ?? 'none'}
+    >
       <Tooltip>
         <TooltipTrigger asChild>
           <span
@@ -62,10 +73,16 @@ export function VoiceStatus({ playerId, isSelf }: { playerId: PlayerId; isSelf: 
           data-testid="voice-peer-mute"
           className="rounded-md p-0.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-200"
         >
-          {muted ? <VolumeX className="size-3.5 text-rose-300" /> : <Volume2 className="size-3.5" />}
+          {muted ? (
+            <VolumeX className="size-3.5 text-rose-300" />
+          ) : (
+            <Volume2 className="size-3.5" />
+          )}
         </button>
       )}
-      {state === 'failed' && <span className="text-[10px] font-semibold text-rose-300">no route</span>}
+      {state === 'failed' && (
+        <span className="text-[10px] font-semibold text-rose-300">no route</span>
+      )}
     </span>
   );
 }

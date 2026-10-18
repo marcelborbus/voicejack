@@ -29,13 +29,13 @@ import * as gateway from '../ws/gateway.js';
 import * as presenceGateway from '../ws/presenceGateway.js';
 import * as statsRoutes from '../routes/stats.js';
 import type { Presence } from '../presence/Presence.js';
+import type { Matchmaker } from '../match/Matchmaker.js';
 import type { Friends } from '../friends/Friends.js';
 import * as friendsRoutes from '../routes/friends.js';
 import * as eloRoutes from '../routes/elo.js';
 import type { Ratings } from '../elo/Ratings.js';
 import * as costsRoutes from '../routes/costs.js';
 import * as legalRoutes from '../routes/legal.js';
-import type { Matchmaker } from '../match/Matchmaker.js';
 
 /** Global request body limit (largest chunk is 2 MiB). */
 export const BODY_LIMIT = Math.floor(2.5 * 1024 * 1024);
@@ -54,10 +54,10 @@ export interface AppDeps {
   authLimiter?: GuestLimiter;
   /** Online/in-game counts + `/ws/presence` (V07). Without it the presence socket is absent. */
   presence?: Presence;
-  /** V10 friends, DMs, invites (`/api/friends/*`). Needs `accounts`. */
-  friends?: Friends;
   /** V08 public matchmaking over `/ws/presence` (queueJoin / queueLeave). */
   matchmaker?: Matchmaker;
+  /** V10 friends, DMs, invites (`/api/friends/*`). Needs `accounts`. */
+  friends?: Friends;
   /** V09 Elo + game history (`/api/me/last-game`). Needs `accounts`. */
   ratings?: Ratings;
   /** Epoch ms the process started (health uptime). */
