@@ -1,5 +1,5 @@
 {
-  "$comment": "Redistributable clip sources for scripts/fetch-clips.mjs. Only CC-BY or public-domain material goes here. Cut times (ss = start, t = length, both in seconds) refer to the exact file at `url`. `poster` is the poster-frame offset inside the cut (default t/3).",
+  "$comment": "Redistributable clip sources for scripts/fetch-clips.mjs. Only CC-BY or public-domain material goes here; `attribution.rightsNote` (not copied into the manifest) records why a source is redistributable. Cut times (ss = start, t = length, both in seconds) refer to the exact file at `url`. `poster` is the poster-frame offset inside the cut (default t/3).",
   "sources": [
     {
       "key": "tears-of-steel",
@@ -221,6 +221,321 @@
           "t": 42,
           "poster": 14,
           "tags": ["classic", "cartoon", "song"]
+        }
+      ]
+    },
+    {
+      "key": "duck-and-cover",
+      "title": "Duck and Cover (1951)",
+      "url": "https://archive.org/download/0771_Duck_and_Cover_12_33_20_12/0771_Duck_and_Cover_12_33_20_12.mp4",
+      "attribution": {
+        "author": "Anthony Rizzo / Archer Productions for the U.S. Federal Civil Defense Administration, 1951 (public domain, U.S. government work)",
+        "source": "https://archive.org/details/0771_Duck_and_Cover_12_33_20_12",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "Funded and produced for the U.S. Federal Civil Defense Administration ('an official civil defense film', per its title card); US federal government work. Prelinger Archives scan."
+      },
+      "cuts": [
+        {
+          "id": "duck-bert",
+          "title": "Duck and Cover: Bert the Turtle Ducks",
+          "ss": 6,
+          "t": 40,
+          "poster": 15,
+          "tags": ["psa", "cartoon", "black-and-white", "meme", "animals"]
+        },
+        {
+          "id": "duck-drill",
+          "title": "Duck and Cover: Everybody Down!",
+          "ss": 402,
+          "t": 38,
+          "poster": 22,
+          "tags": ["psa", "black-and-white", "meme", "narrator"]
+        }
+      ]
+    },
+    {
+      "key": "shy-guy",
+      "title": "Shy Guy (1947)",
+      "url": "https://archive.org/download/ShyGuy1947/ShyGuy1947.mp4",
+      "attribution": {
+        "author": "Coronet Instructional Films, 1947 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/ShyGuy1947",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1947 US educational film; Prelinger Archives catalogues it as public domain (copyright not renewed)."
+      },
+      "cuts": [
+        {
+          "id": "shyguy-pep-talk",
+          "title": "Shy Guy: The Awkward Pep Talk",
+          "ss": 555,
+          "t": 42,
+          "poster": 4,
+          "tags": ["psa", "classic", "dialogue", "black-and-white", "awkward"]
+        },
+        {
+          "id": "shyguy-who-me",
+          "title": "Shy Guy: Who, Me?",
+          "ss": 450,
+          "t": 15,
+          "poster": 12,
+          "tags": ["psa", "reaction", "black-and-white", "awkward", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "date-with-your-family",
+      "title": "A Date with Your Family (1950)",
+      "url": "https://archive.org/download/DateWith1950/DateWith1950.mp4",
+      "attribution": {
+        "author": "Encyclopaedia Britannica Films, 1950 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/DateWith1950",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1950 US educational film; Prelinger Archives catalogues it as public domain (copyright not renewed)."
+      },
+      "cuts": [
+        {
+          "id": "date-family-dinner",
+          "title": "A Date with Your Family: Pleasant Dinner Talk",
+          "ss": 392,
+          "t": 40,
+          "poster": 24,
+          "tags": ["psa", "classic", "dialogue", "black-and-white", "awkward", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "dating-dos-and-donts",
+      "title": "Dating: Do's and Don'ts (1949)",
+      "url": "https://archive.org/download/DatingDo1949/DatingDo1949.mp4",
+      "attribution": {
+        "author": "Coronet Instructional Films, 1949 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/DatingDo1949",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1949 US educational film; Prelinger Archives catalogues it as public domain (copyright not renewed)."
+      },
+      "cuts": [
+        {
+          "id": "dating-phone-call",
+          "title": "Dating Do's and Don'ts: How Do You Ask for a Date?",
+          "ss": 286,
+          "t": 40,
+          "poster": 16,
+          "tags": ["psa", "classic", "dialogue", "awkward", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "caminandes-llama-drama",
+      "title": "Caminandes 1: Llama Drama",
+      "url": "https://archive.org/download/Caminandes1LlamaDrama/01_llama_drama_1080p.mp4",
+      "attribution": {
+        "author": "(CC) Blender Foundation | caminandes.com (Pablo Vazquez, Beorn Leonard, Francesco Siddi; music Jan Morgenstern)",
+        "source": "https://archive.org/details/Caminandes1LlamaDrama",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "cuts": [
+        {
+          "id": "llama-stare",
+          "title": "Caminandes: The Llama Stare",
+          "ss": 11,
+          "t": 13,
+          "poster": 9,
+          "tags": ["blender", "animation", "animals", "reaction", "no-dialogue", "meme"]
+        },
+        {
+          "id": "llama-road",
+          "title": "Caminandes: Llama vs. Road",
+          "ss": 36,
+          "t": 27,
+          "poster": 8,
+          "tags": ["blender", "animation", "animals", "no-dialogue", "fail"]
+        }
+      ]
+    },
+    {
+      "key": "caminandes-gran-dillama",
+      "title": "Caminandes 2: Gran Dillama",
+      "url": "https://archive.org/download/Caminandes2GranDillama/02_gran_dillama_1080p.mp4",
+      "attribution": {
+        "author": "(CC) Blender Foundation | caminandes.com (Pablo Vazquez, Beorn Leonard, Francesco Siddi; music Jan Morgenstern)",
+        "source": "https://archive.org/details/Caminandes2GranDillama",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "cuts": [
+        {
+          "id": "gran-dillama-fence",
+          "title": "Caminandes: Electric Fence",
+          "ss": 43,
+          "t": 30,
+          "poster": 7,
+          "tags": ["blender", "animation", "animals", "no-dialogue", "fail", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "caminandes-llamigos",
+      "title": "Caminandes 3: Llamigos",
+      "url": "https://video.blender.org/object-storage/web_videos/23f3ef79-15dc-44c5-aa45-cf92e78a4509-720.mp4",
+      "attribution": {
+        "author": "(CC) Blender Foundation | cloud.blender.org (Blender Institute, dir. Pablo Vazquez)",
+        "source": "https://video.blender.org/videos/watch/23f3ef79-15dc-44c5-aa45-cf92e78a4509",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "cuts": [
+        {
+          "id": "llamigos-ice",
+          "title": "Caminandes: Llama on Ice",
+          "ss": 8,
+          "t": 40,
+          "poster": 22,
+          "tags": ["blender", "animation", "animals", "no-dialogue", "fail"]
+        }
+      ]
+    },
+    {
+      "key": "sprite-fright",
+      "title": "Sprite Fright",
+      "url": "https://archive.org/download/sprite-fright/Sprite%20Fright%20-%20Open%20Movie%20by%20Blender%20Studio-804p.mp4",
+      "attribution": {
+        "author": "(CC) Blender Foundation | studio.blender.org",
+        "source": "https://studio.blender.org/projects/sprite-fright/pages/about/",
+        "license": "CC BY 1.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/1.0/",
+        "rightsNote": "Blender Studio's about page: 'licensed under the Creative Commons Attribution 1.0 license' (the archive.org mirror says CC BY 4.0; both are attribution-only)."
+      },
+      "cuts": [
+        {
+          "id": "sprite-fright-aww",
+          "title": "Sprite Fright: Aww, Look at Them!",
+          "ss": 160,
+          "t": 40,
+          "poster": 24,
+          "tags": ["blender", "animation", "dialogue", "horror", "comedy"]
+        }
+      ]
+    },
+    {
+      "key": "disorder-in-the-court",
+      "title": "Disorder in the Court (1936)",
+      "url": "https://archive.org/download/3stooges/3stooges_NewDisorder2.mp4",
+      "attribution": {
+        "author": "Preston Black / Columbia Pictures, 1936 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/3stooges",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1936 Columbia short; copyright not renewed (Wikipedia list of US public-domain films)."
+      },
+      "cuts": [
+        {
+          "id": "stooges-swear-in",
+          "title": "Disorder in the Court: Do You Swear?",
+          "ss": 228,
+          "t": 44,
+          "poster": 12,
+          "tags": ["classic", "comedy", "dialogue", "black-and-white", "slapstick", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "little-shop-of-horrors",
+      "title": "The Little Shop of Horrors (1960)",
+      "url": "https://archive.org/download/The_Little_Shop_of_Horrors_60/The_Little_Shop_of_Horrors_60.mp4",
+      "attribution": {
+        "author": "Roger Corman / The Filmgroup, 1960 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/The_Little_Shop_of_Horrors_60",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1960 US film; copyright not renewed (Wikipedia list of US public-domain films)."
+      },
+      "cuts": [
+        {
+          "id": "shop-dentist",
+          "title": "Little Shop of Horrors: The Happiest Dental Patient",
+          "ss": 2218,
+          "t": 44,
+          "poster": 22,
+          "tags": ["classic", "comedy", "dialogue", "black-and-white", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "reefer-madness",
+      "title": "Reefer Madness (1936)",
+      "url": "https://archive.org/download/reefer_madness1938/reefer_madness1938.mp4",
+      "attribution": {
+        "author": "Louis J. Gasnier / George A. Hirliman Productions, 1936 (public domain, improper copyright notice)",
+        "source": "https://archive.org/details/reefer_madness1938",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1936 US film released with an improper copyright notice (Wikipedia list of US public-domain films)."
+      },
+      "cuts": [
+        {
+          "id": "reefer-grin",
+          "title": "Reefer Madness: The Maniacal Grin",
+          "ss": 3444,
+          "t": 38,
+          "poster": 24,
+          "tags": ["classic", "drama", "black-and-white", "overacting", "meme"]
+        }
+      ]
+    },
+    {
+      "key": "teenagers-from-outer-space",
+      "title": "Teenagers from Outer Space (1959)",
+      "url": "https://archive.org/download/teenagers_from_outerspace/Teenagers_from_Outer_Space.mp4",
+      "attribution": {
+        "author": "Tom Graeff / Warner Bros. release, 1959 (public domain, copyright not renewed)",
+        "source": "https://archive.org/details/teenagers_from_outerspace",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1959 US film; copyright not renewed (Wikipedia list of US public-domain films)."
+      },
+      "cuts": [
+        {
+          "id": "teen-ray-gun",
+          "title": "Teenagers from Outer Space: Set It to Disintegrate",
+          "ss": 525,
+          "t": 30,
+          "poster": 12,
+          "tags": ["classic", "sci-fi", "dialogue", "black-and-white", "villain"]
+        }
+      ]
+    },
+    {
+      "key": "the-terror",
+      "title": "The Terror (1963)",
+      "url": "https://archive.org/download/TheTerror/TheTerror.mp4",
+      "attribution": {
+        "author": "Roger Corman / Filmgroup & AIP, 1963 (public domain, no copyright registration)",
+        "source": "https://archive.org/details/TheTerror",
+        "license": "Public Domain",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "rightsNote": "1963 US film; copyright never registered (Wikipedia list of US public-domain films)."
+      },
+      "cuts": [
+        {
+          "id": "terror-karloff",
+          "title": "The Terror: Karloff Explains Everything",
+          "ss": 2168,
+          "t": 44,
+          "poster": 30,
+          "tags": ["classic", "horror", "dialogue", "villain"]
+        },
+        {
+          "id": "terror-stare",
+          "title": "The Terror: The Disapproving Stare",
+          "ss": 2133,
+          "t": 12,
+          "poster": 4,
+          "tags": ["classic", "horror", "reaction", "meme"]
         }
       ]
     }
