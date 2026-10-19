@@ -1,4 +1,5 @@
 import type { ChunkMeta, Limits } from '../protocol/common.js';
+import { isFxId } from '../protocol/fx.js';
 
 /** A chunk may run this far past the clip end (recorder stop latency). */
 export const MANIFEST_END_TOLERANCE_MS = 1000;
@@ -7,7 +8,7 @@ export type ManifestCheck = { ok: true; chunks: ChunkMeta[] } | { ok: false; rea
 
 /**
  * Semantic manifest checks beyond the zod shape: count, unique ids, per-chunk and total byte
- * limits, minimum length, and placement inside the clip. On success returns chunks sorted by
+ * limits, minimum length, a known effect id (#48), and placement inside the clip. On success returns chunks sorted by
  * `startMs` (then id).
  */
 export function validateManifest(
@@ -25,6 +26,9 @@ export function validateManifest(
     ids.add(c.id);
     if (c.bytes > limits.maxChunkBytes) return { ok: false, reason: `chunk ${c.id} too large` };
     total += c.bytes;
+    // #48: zod already checks this on the wire; repeated for callers that skip the schema.
+    if (c.fx !== undefined && !isFxId(c.fx))
+      return { ok: false, reason: `chunk ${c.id} has an unknown effect` };
     if (c.durationMs < limits.minChunkMs) return { ok: false, reason: `chunk ${c.id} too short` };
     if (c.startMs < 0 || c.startMs >= clipDurationMs) {
       return { ok: false, reason: `chunk ${c.id} starts outside the clip` };

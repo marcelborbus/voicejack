@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  FX_IDS,
   LIMITS,
   MAX_BOTS,
   type C2S,
@@ -203,6 +204,7 @@ describe('bot game', () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(h.room.handle(a, { t: 'startGame' })).toBeNull();
     const botIds = [...h.bots.keys()];
+    const fxSeen: string[] = [];
 
     for (let round = 0; round < 2; round++) {
       expect(h.snap(a)).toMatchObject({ phase: 'DUBBING', round });
@@ -225,6 +227,9 @@ describe('bot game', () => {
         for (const c of s.you.manifest) {
           expect(c.startMs + c.durationMs).toBeLessThanOrEqual(CLIP_MS);
           expect(c.offsetMs).toBe(0);
+          // #48: some chunks carry a random effect from the allow-list.
+          if (c.fx !== undefined) expect(FX_IDS).toContain(c.fx);
+          fxSeen.push(c.fx ?? 'none');
           const data = h.uploaded.get(`${s.you.submissionId}/${c.id}`)!;
           expect(SOUNDS.some((x) => x.data.equals(data))).toBe(true);
         }
@@ -259,6 +264,9 @@ describe('bot game', () => {
       await vi.advanceTimersByTimeAsync(T.roundResultsMs + 1);
     }
     expect(h.snap(a).phase).toBe('FINAL');
+    // #48: ~40% of bot chunks get an effect; both kinds show up over two rounds of 3 bots.
+    expect(fxSeen.some((f) => f !== 'none')).toBe(true);
+    expect(fxSeen.some((f) => f === 'none')).toBe(true);
     for (const id of botIds) {
       for (const m of h.sent.get(id)!) {
         if (m.t === 'vote') {

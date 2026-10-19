@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  FX_IDS,
   LIMITS,
   type AudioMime,
   type C2S,
@@ -63,6 +64,8 @@ export const BOT = {
   /** Vote lands at this fraction of the clip's playback. */
   voteAt: [0.3, 0.95],
   score: [3, 9],
+  /** #48: share of bot chunks that get a random voice effect. */
+  fxChance: 0.4,
 } as const;
 
 /**
@@ -232,6 +235,7 @@ export class BotPlayer implements Connection {
       mime: sound.mime,
       bytes: sound.data.length,
     };
+    if (this.rng() < BOT.fxChance) meta.fx = FX_IDS[Math.floor(this.rng() * FX_IDS.length)]!;
     await this.deps.put(round, target.submissionId, meta.id, meta.mime, sound.data);
     if (this.closed) return;
     manifest.push(meta);

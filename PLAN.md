@@ -198,8 +198,14 @@ export interface ChunkMeta {
   durationMs: number;        // audible duration after offset
   mime: AudioMime;
   bytes: number;
+  fx?: FxId;                 // #48 voice effect ('none' | one of FX_IDS in protocol/fx.ts); absent = dry
 }
 export interface ChunkRef extends ChunkMeta { url: string } // GET path, see REST
+// #48 protocol decision: `fx` is optional and PROTOCOL_VERSION stays 3. Server and client ship
+// as one image, so no old server ever sees it (an old zod schema would strip it anyway); an old
+// manifest without it plays dry; a stale tab ignores it and plays dry. A bump would only force
+// stale tabs to reload mid-game for no gain. The server validates the id against the allow-list
+// (zod enum + validateManifest). `durationMs` stays the dry length; tails are client-side.
 
 export interface ShowcaseItem {
   submissionId: SubmissionId;

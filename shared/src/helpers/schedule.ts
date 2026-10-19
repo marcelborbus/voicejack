@@ -3,6 +3,11 @@ export interface SchedulableChunk {
   startMs: number;
   offsetMs: number;
   durationMs: number;
+  /**
+   * #48: audio past `durationMs` that should ring out (reverb/echo tail of an effect render).
+   * The chunk keeps sounding until `startMs + durationMs + tailMs`. Default 0.
+   */
+  tailMs?: number;
 }
 
 export interface ScheduledSource {
@@ -29,14 +34,15 @@ export function planSchedule(
   if (!(rate > 0)) return [];
   const out: ScheduledSource[] = [];
   for (const c of chunks) {
-    const endMs = c.startMs + c.durationMs;
+    const lenMs = c.durationMs + Math.max(0, c.tailMs ?? 0);
+    const endMs = c.startMs + lenMs;
     if (endMs <= mediaTimeMs) continue;
     if (c.startMs >= mediaTimeMs) {
       out.push({
         chunkId: c.id,
         whenDelaySec: (c.startMs - mediaTimeMs) / 1000 / rate,
         bufferOffsetSec: c.offsetMs / 1000,
-        durationSec: c.durationMs / 1000,
+        durationSec: lenMs / 1000,
       });
     } else {
       const into = mediaTimeMs - c.startMs;
@@ -44,7 +50,7 @@ export function planSchedule(
         chunkId: c.id,
         whenDelaySec: 0,
         bufferOffsetSec: (c.offsetMs + into) / 1000,
-        durationSec: (c.durationMs - into) / 1000,
+        durationSec: (lenMs - into) / 1000,
       });
     }
   }

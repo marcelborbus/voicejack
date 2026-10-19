@@ -11,8 +11,13 @@ import {
   ROUNDS_RANGE,
   SHORT_DUBBING_MIN_SECONDS,
 } from '../constants.js';
+import { FxIdSchema, type FxId } from './fx.js';
 
-/** v2 (V14): per-player clips (`you.clip`, `ShowcaseItem.clip`, `RoundResultEntry.clip`). */
+/**
+ * v2 (V14): per-player clips (`you.clip`, `ShowcaseItem.clip`, `RoundResultEntry.clip`).
+ * Not bumped for #48 `ChunkMeta.fx`: an optional field, server and client deploy as one image,
+ * and a stale tab that doesn't know it just plays the dub dry (see PLAN.md, #48).
+ */
 export const PROTOCOL_VERSION = 3;
 
 export type PlayerId = string; // nanoid(12)
@@ -156,6 +161,11 @@ export interface ChunkMeta {
   durationMs: number; // audible duration after offset
   mime: AudioMime;
   bytes: number;
+  /**
+   * #48: voice effect, rendered by every client on playback. Absent = dry (old manifests).
+   * `durationMs` stays the dry length; reverb/echo tails are computed client-side.
+   */
+  fx?: FxId;
 }
 export interface ChunkRef extends ChunkMeta {
   url: string; // GET path, see REST
@@ -168,6 +178,7 @@ export const ChunkMetaSchema = z.object({
   durationMs: z.number().positive(),
   mime: AudioMimeSchema,
   bytes: z.number().int().nonnegative(),
+  fx: FxIdSchema.optional(),
 }) satisfies z.ZodType<ChunkMeta>;
 
 // ---------- showcase / results ----------

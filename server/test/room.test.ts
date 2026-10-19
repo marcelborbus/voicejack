@@ -589,6 +589,30 @@ describe('dubbing rules', () => {
     ).toBe('INVALID');
   });
 
+  it('#48: effect ids are validated, kept in the manifest, changeable, and reach the showcase', () => {
+    const h = setup();
+    const [a, b, c] = start3(h);
+    const bad = { ...chunk('k1', 100), fx: 'autotune' } as unknown as ChunkMeta;
+    expect(h.room.handle(a, { t: 'manifest', round: 0, chunks: [bad] })?.code).toBe('INVALID');
+    const k1 = { ...chunk('k1', 100), fx: 'robot' as const };
+    const k2 = chunk('k2', 3000);
+    expect(h.room.handle(a, { t: 'manifest', round: 0, chunks: [k1, k2] })).toBeNull();
+    expect(h.snap(a).you.manifest.map((x) => x.fx)).toEqual(['robot', undefined]);
+    // Changing a take's effect is just a new manifest with the same chunk ids.
+    const k2fx = { ...k2, fx: 'ghost' as const };
+    expect(h.room.handle(a, { t: 'manifest', round: 0, chunks: [k1, k2fx] })).toBeNull();
+    h.upload(a, 'k1');
+    h.upload(a, 'k2');
+    for (const id of [a, b, c]) h.room.handle(id, { t: 'dubDone', round: 0, done: true });
+    vi.advanceTimersByTime(T.uploadGraceMs);
+    const sc = h.snap(b).showcase!;
+    expect(sc.total).toBe(1);
+    expect(sc.chunks.map((x) => [x.id, x.fx])).toEqual([
+      ['k1', 'robot'],
+      ['k2', 'ghost'],
+    ]);
+  });
+
   it('disconnect/reconnect mid-DUBBING keeps the manifest and submission', () => {
     const h = setup();
     const [a, b] = start3(h);
