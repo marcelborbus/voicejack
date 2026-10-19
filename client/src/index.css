@@ -330,6 +330,17 @@
   }
 }
 
+/* #50: backdrop-filter is costly in Firefox (each blurred overlay re-samples whatever moves
+   beneath it, e.g. a playing video). Same panels, just a little more opaque instead. */
+:root[data-engine='gecko'] .backdrop-blur,
+:root[data-engine='gecko'] .backdrop-blur-sm,
+:root[data-engine='gecko'] .backdrop-blur-md {
+  backdrop-filter: none;
+}
+:root[data-engine='gecko'] .backdrop-blur-md {
+  background-color: rgb(9 9 11 / 0.95);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

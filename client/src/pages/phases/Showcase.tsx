@@ -157,8 +157,8 @@ function ShowcaseHeader({ item, clip }: { item: ShowcaseItem | null; clip: ClipI
       >
         {text === 'Now playing' && (
           <span className="relative flex size-2.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-fuchsia-400 opacity-75" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-fuchsia-400" />
+            {/* #50: stepped blink, not `animate-ping` (a per-frame repaint over the playing clip). */}
+            <span className="relative inline-flex size-2.5 animate-blink rounded-full bg-fuchsia-400" />
           </span>
         )}
         {text === 'Loading' && <Spinner className="size-4" />}
@@ -214,8 +214,9 @@ function VideoOverlay({ item, load }: { item: ShowcaseItem; load: LoadState }) {
   return (
     <div
       className={cn(
-        'absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950/70 text-center backdrop-blur-sm transition-opacity duration-300',
-        content ? 'opacity-100' : 'pointer-events-none opacity-0',
+        'absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950/70 text-center transition-opacity duration-300',
+        // #50: no backdrop blur while hidden: it sat over the playing clip at opacity 0.
+        content ? 'opacity-100 backdrop-blur-sm' : 'pointer-events-none opacity-0',
       )}
     >
       {content}

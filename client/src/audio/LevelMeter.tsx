@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 import { dbToMeter, MIC_OK_THRESHOLD_DB } from './levels';
 import { getMicLevelDb } from './mic';
 
+const SEGMENTS = 28;
+
 /**
  * Segmented input level meter. Polls the mic level per animation frame and writes styles
  * directly (no React re-render per frame). A tick marks the micOk threshold (-50 dBFS).
@@ -25,6 +27,11 @@ export function LevelMeter({
     let shown = 0;
     let peak = 0;
     let peakAt = 0;
+    // #50: the meter is 28 segments, so only touch the DOM when the lit segment count (or the
+    // peak's segment) changes. Writing clip-path / left every frame re-rasterised the masked
+    // bar and re-ran layout 60 times a second, even in silence.
+    let litShown = -1;
+    let litPeak = -1;
     const loop = (t: number) => {
       const v = dbToMeter(getLevelDb());
       // fast attack, slower release
@@ -33,16 +40,23 @@ export function LevelMeter({
         peak = shown;
         peakAt = t;
       }
-      if (barRef.current) barRef.current.style.clipPath = `inset(0 ${(1 - shown) * 100}% 0 0)`;
-      if (peakRef.current) peakRef.current.style.left = `calc(${peak * 100}% - 2px)`;
+      const ls = Math.round(shown * SEGMENTS);
+      const lp = Math.round(peak * SEGMENTS);
+      if (ls !== litShown && barRef.current) {
+        barRef.current.style.clipPath = `inset(0 ${(1 - ls / SEGMENTS) * 100}% 0 0)`;
+        litShown = ls;
+      }
+      if (lp !== litPeak && peakRef.current) {
+        peakRef.current.style.left = `calc(${(lp / SEGMENTS) * 100}% - 2px)`;
+        litPeak = lp;
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [active, getLevelDb]);
 
-  const segMask =
-    'repeating-linear-gradient(90deg, #000 0 calc(100%/28 - 3px), transparent calc(100%/28 - 3px) calc(100%/28))';
+  const segMask = `repeating-linear-gradient(90deg, #000 0 calc(100%/${SEGMENTS} - 3px), transparent calc(100%/${SEGMENTS} - 3px) calc(100%/${SEGMENTS}))`;
   return (
     <div
       className={cn('relative h-4 w-full', className)}
