@@ -3,6 +3,7 @@ import { memo, useEffect, useLayoutEffect, useRef, type PointerEvent } from 'rea
 import { PEAKS_PER_SEC } from '@/dub/chunkLoader';
 import { cn } from '@/lib/utils';
 import { formatPrecise, formatSeconds, type EditorChunk } from './editorStore';
+import { RecordingBars } from './recordingBars';
 
 /** Take colours: [from, to] of the block gradient. Picked by take number. */
 const PALETTE: [string, string][] = [
@@ -136,7 +137,9 @@ export const ChunkBlock = memo(function ChunkBlock({
         <div className="absolute inset-x-2 top-1/2 h-px bg-white/40" />
       )}
       {!narrow && (
-        <span className="pointer-events-none absolute left-2 top-1 rounded-md bg-black/25 px-1.5 text-[10px] font-bold leading-4 tracking-wide backdrop-blur-sm">
+        // No backdrop-blur here: a blurred label per take, next to the growing recording block,
+        // re-sampled the timeline every frame and froze Firefox again from the second take on (#49).
+        <span className="pointer-events-none absolute left-2 top-1 rounded-md bg-black/35 px-1.5 text-[10px] font-bold leading-4 tracking-wide">
           {take}
         </span>
       )}
@@ -174,7 +177,7 @@ function StatusIcon({
   }
   if (narrow) return null;
   const cls = 'pointer-events-none absolute right-1.5 top-1.5 size-3.5 drop-shadow';
-  if (status === 'uploading') return <CloudUpload className={cn(cls, 'animate-pulse opacity-90')} aria-label="Uploading" />;
+  if (status === 'uploading') return <CloudUpload className={cn(cls, 'animate-blink opacity-90')} aria-label="Uploading" />;
   if (status === 'restoring') return <Loader2 className={cn(cls, 'animate-spin')} aria-label="Restoring" />;
   return (
     <Check
@@ -188,6 +191,11 @@ function StatusIcon({
 /**
  * The take being recorded: grows with the playhead and draws the live mic level.
  * `nowMs()` and `levelDb()` are polled per animation frame.
+ *
+ * Cheap per frame on purpose (Firefox froze here, #49): the canvas is sized once for the whole
+ * possible take and only the new bars are drawn (no per-frame canvas resize, no layout reads),
+ * the box only changes width when it grows by a whole pixel, and it has no blurred glow (a
+ * box-shadow blur on a box that resizes every frame is re-rasterised every frame).
  */
 export function RecordingBlock({
   startMs,
@@ -208,42 +216,56 @@ export function RecordingBlock({
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const levels = useRef<number[]>([]);
+  const spanMs = Math.max(0, maxMs);
+  const canvasCssW = Math.max(1, spanMs * pxPerMs - 8);
+  const canvasCssH = Math.max(1, laneH - 8 - 12);
 
   useEffect(() => {
+    const box = boxRef.current;
+    const c = canvasRef.current;
+    if (!box || !c) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.min(MAX_CANVAS_PX, Math.round(canvasCssW * dpr)));
+    const h = Math.max(1, Math.round(canvasCssH * dpr));
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d');
+    const bars = new RecordingBars(spanMs, w, h, dpr);
     let raf = 0;
-    let lastBucket = -1;
+    let lastWidth = -1;
     const loop = () => {
       raf = requestAnimationFrame(loop);
-      const box = boxRef.current;
-      const c = canvasRef.current;
-      if (!box || !c) return;
-      const dur = Math.max(0, Math.min(maxMs, nowMs() - startMs));
-      box.style.width = `${Math.max(6, dur * pxPerMs)}px`;
-      // One level sample per 10 ms bucket of recorded time (as peaks).
-      const bucket = Math.floor((dur * PEAKS_PER_SEC) / 1000);
-      if (bucket > lastBucket) {
-        const db = levelDb();
-        const amp = Math.max(0, Math.min(1, Math.pow(10, db / 20) * 2.2));
-        for (let i = lastBucket + 1; i <= bucket; i++) levels.current[i] = amp;
-        lastBucket = bucket;
+      const dur = Math.max(0, Math.min(spanMs, nowMs() - startMs));
+      const width = Math.max(6, Math.round(dur * pxPerMs));
+      if (width !== lastWidth) {
+        box.style.width = `${width}px`;
+        lastWidth = width;
       }
-      drawPeaks(c, levels.current, 0, dur, 'rgba(255,255,255,0.9)');
+      const db = levelDb();
+      bars.push(dur, Math.max(0, Math.min(1, Math.pow(10, db / 20) * 2.2)));
+      if (g) {
+        g.fillStyle = 'rgba(255,255,255,0.9)';
+        bars.drawNew(dur, (x, y, bw, bh) => g.fillRect(x, y, bw, bh));
+      }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [startMs, pxPerMs, maxMs, nowMs, levelDb]);
+  }, [startMs, pxPerMs, spanMs, canvasCssW, canvasCssH, nowMs, levelDb]);
 
   return (
     <div
       ref={boxRef}
       data-testid="recording-block"
-      className="pointer-events-none absolute z-20 overflow-hidden rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 shadow-[0_0_0_2px_rgba(255,255,255,0.9),0_0_24px_rgba(244,63,94,0.55)]"
+      className="pointer-events-none absolute z-20 overflow-hidden rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 shadow-[0_0_0_2px_rgba(255,255,255,0.9)]"
       style={{ left: startMs * pxPerMs, top: lane * laneH + 4, height: laneH - 8, width: 6 }}
     >
-      <canvas ref={canvasRef} className="absolute inset-x-1 inset-y-1.5 h-[calc(100%-12px)] w-[calc(100%-8px)]" />
+      <canvas
+        ref={canvasRef}
+        className="absolute left-1 top-1.5"
+        style={{ width: canvasCssW, height: canvasCssH }}
+      />
       <span className="absolute left-2 top-1 flex items-center gap-1 text-[10px] font-black tracking-widest">
-        <span className="size-1.5 animate-pulse rounded-full bg-white" /> REC
+        <span className="size-1.5 animate-blink rounded-full bg-white" /> REC
       </span>
     </div>
   );

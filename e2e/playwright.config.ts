@@ -19,20 +19,47 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   reporter: [['list']],
   use: {
-    ...devices['Desktop Chrome'],
     baseURL: BASE,
     headless: true,
-    permissions: ['microphone'],
     trace: 'retain-on-failure',
-    launchOptions: {
-      args: [
-        '--use-fake-device-for-media-stream',
-        '--use-fake-ui-for-media-stream',
-        '--autoplay-policy=no-user-gesture-required',
-        '--disable-features=WebRtcHideLocalIpsWithMdns',
-      ],
-    },
   },
+  projects: [
+    {
+      name: 'chromium',
+      testIgnore: /record-firefox\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        permissions: ['microphone'],
+        launchOptions: {
+          args: [
+            '--use-fake-device-for-media-stream',
+            '--use-fake-ui-for-media-stream',
+            '--autoplay-policy=no-user-gesture-required',
+            '--disable-features=WebRtcHideLocalIpsWithMdns',
+          ],
+        },
+      },
+    },
+    {
+      // #49: the editor recording path on Firefox (it froze there). A HiDPI 1080p window makes
+      // per-frame paint costs visible the way they hit real desktops.
+      name: 'firefox',
+      testMatch: /record-firefox\.spec\.ts/,
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 2,
+        launchOptions: {
+          firefoxUserPrefs: {
+            'media.navigator.streams.fake': true,
+            'media.navigator.permission.disabled': true,
+            'media.autoplay.default': 0,
+            'media.autoplay.block-webaudio': false,
+          },
+        },
+      },
+    },
+  ],
   webServer: {
     command: 'bash scripts/serve.sh',
     url: `${BASE}/api/health`,

@@ -242,7 +242,7 @@ function UploadStatus() {
         data-testid="upload-status"
         data-state="uploading"
       >
-        <CloudUpload className="size-3.5 animate-pulse" /> Saving…
+        <CloudUpload className="size-3.5 animate-blink" /> Saving…
       </span>
     );
   if (count === 0) return null;

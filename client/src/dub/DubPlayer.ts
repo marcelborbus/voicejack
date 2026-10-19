@@ -23,6 +23,7 @@ export type DubPlayerEvent =
   | { type: 'schedule'; reason: string; mediaMs: number; rate: number; sources: number }
   | { type: 'stop'; reason: string }
   | { type: 'resync'; driftMs: number }
+  | { type: 'resyncSuppressed'; driftMs: number }
   | { type: 'videoCorrect'; driftMs: number; targetMs: number };
 
 export interface DubPlayerOptions {
@@ -56,6 +57,16 @@ interface Live {
 const FADE_SEC = 0.008;
 const MAX_LATENCY_SEC = 0.4;
 const MOTION_WINDOW_MS = 30;
+/** Wait-for-motion gives up after 400 ms of clock time *or* this many polls (8 ms apart). */
+const MOTION_MAX_MS = 400;
+export const MOTION_MAX_POLLS = 64;
+/**
+ * Drift resync budget: at most this many `drift` reschedules per window. A clock that never
+ * agrees (a stalled audio device, a video that reports a frozen or coarse `currentTime`)
+ * would otherwise tear down and rebuild every source a few times a second, forever.
+ */
+export const DRIFT_RESYNC_MAX = 4;
+export const DRIFT_RESYNC_WINDOW_MS = 2000;
 
 /**
  * The one playback engine for editor, showcase, final replay and render (§2.3).
@@ -89,6 +100,8 @@ export class DubPlayer {
   private settleTimers: unknown[] = [];
   private readonly waitForMotion: boolean;
   private disposed = false;
+  private scheduling = false;
+  private driftResyncs: number[] = [];
 
   // synced mode
   private syncStartPerf: number | null = null;
@@ -243,7 +256,7 @@ export class DubPlayer {
     if (!this.video.paused) this.scheduleWhenMoving('seeked');
   }
 
-  /** Schedule as soon as the video's clock is really moving (or after 400 ms regardless). */
+  /** Schedule as soon as the video's clock is really moving (or after 400 ms / 64 polls regardless). */
   private scheduleWhenMoving(reason: string): void {
     if (!this.waitForMotion) return this.schedule(reason);
     this.stopAll(null);
@@ -254,13 +267,17 @@ export class DubPlayer {
     const from = this.video.currentTime;
     const since = this.perfNow();
     const samples: [number, number][] = [];
+    let polls = 0;
     const poll = () => {
       this.motionTimer = null;
       const v = this.video;
       if (this.disposed || v.paused || v.seeking || v.ended) return;
       const now = this.perfNow();
       const cur = v.currentTime;
-      if (now - since > 400) return this.schedule(reason);
+      // Bounded twice over: by the clock and by the number of polls (a clamped or frozen
+      // `performance.now()` must not keep this polling forever).
+      if (now - since > MOTION_MAX_MS || ++polls >= MOTION_MAX_POLLS) return this.schedule(reason);
+      if (samples.length > MOTION_MAX_POLLS) samples.shift();
       if (cur !== from) {
         samples.push([now, cur]);
         const rate = v.playbackRate > 0 ? v.playbackRate : 1;
@@ -280,7 +297,17 @@ export class DubPlayer {
   }
 
   private schedule(reason: string): void {
-    if (this.disposed) return;
+    // Re-entrancy guard: nothing below may synchronously end up scheduling again.
+    if (this.disposed || this.scheduling) return;
+    this.scheduling = true;
+    try {
+      this.scheduleNow(reason);
+    } finally {
+      this.scheduling = false;
+    }
+  }
+
+  private scheduleNow(reason: string): void {
     this.stopAll(null);
     this.clearMotion();
     const v = this.video;
@@ -364,6 +391,13 @@ export class DubPlayer {
     const implied = this.audioMediaTimeMs()!;
     const drift = this.video.currentTime * 1000 - implied;
     if (Math.abs(drift) > this.driftThresholdMs) {
+      const now = this.perfNow();
+      this.driftResyncs = this.driftResyncs.filter((t) => now - t < DRIFT_RESYNC_WINDOW_MS);
+      if (this.driftResyncs.length >= DRIFT_RESYNC_MAX) {
+        this.onEvent?.({ type: 'resyncSuppressed', driftMs: drift });
+        return;
+      }
+      this.driftResyncs.push(now);
       this.onEvent?.({ type: 'resync', driftMs: drift });
       this.schedule('drift');
     }

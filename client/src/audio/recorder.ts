@@ -61,30 +61,45 @@ export interface RecorderOptions {
  * Starts the video and resolves with the performance.now() time of its first presented frame.
  * Pass this (or your own) as `startVideo` to `Recorder.start`.
  */
-export function playAndWaitFirstFrame(video: HTMLVideoElement): Promise<number> {
+export function playAndWaitFirstFrame(
+  video: HTMLVideoElement,
+  now: () => number = () => performance.now(),
+): Promise<number> {
   return new Promise<number>((resolve, reject) => {
     let done = false;
+    let safety: ReturnType<typeof setTimeout> | null = null;
     const finish = (t: number) => {
       if (done) return;
       done = true;
-      resolve(t);
+      if (safety !== null) clearTimeout(safety);
+      resolve(sanePresentationTime(t, now()));
     };
     if ('requestVideoFrameCallback' in video) {
-      video.requestVideoFrameCallback((now, meta) => finish(meta.presentationTime ?? now));
+      // One callback only (never re-armed), so this can't turn into a frame loop.
+      video.requestVideoFrameCallback((t, meta) => finish(meta.presentationTime ?? t));
     } else {
-      (video as HTMLVideoElement).addEventListener('playing', () => finish(performance.now()), {
+      (video as HTMLVideoElement).addEventListener('playing', () => finish(now()), {
         once: true,
       });
     }
     // Safety net: rVFC never fires for a video that is already at its end.
-    setTimeout(() => finish(performance.now()), 1500);
+    safety = setTimeout(() => finish(now()), 1500);
     video.play().catch((e: unknown) => {
       if (!done) {
         done = true;
+        if (safety !== null) clearTimeout(safety);
         reject(e instanceof Error ? e : new Error(String(e)));
       }
     });
   });
+}
+
+/**
+ * The first frame's presentation time, or `now` when the browser hands us something outside
+ * the `performance.now()` timebase (non-finite, in the future, or seconds in the past).
+ */
+export function sanePresentationTime(t: number, now: number): number {
+  return Number.isFinite(t) && t <= now + 50 && t >= now - 2000 ? t : now;
 }
 
 /**

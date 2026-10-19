@@ -190,7 +190,9 @@ function RecordButton({
           <span className="size-3.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)] transition-transform group-hover:scale-110" />
         )}
         {recording && !arming && (
-          <span className="absolute inset-0 animate-ping rounded-full bg-white/25 [animation-duration:1.4s]" />
+          // Static ring, no `animate-ping`: an infinite scale animation here cost Firefox most of
+          // its frame rate while recording (#49).
+          <span className="absolute inset-0 rounded-full ring-2 ring-white/40" />
         )}
       </span>
       {recording ? (arming ? 'Starting…' : 'Stop') : 'Record'}
@@ -300,7 +302,7 @@ export function Countdown({ endsAt, onExpire }: { endsAt: number | null; onExpir
         over
           ? 'border-white/10 bg-zinc-800/60 text-zinc-400'
           : urgent
-            ? 'animate-pulse border-rose-500/40 bg-rose-500/15 text-rose-200'
+            ? 'animate-blink border-rose-500/40 bg-rose-500/15 text-rose-200'
             : warn
               ? 'border-amber-400/30 bg-amber-400/10 text-amber-200'
               : 'border-white/[0.08] bg-white/[0.04] text-zinc-50',

@@ -1,7 +1,14 @@
 import { planSchedule } from '@dub/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { computePeaks } from '../src/dub/chunkLoader';
-import { DubPlayer, type DubChunk, type DubPlayerEvent } from '../src/dub/DubPlayer';
+import {
+  DRIFT_RESYNC_MAX,
+  DRIFT_RESYNC_WINDOW_MS,
+  DubPlayer,
+  MOTION_MAX_POLLS,
+  type DubChunk,
+  type DubPlayerEvent,
+} from '../src/dub/DubPlayer';
 import type {
   AudioBufferLike,
   AudioContextLike,
@@ -268,6 +275,71 @@ describe('DubPlayer wait-for-motion', () => {
     expect(events.filter((e) => e.type === 'schedule')).toHaveLength(0);
     timers.advance(30);
     expect(events.filter((e) => e.type === 'schedule')).toHaveLength(1);
+    player.dispose();
+  });
+});
+
+describe('DubPlayer loop guards (#49)', () => {
+  it('wait-for-motion stops polling after MOTION_MAX_POLLS even if performance.now() is frozen', () => {
+    const ctx = new FakeCtx();
+    const video = new FakeVideo();
+    const timers = new FakeTimers();
+    const events: DubPlayerEvent[] = [];
+    let polls = 0;
+    const counting: Timers = {
+      ...timers,
+      setTimeout: (fn, ms) => {
+        if (ms === 8) polls++;
+        return timers.setTimeout(fn, ms);
+      },
+      setInterval: (fn, ms) => timers.setInterval(fn, ms),
+      clearTimeout: (id) => timers.clearTimeout(id),
+      clearInterval: (id) => timers.clearInterval(id),
+    };
+    const player = new DubPlayer({
+      video,
+      ctx,
+      timers: counting,
+      perfNow: () => 0, // a clamped / frozen clock: "400 ms" never passes
+      onEvent: (e) => events.push(e),
+    });
+    video.startPlaying(); // and the video clock never moves either
+    timers.advance(MOTION_MAX_POLLS * 8 + 50);
+    expect(events.filter((e) => e.type === 'schedule')).toHaveLength(1);
+    const after = polls;
+    timers.advance(5000);
+    // No poll chain left running (the watchdog only re-arms motion when not anchored).
+    expect(polls).toBe(after);
+    expect(after).toBeLessThanOrEqual(MOTION_MAX_POLLS + 1);
+    player.dispose();
+  });
+
+  it('rate-limits drift resyncs when the audio clock stalls (no reschedule storm)', () => {
+    const ctx = new FakeCtx();
+    const video = new FakeVideo();
+    const timers = new FakeTimers();
+    const events: DubPlayerEvent[] = [];
+    const player = new DubPlayer({
+      video,
+      ctx,
+      timers,
+      perfNow: () => timers.now,
+      waitForMotion: false,
+      onEvent: (e) => events.push(e),
+    });
+    player.setChunks(CHUNKS);
+    video.startPlaying();
+    // The output device stalls: ctx.currentTime stays put while the video runs on.
+    const secs = 10;
+    timers.advance(secs * 1000, (dt) => {
+      video.currentTime += dt / 1000;
+    });
+    const resyncs = events.filter((e) => e.type === 'resync').length;
+    expect(resyncs).toBeGreaterThan(0);
+    expect(resyncs).toBeLessThanOrEqual(
+      DRIFT_RESYNC_MAX * Math.ceil((secs * 1000) / DRIFT_RESYNC_WINDOW_MS),
+    );
+    expect(events.some((e) => e.type === 'resyncSuppressed')).toBe(true);
     player.dispose();
   });
 });

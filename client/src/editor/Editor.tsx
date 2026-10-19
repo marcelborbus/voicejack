@@ -218,7 +218,7 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount
               data-testid="on-air"
               className="inline-flex animate-fade-in items-center gap-1.5 rounded-md border-2 border-rose-400 px-2 py-px text-[11px] font-black uppercase tracking-[0.18em] text-rose-300 shadow-[0_0_16px_rgba(244,63,94,0.45)]"
             >
-              <span className="size-1.5 animate-pulse rounded-full bg-rose-400" /> On air
+              <span className="size-1.5 animate-blink rounded-full bg-rose-400" /> On air
             </span>
           )}
         </p>
@@ -305,7 +305,7 @@ function VideoStage({ clip, videoRef }: { clip: ClipInfo; videoRef: React.RefObj
       <div className="pointer-events-none absolute left-3 top-3 flex gap-2">
         {recording && (
           <Badge className="animate-fade-in border-transparent bg-rose-600 px-3 py-1 text-sm text-white shadow-lg shadow-rose-600/40">
-            <span className="mr-1 size-2 animate-pulse rounded-full bg-white" />
+            <span className="mr-1 size-2 animate-blink rounded-full bg-white" />
             {recording.phase === 'arming' ? 'Get ready…' : recording.replacingId ? 'Re-recording' : 'Recording'}
           </Badge>
         )}

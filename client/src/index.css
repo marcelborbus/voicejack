@@ -55,6 +55,9 @@
   --animate-jiggle: jiggle 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-draw: draw 700ms 200ms cubic-bezier(0.6, 0, 0.3, 1) both;
   --animate-sway: sway 4s ease-in-out infinite;
+  /* Stepped on/off blink: 2 repaints a second instead of one per frame like `animate-pulse`
+     (cheap enough for the recording UI on Firefox, #49). */
+  --animate-blink: blink 1.2s steps(1, end) infinite;
 
   @keyframes fade-up {
     from {
@@ -99,6 +102,15 @@
     }
     50% {
       transform: translateY(-8px) rotate(2deg);
+    }
+  }
+  @keyframes blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
     }
   }
   @keyframes gradient-pan {
