@@ -6,6 +6,7 @@ import { closeAll, newPlayer, readyUp } from './helpers';
 // it to FINAL (analytics/Elo exclusion is covered by server/test/testRoom.test.ts).
 // v1.2 #47: bots talk in the lobby (`botVoice`, speaking bars) and dub 3–8 s snippets.
 test('admin test game: 3 bots, short dubbing, plays to FINAL', async ({ browser }) => {
+  test.setTimeout(150_000); // lobby voice + showcase speaking checks wait on real timers
   const admin = await newPlayer(browser, 'Admin');
   try {
     const { page } = admin;
@@ -69,6 +70,16 @@ test('admin test game: 3 bots, short dubbing, plays to FINAL', async ({ browser 
     await expect(page.locator('[data-testid=showcase] h2')).toContainText('of 3', {
       timeout: 30_000,
     });
+    // #51: the showcase lists everyone in voice (bots included, author stays anonymous) and
+    // lights a chip up while that player talks (here: our own fake-mic beep).
+    const strip = page.getByTestId('speaking-strip');
+    await expect(strip.getByTestId('speaking-strip-player')).toHaveCount(4);
+    await expect(strip.locator('[data-testid=speaking-strip-player][data-bot=true]')).toHaveCount(
+      3,
+    );
+    await expect(
+      strip.locator('[data-testid=speaking-strip-player][data-speaking=true]'),
+    ).not.toHaveCount(0, { timeout: 20_000 });
     // Vote until the game ends.
     const final = page.getByTestId('final');
     await expect(async () => {

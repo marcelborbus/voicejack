@@ -341,6 +341,47 @@
   background-color: rgb(9 9 11 / 0.95);
 }
 
+/* #51: showcase "who is talking" chips. State comes from `data-speaking` (set from a store
+   subscription, not React); bars only animate while speaking, via transform. */
+.speaking-chip {
+  transition:
+    border-color 150ms,
+    background-color 150ms;
+}
+.speaking-chip[data-speaking='true'] {
+  border-color: rgb(52 211 153 / 0.6);
+  background-color: rgb(52 211 153 / 0.12);
+  color: var(--color-zinc-50);
+}
+.speaking-bars > span {
+  width: 3px;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--color-emerald-400);
+  transform: scaleY(0.3);
+  transform-origin: bottom;
+  opacity: 0.3;
+}
+.speaking-chip[data-speaking='true'] .speaking-bars > span {
+  opacity: 1;
+  animation: speaking-bar 0.7s ease-in-out infinite;
+}
+.speaking-chip[data-speaking='true'] .speaking-bars > span:nth-child(2) {
+  animation-delay: 120ms;
+}
+.speaking-chip[data-speaking='true'] .speaking-bars > span:nth-child(3) {
+  animation-delay: 240ms;
+}
+@keyframes speaking-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

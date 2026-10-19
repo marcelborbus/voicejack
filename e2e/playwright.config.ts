@@ -45,6 +45,9 @@ export default defineConfig({
       // per-frame paint costs visible the way they hit real desktops.
       name: 'firefox',
       testMatch: /record-firefox\.spec\.ts/,
+      // Runs after the Chromium suite: a 2x 1080p Firefox next to a Chromium worker starves
+      // both (and the frame-rate check wants the machine to itself).
+      dependencies: ['chromium'],
       use: {
         ...devices['Desktop Firefox'],
         viewport: { width: 1920, height: 1080 },

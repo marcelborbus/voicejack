@@ -3,6 +3,7 @@ import { Clapperboard, EyeOff, Sparkles, Users, VenetianMask } from 'lucide-reac
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ClipAttribution } from '@/components/showcase/ClipAttribution';
 import { recordShowcaseItem } from '@/components/showcase/showcaseHistory';
+import { SpeakingStrip } from '@/components/showcase/SpeakingStrip';
 import { useShowcasePlayback, type LoadState } from '@/components/showcase/useShowcasePlayback';
 import { useServerNow } from '@/components/showcase/useServerNow';
 import { VotePanel } from '@/components/showcase/VotePanel';
@@ -83,6 +84,7 @@ export function Showcase() {
               <>
                 <VotePanel key={item.submissionId} item={item} />
                 <VoterCount key={`count-${item.submissionId}`} item={item} />
+                <SpeakingStrip />
               </>
             ) : (
               <p className="text-zinc-400">Wrapping up…</p>

@@ -98,6 +98,8 @@ test('firefox: admin test game, record 2 takes, Done, showcase', async ({ browse
     await page.getByTestId('done').click();
     await expect(page.getByTestId('showcase')).toBeVisible({ timeout: 60_000 });
     await expect(page.locator('[data-testid=showcase] h2')).toContainText('of 4');
+    // #51: every player in voice is listed next to the vote panel, bots included.
+    await expect(page.getByTestId('speaking-strip-player')).toHaveCount(4);
   } finally {
     await closeAll([admin]);
   }
