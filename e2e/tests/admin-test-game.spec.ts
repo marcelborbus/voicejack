@@ -5,6 +5,29 @@ import { closeAll, newPlayer, readyUp } from './helpers';
 // private room with 3 server bots that send snippets cut from the official library, then plays
 // it to FINAL (analytics/Elo exclusion is covered by server/test/testRoom.test.ts).
 // v1.2 #47: bots talk in the lobby (`botVoice`, speaking bars) and dub 3–8 s snippets.
+// #53: "Start right away" (default on): no Ready/Start clicks, the game begins once the admin's
+// mic passed the check.
+test('admin test game: auto start goes straight to DUBBING', async ({ browser }) => {
+  const admin = await newPlayer(browser, 'Admin');
+  try {
+    const { page } = admin;
+    await page.goto('/admin');
+    const card = page.getByTestId('test-game-card');
+    await expect(card.getByTestId('test-game-autostart')).toBeChecked();
+    await card.getByTestId('test-game-bots').fill('2');
+    await card.getByTestId('test-game-seconds').fill('8');
+    const t0 = Date.now();
+    await card.getByTestId('test-game-start').click();
+    await page.waitForURL(/\/r\/[A-Z0-9]{6}$/);
+    // No ready-toggle / start-game clicks anywhere in this test.
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 15_000 });
+    test.info().annotations.push({ type: 'click→editor ms', description: String(Date.now() - t0) });
+    await expect(page.getByTestId('round-badge')).toHaveText(/Round 1\/1/);
+  } finally {
+    await closeAll([admin]);
+  }
+});
+
 test('admin test game: 3 bots, short dubbing, plays to FINAL', async ({ browser }) => {
   test.setTimeout(150_000); // lobby voice + showcase speaking checks wait on real timers
   const admin = await newPlayer(browser, 'Admin');
@@ -36,6 +59,8 @@ test('admin test game: 3 bots, short dubbing, plays to FINAL', async ({ browser 
     await card.getByTestId('test-game-bots').fill('3');
     await card.getByTestId('test-game-rounds').fill('1');
     await card.getByTestId('test-game-seconds').fill('8');
+    // Manual start (autoStart off): the lobby with ready/start, bot lobby voice.
+    await card.getByTestId('test-game-autostart').uncheck();
     await card.getByTestId('test-game-start').click();
 
     await page.waitForURL(/\/r\/[A-Z0-9]{6}$/);

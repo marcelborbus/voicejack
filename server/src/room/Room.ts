@@ -42,6 +42,8 @@ import type { Outcome, RemoveReason, RoomDeps, RoomError, Submission } from './t
 
 /** V08: a public game starts once at least this many matched players are ready. */
 export const PUBLIC_MIN_READY = 2;
+/** #53: an auto-started test room waits this long for the host's mic before going without. */
+export const AUTO_START_MIC_WAIT_MS = 3000;
 
 interface PlayerState {
   id: PlayerId;
@@ -138,6 +140,14 @@ export class Room {
   private readonly kickVotes = new Map<PlayerId, Set<PlayerId>>();
   /** V08: `reporter>target` pairs already reported in this room. */
   private readonly reported = new Set<string>();
+  /**
+   * #53 admin test rooms: start the first game by itself. 'pending' until the host connects,
+   * 'armed' once the host passed (or failed, or 3 s without) the mic check: then the game starts
+   * as soon as nothing else blocks it. One-shot ('off' after the start).
+   */
+  private autoStart: 'off' | 'pending' | 'waitingMic' | 'armed' = 'off';
+  /** #53: the test-room host may play without a mic (skipped the mic check). */
+  private micSkipped: PlayerId | null = null;
 
   constructor(deps: RoomDeps) {
     this.deps = deps;
@@ -168,6 +178,44 @@ export class Room {
 
   private get clips(): readonly ClipInfo[] {
     return this.clipsFor(this.settings.libraryId);
+  }
+
+  /**
+   * #53: start the first game without Ready/Start clicks (admin test rooms). The host is set
+   * ready once their mic passes, fails, or `AUTO_START_MIC_WAIT_MS` after they connect.
+   */
+  enableAutoStart(): void {
+    if (this.phase !== 'LOBBY' || this.kind !== 'private') return;
+    this.autoStart = 'pending';
+    // Server bots would get ready after a short "human" delay; no need to wait for that here.
+    for (const q of this.players.values()) {
+      if (q.isBot) {
+        q.micOk = true;
+        q.ready = true;
+      }
+    }
+    const host = this.players.get(this.hostId);
+    if (host?.connected) this.autoStartHostConnected();
+  }
+
+  private autoStartHostConnected(): void {
+    if (this.autoStart !== 'pending') return;
+    const host = this.players.get(this.hostId);
+    if (host?.micOk) return this.armAutoStart(false);
+    this.autoStart = 'waitingMic';
+    this.timers.set('autoStart', AUTO_START_MIC_WAIT_MS, () => this.armAutoStart(true));
+  }
+
+  /** Host is set ready (skipping the mic check if `skipMic`); starts when nothing else blocks. */
+  private armAutoStart(skipMic: boolean): void {
+    if (this.autoStart === 'off' || this.autoStart === 'armed' || this.phase !== 'LOBBY') return;
+    this.timers.clear('autoStart');
+    const host = this.players.get(this.hostId);
+    if (!host) return;
+    this.autoStart = 'armed';
+    if (skipMic && !host.micOk) this.micSkipped = host.id;
+    host.ready = true;
+    if (!this.maybeAutoStart()) this.changed();
   }
 
   /** Library contents changed (admin): lobbies get fresh clip counts and tags. */
@@ -373,6 +421,10 @@ export class Room {
     p.dropPhase = null;
     this.timers.clear(`drop:${p.id}`);
     this.maybeMigrateHost();
+    if (p.id === this.hostId && this.autoStart === 'pending') {
+      this.autoStartHostConnected();
+      if (this.maybeAutoStart()) return null;
+    }
     this.changed();
     return null;
   }
@@ -484,17 +536,27 @@ export class Room {
 
   private micStatus(p: PlayerState, ok: boolean): Outcome {
     p.micOk = ok;
-    if (!ok) p.ready = false;
-    if (!this.maybeStartPublic()) this.changed();
+    if (p.id === this.hostId && this.autoStart === 'waitingMic') {
+      // #53: mic works → go; mic failed → go without it (testing without a mic).
+      this.armAutoStart(!ok);
+      return null;
+    }
+    if (!ok && this.micSkipped !== p.id) p.ready = false;
+    if (!this.maybeAutoStart()) this.changed();
     return null;
   }
 
   private setReady(p: PlayerState, ready: boolean): Outcome {
     if (this.phase !== 'LOBBY') return err('BAD_PHASE', 'not in lobby');
-    if (ready && !p.micOk) return err('INVALID', 'mic check required before ready');
+    if (ready && !this.micPassed(p)) return err('INVALID', 'mic check required before ready');
     p.ready = ready;
-    if (!this.maybeStartPublic()) this.changed();
+    if (!this.maybeAutoStart()) this.changed();
     return null;
+  }
+
+  /** Mic check passed, or skipped by an auto-started test room's host (#53). */
+  private micPassed(q: PlayerState): boolean {
+    return q.micOk || this.micSkipped === q.id;
   }
 
   private updateSettings(p: PlayerState, patch: Partial<GameSettings>): Outcome {
@@ -621,7 +683,7 @@ export class Room {
     if (list.length < 2 && !this.deps.options.allowSolo) out.push('need at least 2 players');
     for (const q of list) {
       if (!q.connected) out.push(`${q.name} is offline`);
-      else if (!q.micOk) out.push(`${q.name} has not passed the mic check`);
+      else if (!this.micPassed(q)) out.push(`${q.name} has not passed the mic check`);
       else if (!q.ready) out.push(`${q.name} is not ready`);
     }
     // V14: every player dubs a different clip, so a round needs one clip per player. Once the
@@ -937,7 +999,7 @@ export class Room {
     const ms = this.deps.timings.readyCheckMs;
     this.readyEndsAt = this.deps.clock.now() + ms;
     this.timers.set('readyCheck', ms, () => this.endReadyCheck());
-    if (!this.maybeStartPublic()) this.changed();
+    if (!this.maybeAutoStart()) this.changed();
   }
 
   private isReadyHuman(q: PlayerState): boolean {
@@ -945,6 +1007,16 @@ export class Room {
   }
 
   /** Public ready check running and everyone is ready: start early. True if it started. */
+  /** V08 public ready check, or #53 test-room auto start. True if the game started. */
+  private maybeAutoStart(): boolean {
+    if (this.maybeStartPublic()) return true;
+    if (this.autoStart !== 'armed' || this.phase !== 'LOBBY') return false;
+    if (this.startBlockers().length > 0) return false;
+    this.autoStart = 'off';
+    this.beginGame();
+    return true;
+  }
+
   private maybeStartPublic(): boolean {
     if (this.kind !== 'public' || this.readyEndsAt === null || this.phase !== 'LOBBY') return false;
     const list = [...this.players.values()];

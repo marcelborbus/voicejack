@@ -3,7 +3,7 @@ import { ArrowRight, Ban, DoorOpen, Home as HomeIcon, LogOut, Users, WifiOff } f
 import { useEffect, useState, type ComponentType, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { unlockAudio } from '@/audio/context';
-import { releaseMic } from '@/audio/mic';
+import { prefetchMic, releaseMic } from '@/audio/mic';
 import { SoundUnlockOverlay } from '@/audio/SoundUnlockOverlay';
 import { InviteButton } from '@/components/InviteButton';
 import { LoadingQuip } from '@/components/LoadingQuip';
@@ -55,6 +55,11 @@ export function Room() {
   const [attempt, setAttempt] = useState(0);
   const hasToken = code ? !!getToken(code) : false;
   const canConnect = !!code && (hasToken || joinName !== null);
+
+  // #53: open the mic right away when the permission is already granted (never prompts here).
+  useEffect(() => {
+    if (canConnect) prefetchMic();
+  }, [canConnect]);
 
   useEffect(() => {
     if (!code || !canConnect) return;

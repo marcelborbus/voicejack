@@ -12,8 +12,9 @@ import { originAllowed } from '../ws/gateway.js';
 import { adminIdentity } from './admin.js';
 
 /**
- * v1.2 #46 `POST /api/admin/test-room` {bots, libraryId?, rounds, dubbingSeconds, name?}: a
- * private room with the admin as host and 1–7 bots, for testing in prod without DEV_BOTS.
+ * v1.2 #46 `POST /api/admin/test-room` {bots, libraryId?, rounds, dubbingSeconds, name?,
+ * autoStart?}: a private room with the admin as host and 1–7 bots, for testing in prod without
+ * DEV_BOTS (#53: by default it starts by itself once the host is in).
  * Same gate as the rest of `/api/admin` (Authelia `Remote-Groups: admins` from a trusted proxy,
  * `ADMIN_DEV` on loopback) plus the Origin check. Returns the host's reconnect token.
  */
@@ -47,6 +48,7 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
           name: name || 'Admin',
           userId: session?.user.id ?? null,
           bots: b.bots,
+          autoStart: b.autoStart,
           settings: {
             rounds: b.rounds,
             dubbingSeconds: b.dubbingSeconds,

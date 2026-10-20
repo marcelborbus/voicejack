@@ -8,7 +8,7 @@ import { buildApp } from '../src/http/app.js';
 import { ClipLibrary } from '../src/clips/ClipLibrary.js';
 import { JobQueue, hasFfmpeg } from '../src/clips/normalize.js';
 import { RoomManager } from '../src/room/RoomManager.js';
-import type { Room } from '../src/room/Room.js';
+import { AUTO_START_MIC_WAIT_MS, type Room } from '../src/room/Room.js';
 import type { AnalyticsEvent, Tracker } from '../src/analytics/Analytics.js';
 import { LibraryBotSounds, type SoundSourceLibrary } from '../src/bots/librarySounds.js';
 import { SNIPPET, SNIPPET_RECIPE } from '../src/bots/snippets.js';
@@ -92,7 +92,13 @@ describe('admin test room (v1.2 #46)', () => {
   });
 
   it('creates a private room: admin host + bots, short dubbing, bot controls, no analytics', async () => {
-    const res = await create({ bots: 3, rounds: 1, dubbingSeconds: 10, name: 'Marcel' });
+    const res = await create({
+      bots: 3,
+      rounds: 1,
+      dubbingSeconds: 10,
+      name: 'Marcel',
+      autoStart: false,
+    });
     expect(res.statusCode).toBe(201);
     const body = res.json<TestRoomResponse>();
     expect(body.code).toMatch(/^[A-Z0-9]{6}$/);
@@ -126,6 +132,79 @@ describe('admin test room (v1.2 #46)', () => {
     // A normal room still counts (sanity check of the spy).
     rooms.create('Normal');
     expect(events).toContain('room_created');
+  });
+
+  describe('autoStart (#53)', () => {
+    const made = (autoStart?: boolean) => {
+      const r = rooms.createTestRoom({ name: 'Admin', bots: 2, settings: {}, autoStart });
+      if (!('room' in r)) throw new Error(r.message);
+      return { room: r.room, host: r.join.playerId };
+    };
+
+    it('is on by default in the API', async () => {
+      const res = await create({ bots: 2 });
+      const room = rooms.get(res.json<TestRoomResponse>().code)!;
+      const host = hostOf(room);
+      room.connect(host);
+      expect(room.handle(host, { t: 'micStatus', ok: true })).toBeNull();
+      expect(room.currentPhase).toBe('DUBBING');
+    });
+
+    it('starts as soon as the connected host reports micOk (no ready/start)', () => {
+      const { room, host } = made(true);
+      room.connect(host);
+      expect(room.currentPhase).toBe('LOBBY');
+      room.handle(host, { t: 'micStatus', ok: true });
+      expect(room.currentPhase).toBe('DUBBING');
+    });
+
+    it('starts at once when the host already passed the mic check before connecting', () => {
+      const { room, host } = made(true);
+      room.handle(host, { t: 'micStatus', ok: true });
+      expect(room.currentPhase).toBe('LOBBY'); // not connected yet
+      room.connect(host);
+      expect(room.currentPhase).toBe('DUBBING');
+    });
+
+    it('skips the mic check when the host has no mic', () => {
+      const { room, host } = made(true);
+      room.connect(host);
+      room.handle(host, { t: 'micStatus', ok: false }); // denied / no device
+      expect(room.currentPhase).toBe('DUBBING');
+    });
+
+    it('goes without a mic 3 s after the host connected', async () => {
+      const { room, host } = made(true);
+      room.connect(host);
+      expect(room.currentPhase).toBe('LOBBY');
+      await vi.waitFor(() => expect(room.currentPhase).toBe('DUBBING'), {
+        timeout: AUTO_START_MIC_WAIT_MS + 2000,
+        interval: 50,
+      });
+    });
+
+    it('is one-shot and off when not asked for', () => {
+      const off = made(false);
+      off.room.connect(off.host);
+      off.room.handle(off.host, { t: 'micStatus', ok: true });
+      expect(off.room.currentPhase).toBe('LOBBY');
+      expect(off.room.handle(off.host, { t: 'micStatus', ok: false })).toBeNull();
+      expect(off.room.currentPhase).toBe('LOBBY');
+    });
+
+    it('never applies to normal rooms', () => {
+      const r = rooms.create('Host');
+      if (!('room' in r)) throw new Error('no room');
+      const guest = r.room.join('Guest');
+      if ('code' in guest) throw new Error('no guest');
+      for (const id of [r.join.playerId, guest.playerId]) {
+        r.room.connect(id);
+        r.room.handle(id, { t: 'micStatus', ok: true });
+      }
+      expect(r.room.currentPhase).toBe('LOBBY');
+      expect(r.room.handle(guest.playerId, { t: 'micStatus', ok: false })).toBeNull();
+      expect(r.room.currentPhase).toBe('LOBBY');
+    });
   });
 
   it('normal private rooms still need DEV_BOTS for bots', () => {

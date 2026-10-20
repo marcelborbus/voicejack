@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2, Mic, MicOff, RotateCcw } from 'lucide-reac
 import { useEffect } from 'react';
 import { unlockAudio } from '@/audio/context';
 import { LevelMeter } from '@/audio/LevelMeter';
-import { acquireMic, useMic } from '@/audio/mic';
+import { acquireMic, prefetchMic, useMic } from '@/audio/mic';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
@@ -10,23 +10,11 @@ import { cn } from '@/lib/utils';
 
 /** Mic permission + signal check. Reports `micStatus` to the server via the mic module. */
 export function MicCheck({ className }: { className?: string }) {
-  const { status, micOk, progress, error, deviceLabel } = useMic();
+  const { status, micOk, progress, error, deviceLabel, silent } = useMic();
 
-  // If permission was granted before (reload), reopen the mic without asking again.
-  useEffect(() => {
-    if (useMic.getState().status !== 'idle') return;
-    let alive = true;
-    navigator.permissions
-      ?.query({ name: 'microphone' as PermissionName })
-      .then((p) => {
-        if (alive && p.state === 'granted' && useMic.getState().status === 'idle')
-          void acquireMic();
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // If permission was granted before (reload), reopen the mic without asking again (the room
+  // route usually did this already, #53).
+  useEffect(() => prefetchMic(), []);
 
   const start = () => {
     void unlockAudio(); // inside the click gesture
@@ -41,6 +29,7 @@ export function MicCheck({ className }: { className?: string }) {
       className={cn('flex flex-col gap-4', className)}
       data-testid="mic-check-panel"
       data-mic-ok={micOk}
+      data-mic-silent={silent}
     >
       <div className="flex items-center gap-4">
         <span
@@ -67,7 +56,9 @@ export function MicCheck({ className }: { className?: string }) {
             {micOk
               ? 'Mic works!'
               : live
-                ? 'Say something…'
+                ? silent
+                  ? "Can't hear you"
+                  : 'Say something…'
                 : status === 'requesting'
                   ? 'Allow microphone access'
                   : failed
@@ -80,7 +71,9 @@ export function MicCheck({ className }: { className?: string }) {
             {micOk
               ? (deviceLabel ?? 'We can hear you.')
               : live
-                ? 'Talk normally for a moment so we can hear you.'
+                ? silent
+                  ? 'No sound from this mic. Is it muted, or is another input selected?'
+                  : 'Talk normally for a moment so we can hear you.'
                 : status === 'requesting'
                   ? 'Your browser is asking for permission.'
                   : failed

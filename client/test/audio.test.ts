@@ -53,35 +53,51 @@ describe('MicOkDetector', () => {
     expect(feed(d, rep(-80, 200)).some(Boolean)).toBe(false);
   });
 
-  it('stays false for loud bursts shorter than 300 ms', () => {
+  it('stays false for loud bursts shorter than 120 ms', () => {
     const d = new MicOkDetector();
-    // 250 ms loud (5 samples × 50 ms), then silence
-    feed(d, [...rep(-30, 5), ...rep(-80, 40)]);
+    // 100 ms loud (4 samples × 25 ms), then silence
+    feed(d, [...rep(-30, 4), ...rep(-80, 40)], 25);
     expect(d.ok).toBe(false);
-    expect(d.progress()).toBeCloseTo(250 / 300);
+    expect(d.progress()).toBeCloseTo(100 / 120);
   });
 
-  it('turns true after 300 ms above -50 dBFS', () => {
+  it('turns true after ~120 ms above -50 dBFS (#53: first window with signal)', () => {
     const d = new MicOkDetector();
-    const out = feed(d, [...rep(-80, 10), ...rep(-40, 8)]);
-    // loud samples start at index 10; 300 ms counted once 7 loud samples are followed by an 8th
-    expect(out.slice(0, 16).some(Boolean)).toBe(false);
+    const out = feed(d, [...rep(-80, 10), ...rep(-40, 6)], 25);
+    // loud from index 10 (250 ms); 120 ms counted once 5 loud samples are followed by a 6th
+    expect(out.slice(0, 15).some(Boolean)).toBe(false);
     expect(out.at(-1)).toBe(true);
+    // i.e. OK ~125 ms after the voice starts, not 300+ ms
+    expect(15 * 25 - 250).toBeLessThanOrEqual(130);
   });
 
   it('counts cumulative loud time within the 5 s window (syllables)', () => {
     const d = new MicOkDetector();
-    // 4 bursts of 100 ms with 400 ms pauses → 400 ms loud within 2 s
-    const syllable = [...rep(-35, 2), ...rep(-70, 8)];
-    feed(d, [...syllable, ...syllable, ...syllable, ...syllable, -70]);
+    // 3 bursts of 50 ms with 450 ms pauses → 150 ms loud within 1.5 s
+    const syllable = [...rep(-35, 1), ...rep(-70, 9)];
+    feed(d, [...syllable, ...syllable, ...syllable, -70]);
     expect(d.ok).toBe(true);
   });
 
   it('forgets loud time older than 5 s', () => {
     const d = new MicOkDetector();
-    // 200 ms loud, 6 s quiet, 200 ms loud → never 300 ms within one window
-    feed(d, [...rep(-35, 4), ...rep(-70, 120), ...rep(-35, 4), -70]);
+    // 100 ms loud, 6 s quiet, 100 ms loud → never 120 ms within one window
+    feed(d, [...rep(-35, 2), ...rep(-70, 120), ...rep(-35, 2), -70]);
     expect(d.ok).toBe(false);
+  });
+
+  it('reports a dead mic after 5 s without any signal, never once ok', () => {
+    const d = new MicOkDetector();
+    feed(d, rep(-100, 99)); // 0 … 4.9 s of digital silence
+    expect(d.dead(4900)).toBe(false);
+    d.push(5000, -100);
+    expect(d.dead(5000)).toBe(true);
+    d.push(5050, -30); // a sound: no longer dead, then ok
+    expect(d.dead(5050)).toBe(false);
+    feed(d, rep(-30, 4), 50, 5100);
+    expect(d.ok).toBe(true);
+    feed(d, rep(-100, 200), 50, 6000);
+    expect(d.dead(16_000)).toBe(false); // latched
   });
 
   it('treats exactly -50 dBFS as not loud', () => {
@@ -93,7 +109,7 @@ describe('MicOkDetector', () => {
   it('does not let a stalled timer fake a long signal', () => {
     const d = new MicOkDetector();
     d.push(0, -30);
-    d.push(2000, -80); // one loud sample then a 2 s gap: counts as 200 ms max
+    d.push(2000, -80); // one loud sample then a 2 s gap: counts as 60 ms max
     expect(d.ok).toBe(false);
   });
 

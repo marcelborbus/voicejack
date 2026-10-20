@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
+import { unlockAudio } from '@/audio/context';
+import { prefetchMic } from '@/audio/mic';
 import { toast } from '@/lib/toast';
 import { useMe } from '@/state/me';
 import { setToken } from '@/state/storage';
@@ -35,16 +37,22 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
   const [libraryId, setLibraryId] = useState('');
   const [rounds, setRounds] = useState(1);
   const [secs, setSecs] = useState<number>(NORMAL_SETTINGS.dubbingSeconds);
+  const [autoStart, setAutoStart] = useState(true);
   const [busy, setBusy] = useState(false);
   const usable = libraries.filter((l) => !l.disabled && l.clipCount > 0);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    // #53: inside the click: unlock audio and open the mic (if already allowed) while the room
+    // is created, so the mic check is done by the time the lobby shows.
+    void unlockAudio();
+    prefetchMic();
     try {
       const r = await adminApi.testRoom({
         bots,
         rounds,
+        autoStart,
         dubbingSeconds: secs,
         ...(libraryId ? { libraryId } : {}),
         ...(myName ? { name: myName } : {}),
@@ -68,8 +76,8 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
         </CardTitle>
         <p className="text-sm text-zinc-400">
           A private room with you as host and bots that send random snippets of the official
-          library. Not counted in analytics or Elo. The first start after a deploy or library change
-          can take a little while: the bot voices are cut from the clips then.
+          library. Not counted in analytics or Elo. Right after a deploy or library change the bots
+          may beep instead of talking for a few minutes while their voices are cut from the clips.
         </p>
       </CardHeader>
       <CardContent>
@@ -143,6 +151,22 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
               ))}
             </div>
           </div>
+          <label
+            className="flex flex-wrap items-center gap-2 text-sm font-semibold sm:order-last sm:col-span-5"
+            data-testid="test-game-autostart-label"
+          >
+            <input
+              type="checkbox"
+              className="size-4 accent-fuchsia-500"
+              checked={autoStart}
+              onChange={(e) => setAutoStart(e.target.checked)}
+              data-testid="test-game-autostart"
+            />
+            Start right away
+            <span className="font-normal text-zinc-400">
+              (no Ready/Start clicks: the game begins once your mic is checked, or after 3 s)
+            </span>
+          </label>
           <Button
             type="submit"
             className="self-start sm:mt-6"

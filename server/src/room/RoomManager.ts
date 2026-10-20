@@ -214,6 +214,8 @@ export class RoomManager {
     userId?: string | null;
     bots: number;
     settings: Partial<GameSettings>;
+    /** #53: start the game by itself once the host is connected (and mic-checked). */
+    autoStart?: boolean;
   }): { room: Room; join: JoinResult } | RoomError {
     const room = this.newRoom('private', true);
     if (!(room instanceof Room)) return room;
@@ -239,6 +241,7 @@ export class RoomManager {
       const e = room.handle(host, { t: 'addBot' });
       if (e) return fail(e);
     }
+    if (opts.autoStart) room.enableAutoStart();
     void this.refreshBotSounds();
     return { room, join };
   }

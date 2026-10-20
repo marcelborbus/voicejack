@@ -30,6 +30,11 @@ export const TestRoomBodySchema = z.object({
     .default(NORMAL_SETTINGS.dubbingSeconds), // v1.2 #47: the normal 210 s
   /** Host name shown in the room (default: the account name, else "Admin"). */
   name: z.string().trim().min(1).max(NAME_MAX_LENGTH).optional(),
+  /**
+   * #53: start the game without Ready/Start clicks: once the host is connected and their mic
+   * passed (or failed, or 3 s went by: testing without a mic works).
+   */
+  autoStart: z.boolean().default(true),
 });
 export type TestRoomBody = z.input<typeof TestRoomBodySchema>;
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { setSticky } from '@/state/session';
-import { getAudioContext } from './context';
+import { getAudioContext, unlockAudio } from './context';
 import { MicOkDetector, rms, SILENCE_DB, toDb } from './levels';
 
 export const MIC_CONSTRAINTS: MediaStreamConstraints = {
@@ -24,6 +24,8 @@ export interface MicState {
   progress: number;
   error: string | null;
   deviceLabel: string | null;
+  /** #53: live, but nothing heard for 5 s (muted / dead mic). Clears on the first sound. */
+  silent: boolean;
 }
 
 export const useMic = create<MicState>(() => ({
@@ -32,7 +34,12 @@ export const useMic = create<MicState>(() => ({
   progress: 0,
   error: null,
   deviceLabel: null,
+  silent: false,
 }));
+
+/** #53: level polling until micOk (fast, so ~120 ms of signal is seen at once), then metering. */
+const DETECT_TICK_MS = 25;
+const METER_TICK_MS = 50;
 
 let stream: MediaStream | null = null;
 let analyser: AnalyserNode | null = null;
@@ -106,7 +113,13 @@ function attach(s: MediaStream) {
   stream = s;
   detector.reset();
   const track = s.getAudioTracks()[0];
-  useMic.setState({ status: 'live', error: null, deviceLabel: track?.label || null, progress: 0 });
+  useMic.setState({
+    status: 'live',
+    error: null,
+    deviceLabel: track?.label || null,
+    progress: 0,
+    silent: false,
+  });
   track?.addEventListener('ended', () => {
     if (stream !== s) return;
     detach();
@@ -122,21 +135,54 @@ function attach(s: MediaStream) {
   source.connect(analyser);
   frame = new Float32Array(analyser.fftSize);
 
+  setTick(DETECT_TICK_MS);
+}
+
+function setTick(ms: number) {
   if (meterTimer) clearInterval(meterTimer);
-  meterTimer = setInterval(tick, 50);
+  meterTimer = setInterval(tick, ms);
 }
 
 function tick() {
   if (!analyser || !frame) return;
+  // A suspended context feeds the analyser zeros: that is not a dead mic, just no gesture yet.
+  if (analyser.context.state !== 'running') return;
   analyser.getFloatTimeDomainData(frame);
   levelDb = toDb(rms(frame));
   const wasOk = detector.ok;
-  const ok = detector.push(performance.now(), levelDb);
+  const now = performance.now();
+  const ok = detector.push(now, levelDb);
   if (!wasOk) {
     const progress = detector.progress();
     if (Math.abs(progress - useMic.getState().progress) > 0.05 || ok) useMic.setState({ progress });
+    const silent = detector.dead(now);
+    if (silent !== useMic.getState().silent) {
+      useMic.setState({ silent });
+      if (silent) reportMicOk(false); // a real failure: the server (and #53 auto start) knows
+    }
   }
-  if (ok && !wasOk) reportMicOk(true);
+  if (ok && !wasOk) {
+    useMic.setState({ silent: false });
+    reportMicOk(true);
+    setTick(METER_TICK_MS);
+  }
+}
+
+/**
+ * #53: open the mic as early as possible (room route, admin "Start test game" click) when the
+ * permission is already granted, so the check is done by the time the lobby shows. Never
+ * prompts. Resumes the audio context if the page has had a gesture.
+ */
+export function prefetchMic(): void {
+  if (useMic.getState().status !== 'idle' || !navigator.permissions?.query) return;
+  navigator.permissions
+    .query({ name: 'microphone' as PermissionName })
+    .then((p) => {
+      if (p.state !== 'granted' || useMic.getState().status !== 'idle') return;
+      if (navigator.userActivation?.hasBeenActive ?? true) void unlockAudio();
+      void acquireMic();
+    })
+    .catch(() => undefined);
 }
 
 function detach() {
@@ -156,6 +202,6 @@ export function releaseMic(): void {
   const s = stream;
   detach();
   s?.getTracks().forEach((t) => t.stop());
-  useMic.setState({ status: 'idle', micOk: false, progress: 0, error: null });
+  useMic.setState({ status: 'idle', micOk: false, progress: 0, error: null, silent: false });
   setSticky('mic', null);
 }
