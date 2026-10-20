@@ -16,6 +16,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { unlockAudio } from '@/audio/context';
 import { prefetchMic } from '@/audio/mic';
 import { toast } from '@/lib/toast';
+import { preloadPhase } from '@/pages/phases/lazy';
 import { useMe } from '@/state/me';
 import { setToken } from '@/state/storage';
 import { adminApi } from './api';
@@ -48,6 +49,7 @@ export function TestGameCard({ libraries }: { libraries: AdminLibrary[] }) {
     // is created, so the mic check is done by the time the lobby shows.
     void unlockAudio();
     prefetchMic();
+    void preloadPhase('DUBBING').catch(() => undefined); // auto start: the editor comes next
     try {
       const r = await adminApi.testRoom({
         bots,

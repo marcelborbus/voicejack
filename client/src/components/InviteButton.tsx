@@ -1,6 +1,5 @@
 import { Check, Copy, Link2, QrCode, Share2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { renderSVG } from 'uqr';
+import { useEffect, useState } from 'react';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import {
   Dialog,
@@ -105,14 +104,24 @@ export function InviteLinkField({ code, className }: { code: string; className?:
 /** QR code for phones on the same couch (rendered locally by `uqr`, no network). */
 export function InviteQr({ code }: { code: string }) {
   const url = inviteUrl(code);
-  const svg = useMemo(
-    () => renderSVG(url, { border: 2, whiteColor: '#ffffff', blackColor: '#170f28' }),
-    [url],
-  );
+  // #53: the QR encoder is its own chunk, loaded when the dialog opens (or on hover).
+  const [svg, setSvg] = useState<string | null>(null);
+  const load = () => {
+    void import('uqr').then(({ renderSVG }) =>
+      setSvg(renderSVG(url, { border: 2, whiteColor: '#ffffff', blackColor: '#170f28' })),
+    );
+  };
+  useEffect(() => setSvg(null), [url]);
   return (
-    <Dialog>
+    <Dialog onOpenChange={(open) => open && load()}>
       <DialogTrigger asChild>
-        <Button variant="secondary" size="sm" data-testid="invite-qr" aria-label="Show QR code">
+        <Button
+          variant="secondary"
+          size="sm"
+          data-testid="invite-qr"
+          aria-label="Show QR code"
+          onPointerEnter={() => void import('uqr')}
+        >
           <QrCode /> QR
         </Button>
       </DialogTrigger>
@@ -126,8 +135,8 @@ export function InviteQr({ code }: { code: string }) {
         <div
           role="img"
           aria-label={`QR code for ${url}`}
-          className="mx-auto mb-1 w-full max-w-64 overflow-hidden rounded-2xl border-2 border-[#1a1027] bg-white p-2 shadow-[0_5px_0_rgb(0_0_0/0.45)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-          dangerouslySetInnerHTML={{ __html: svg }}
+          className="mx-auto mb-1 aspect-square w-full max-w-64 overflow-hidden rounded-2xl border-2 border-[#1a1027] bg-white p-2 shadow-[0_5px_0_rgb(0_0_0/0.45)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+          dangerouslySetInnerHTML={{ __html: svg ?? '' }}
         />
         <p className="truncate text-center font-mono text-sm text-zinc-300">
           {url.replace(/^https?:\/\//, '')}

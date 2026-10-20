@@ -1,6 +1,6 @@
 import { NAME_MAX_LENGTH, type Phase, type RoomInfoResponse } from '@dub/shared';
 import { ArrowRight, Ban, DoorOpen, Home as HomeIcon, LogOut, Users, WifiOff } from 'lucide-react';
-import { useEffect, useState, type ComponentType, type FormEvent } from 'react';
+import { Suspense, useEffect, useState, type ComponentType, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { unlockAudio } from '@/audio/context';
 import { prefetchMic, releaseMic } from '@/audio/mic';
@@ -23,21 +23,14 @@ import { joinRoom, leaveRoom, releaseRoom } from '@/state/session';
 import { usePlayerName } from '@/state/me';
 import { getToken, normalizeRoomCode, saveName } from '@/state/storage';
 import { RoomOnlyNameHint } from '@/components/RoomOnlyNameHint';
-import { Dubbing } from './phases/Dubbing';
-import { Final } from './phases/Final';
 import { Lobby } from './phases/Lobby';
-import { RoundResults } from './phases/RoundResults';
-import { Showcase } from './phases/Showcase';
+import { LazyPhases, prefetchAfter } from './phases/lazy';
 import { VoiceDock, VoiceProvider } from '@/voice/VoiceProvider';
 import { PublicRoomBar } from '@/components/match';
 
-const PHASES: Record<Phase, ComponentType> = {
-  LOBBY: Lobby,
-  DUBBING: Dubbing,
-  SHOWCASE: Showcase,
-  ROUND_RESULTS: RoundResults,
-  FINAL: Final,
-};
+// #53: the lobby is in the main bundle; every later phase is a lazy chunk, prefetched while the
+// phase before it runs.
+const PHASES: Record<Phase, ComponentType> = { LOBBY: Lobby, ...LazyPhases };
 
 /**
  * `/r/:code`. Without a stored token it asks for a name first; then it holds the room session
@@ -70,6 +63,8 @@ export function Room() {
   const fatal = useRoom((s) => (s.code === code ? s.fatal : null));
   const phase = useRoom((s) => (s.code === code ? (s.snapshot?.phase ?? null) : null));
   const isPublic = useRoom((s) => s.code === code && s.snapshot?.kind === 'public');
+
+  useEffect(() => (phase ? prefetchAfter(phase) : undefined), [phase]);
 
   // UI sounds: a whoosh on each phase change; silent while dubbing (mics are hot).
   useEffect(() => {
@@ -105,7 +100,9 @@ export function Room() {
       {isPublic && <PublicRoomBar />}
       <SoundUnlockOverlay />
       <div key={phase} className="animate-fade-up">
-        <PhaseView />
+        <Suspense fallback={<PhaseLoading />}>
+          <PhaseView />
+        </Suspense>
       </div>
     </div>
   );
@@ -313,6 +310,10 @@ function FatalScreen({ code, message }: { code: string; message: string }) {
       </Card>
     </div>
   );
+}
+
+function PhaseLoading() {
+  return <LoadingQuip testId="phase-loading" title="Rolling film…" className="flex-1 py-16" />;
 }
 
 function Connecting() {

@@ -2,7 +2,6 @@ import { useEffect, useSyncExternalStore } from 'react';
 import {
   PRESENCE_WS_PATH,
   STATS_PATH,
-  parsePresenceS2C,
   type PresenceC2S,
   type PresenceCounts,
   type PresenceS2C,
@@ -130,7 +129,7 @@ export class PresenceSocket {
     };
     ws.onmessage = (ev) => {
       if (this.ws !== ws || typeof ev.data !== 'string') return;
-      const msg = parsePresenceS2C(ev.data);
+      const msg = parseFrame(ev.data);
       if (msg) this.onMessage(msg);
     };
     ws.onclose = () => {
@@ -227,4 +226,17 @@ const getCounts = () => presence.counts;
 export function usePresenceCounts(): PresenceCounts | null {
   useEffect(() => presence.start(), []);
   return useSyncExternalStore(presence.subscribeCounts, getCounts, getCounts);
+}
+
+/**
+ * A presence frame from our own server. #53: no zod schema check on the client (it kept zod in
+ * the main bundle); the room socket trusts the server the same way.
+ */
+function parseFrame(raw: string): PresenceS2C | null {
+  try {
+    const m = JSON.parse(raw) as { t?: unknown } | null;
+    return m && typeof m.t === 'string' ? (m as PresenceS2C) : null;
+  } catch {
+    return null;
+  }
 }

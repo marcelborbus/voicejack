@@ -1,8 +1,7 @@
 import { DoorOpen, Users, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
-import { ChatDrawer } from './ChatDrawer';
 import { FriendList } from './FriendList';
 import {
   dismissInvite,
@@ -14,6 +13,9 @@ import {
 } from './store';
 
 const INVITE_TTL_MS = 3 * 60_000;
+
+// #53: the chat drawer is its own chunk, fetched when a chat opens.
+const ChatDrawer = lazy(() => import('./ChatDrawer').then((m) => ({ default: m.ChatDrawer })));
 
 function InviteCard({ inv }: { inv: PendingInvite }) {
   const navigate = useNavigate();
@@ -91,6 +93,10 @@ export function FriendsOverlay() {
   const registered = useIsRegistered();
   const invites = useFriends((s) => s.invites);
   const { pathname } = useLocation();
+  // Mounted from the first opened chat on (keeps its close animation afterwards).
+  const chatWith = useFriends((s) => s.chatWith);
+  const [chatOpen, setChatOpen] = useState(false);
+  if (chatWith && !chatOpen) setChatOpen(true);
   if (!registered) return null;
   return (
     <>
@@ -101,7 +107,11 @@ export function FriendsOverlay() {
           ))}
         </div>
       )}
-      <ChatDrawer />
+      {chatOpen && (
+        <Suspense>
+          <ChatDrawer />
+        </Suspense>
+      )}
       {pathname !== '/' && <FriendsDock />}
     </>
   );

@@ -225,3 +225,14 @@ export async function renderFx(src: FxSource, fx: FxEffectId): Promise<Processed
     worklet,
   };
 }
+
+/** #53: warm the HTTP cache for the worklet module (the lobby prefetches the dubbing phase). */
+export function prefetchWorklet(): void {
+  if (typeof document === 'undefined') return;
+  if (document.querySelector(`link[rel=prefetch][href="${workletUrl}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = workletUrl;
+  link.as = 'script';
+  document.head.appendChild(link);
+}

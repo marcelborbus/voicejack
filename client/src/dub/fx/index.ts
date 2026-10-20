@@ -12,6 +12,7 @@ import { renderFx, type ProcessedAudio } from './render';
 
 export { FX_LIST, FX_REGISTRY, MAX_TAIL_SEC, type FxDef } from './registry';
 export type { ProcessedAudio } from './render';
+export { prefetchWorklet } from './render';
 
 export const fxCache = new FxCache({ render: renderFx });
 
