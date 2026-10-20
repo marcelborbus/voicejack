@@ -2,33 +2,25 @@ import type { ChunkRef, ClipInfo } from '@dub/shared';
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { getAudioContext, unlockAudio } from '@/audio/context';
-import { loadChunks } from '@/dub/chunkLoader';
 import { DubPlayer, type DubChunk } from '@/dub/DubPlayer';
+import { loadDub } from '@/dub/fx';
 import { Button } from '@/components/ui/button';
+import { FxBadge } from '@/components/showcase/FxBadge';
 import { Spinner } from '@/components/ui/spinner';
 import { useRoom } from '@/state/room';
 import { getToken } from '@/state/storage';
 
-/** Decodes a submission's chunks into DubPlayer input (cached by URL). */
+/** Decodes a submission's chunks (cached by URL) and renders their effects (#48) into DubPlayer input. */
 export function useDubChunks(chunks: readonly ChunkRef[]): DubChunk[] | null {
   const code = useRoom((s) => s.code);
   const [out, setOut] = useState<DubChunk[] | null>(null);
-  const key = chunks.map((c) => c.url).join('|');
+  const key = chunks.map((c) => `${c.url}#${c.fx ?? ''}`).join('|');
   useEffect(() => {
     let alive = true;
     setOut(null);
     const token = code ? getToken(code) : null;
-    loadChunks(getAudioContext(), chunks, { token }).then((loaded) => {
-      if (!alive) return;
-      setOut(
-        loaded.map((c) => ({
-          id: c.meta.id,
-          startMs: c.meta.startMs,
-          offsetMs: c.meta.offsetMs,
-          durationMs: c.meta.durationMs,
-          buffer: c.buffer,
-        })),
-      );
+    loadDub(getAudioContext(), chunks, { token }).then((dub) => {
+      if (alive) setOut(dub);
     });
     return () => {
       alive = false;
@@ -42,10 +34,13 @@ export function useDubChunks(chunks: readonly ChunkRef[]): DubChunk[] | null {
 export function BestDubReplay({
   clip,
   dub,
+  chunks,
   pauseSignal,
 }: {
   clip: ClipInfo;
   dub: DubChunk[] | null;
+  /** #48: the dub's chunks, for the effects badge. */
+  chunks?: readonly ChunkRef[];
   /** Bumping this pauses the replay (e.g. when a render starts). */
   pauseSignal?: number;
 }) {
@@ -116,6 +111,7 @@ export function BestDubReplay({
           className="absolute inset-0 size-full object-contain"
           onClick={toggle}
         />
+        {chunks && <FxBadge chunks={chunks} />}
         {!playing && (
           <button
             type="button"
@@ -125,7 +121,11 @@ export function BestDubReplay({
             className="absolute inset-0 flex items-center justify-center bg-black/35 transition-colors hover:bg-black/20"
           >
             <span className="inline-flex size-20 items-center justify-center rounded-full bg-brand shadow-2xl shadow-fuchsia-500/40 transition-transform group-hover:scale-105">
-              {dub ? <Play className="ml-1 size-9 fill-white text-white" /> : <Spinner className="size-8 text-white" />}
+              {dub ? (
+                <Play className="ml-1 size-9 fill-white text-white" />
+              ) : (
+                <Spinner className="size-8 text-white" />
+              )}
             </span>
           </button>
         )}
@@ -152,7 +152,11 @@ export function BestDubReplay({
           <RotateCcw />
         </Button>
         <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-800">
-          <div ref={barRef} className="absolute inset-0 origin-left bg-brand" style={{ transform: 'scaleX(0)' }} />
+          <div
+            ref={barRef}
+            className="absolute inset-0 origin-left bg-brand"
+            style={{ transform: 'scaleX(0)' }}
+          />
         </div>
       </div>
     </div>

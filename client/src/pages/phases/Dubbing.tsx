@@ -1,14 +1,16 @@
-import type { Limits } from '@dub/shared';
+import type { FxId, Limits } from '@dub/shared';
 import { AlertTriangle, CloudCheck, CloudUpload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAudioContext } from '@/audio/context';
 import { LoadingQuip } from '@/components/LoadingQuip';
 import { Spinner } from '@/components/ui/spinner';
+import { fxCache } from '@/dub/fx';
 import { Editor } from '@/editor/Editor';
 import {
   deleteChunk,
   editorStore,
   patchChunk,
+  setChunkFx,
   useEditor,
   type ChunkStatus,
 } from '@/editor/editorStore';
@@ -169,6 +171,15 @@ function DubbingRound({
     (id: string) => {
       editorStore.set((s) => deleteChunk(s, id));
       queue.remove(id);
+      fxCache.drop(id);
+    },
+    [queue],
+  );
+
+  const onSetFx = useCallback(
+    (id: string, fx: FxId) => {
+      editorStore.set((s) => setChunkFx(s, id, fx));
+      queue.setFx(id, fx);
     },
     [queue],
   );
@@ -191,6 +202,7 @@ function DubbingRound({
       onRerecord={(id) => void startRecording(id)}
       onDelete={onDelete}
       onRetry={(id) => queue.retry(id)}
+      onSetFx={onSetFx}
       onDeadline={deadline}
       canRecord={!expired && !full}
       recordHint={

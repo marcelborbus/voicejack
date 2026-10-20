@@ -2,6 +2,7 @@ import type { ClipInfo, ShowcaseItem } from '@dub/shared';
 import { Clapperboard, EyeOff, Sparkles, Users, VenetianMask } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ClipAttribution } from '@/components/showcase/ClipAttribution';
+import { FxBadge } from '@/components/showcase/FxBadge';
 import { recordShowcaseItem } from '@/components/showcase/showcaseHistory';
 import { SpeakingStrip } from '@/components/showcase/SpeakingStrip';
 import { useShowcasePlayback, type LoadState } from '@/components/showcase/useShowcasePlayback';
@@ -56,6 +57,7 @@ export function Showcase() {
                 data-testid="showcase-video"
               />
               {item && <VideoOverlay item={item} load={load} />}
+              {item && <FxBadge chunks={item.chunks} />}
               {item && (
                 <div className="pointer-events-none absolute left-3 top-3 flex gap-2">
                   {snap.you.isOwnItem ? (

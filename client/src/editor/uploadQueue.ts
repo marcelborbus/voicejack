@@ -1,4 +1,4 @@
-import { paths, PLAYER_TOKEN_HEADER, type ChunkMeta, type ErrorCode } from '@dub/shared';
+import { paths, PLAYER_TOKEN_HEADER, type ChunkMeta, type ErrorCode, type FxId } from '@dub/shared';
 
 /**
  * Per-round upload queue (§2.3): POSTs each take right after it is recorded (3 retries with
@@ -39,7 +39,8 @@ interface Item {
 const DEFAULT_BACKOFF = [500, 1500, 3000] as const;
 
 /** HTTP statuses worth retrying. 409 (phase over), 413, 401, 415 are final. */
-const retryable = (status: number) => status === 0 || status === 408 || status === 429 || status >= 500;
+const retryable = (status: number) =>
+  status === 0 || status === 408 || status === 429 || status >= 500;
 
 export class UploadQueue {
   readonly code: string;
@@ -93,6 +94,15 @@ export class UploadQueue {
   adopt(meta: ChunkMeta): void {
     if (this.disposed || this.items.has(meta.id)) return;
     this.items.set(meta.id, { meta, blob: null, state: 'uploaded', gen: 0 });
+  }
+
+  /** #48: change a take's effect (uploaded or not); the server gets the new manifest. */
+  setFx(id: string, fx: FxId): void {
+    const item = this.items.get(id);
+    if (!item || this.disposed) return;
+    const { fx: _old, ...rest } = item.meta;
+    item.meta = fx === 'none' ? rest : { ...rest, fx };
+    this.syncManifest();
   }
 
   /** Delete a take. */
@@ -183,7 +193,10 @@ export class UploadQueue {
           this.resolveIdle();
           return;
         }
-        const body = (await res.json().catch(() => null)) as { error?: ErrorCode; message?: string } | null;
+        const body = (await res.json().catch(() => null)) as {
+          error?: ErrorCode;
+          message?: string;
+        } | null;
         lastCode = body?.error ?? 'NETWORK';
         lastMsg = body?.message ?? `HTTP ${status}`;
       } catch (e) {

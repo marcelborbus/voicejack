@@ -184,7 +184,7 @@ function BestDubCard({ final }: { final: FinalResult }) {
         <p className="text-sm text-zinc-400">“{best.clip.title}”</p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <BestDubReplay clip={best.clip} dub={dub} pauseSignal={pauseSignal} />
+        <BestDubReplay clip={best.clip} dub={dub} chunks={best.chunks} pauseSignal={pauseSignal} />
         <SaveVideo
           clip={best.clip}
           dub={dub}

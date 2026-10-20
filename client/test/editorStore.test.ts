@@ -5,9 +5,13 @@ import {
   deleteChunk,
   formatPrecise,
   initialEditorData,
+  FX_CHOICES,
   neighbourChunk,
+  nextFx,
   patchChunk,
+  randomFx,
   resetFor,
+  setChunkFx,
   selectChunk,
   totalBytes,
   type EditorChunk,
@@ -118,5 +122,42 @@ describe('editorStore reducers', () => {
     expect(formatPrecise(0)).toBe('0:00.00');
     expect(formatPrecise(4210)).toBe('0:04.21');
     expect(formatPrecise(75_005)).toBe('1:15.01');
+  });
+});
+
+describe('effects (#48)', () => {
+  it('setChunkFx sets / clears meta.fx immutably and keeps unrelated takes', () => {
+    const s = withChunks(['a', 0], ['b', 500]);
+    const s2 = setChunkFx(s, 'a', 'ghost');
+    expect(s2.chunks[0]!.meta.fx).toBe('ghost');
+    expect(s.chunks[0]!.meta.fx).toBeUndefined();
+    expect(s2.chunks[1]).toBe(s.chunks[1]);
+    expect(setChunkFx(s2, 'a', 'ghost')).toBe(s2);
+    expect(setChunkFx(s2, 'a', 'none').chunks[0]!.meta).not.toHaveProperty('fx');
+    expect(setChunkFx(s, 'zzz', 'robot')).toBe(s);
+  });
+  it('nextFx cycles through none + 16 effects; randomFx never repeats or picks none', () => {
+    expect(FX_CHOICES).toHaveLength(17);
+    let fx = FX_CHOICES[0]!;
+    const seen = new Set<string>();
+    for (let i = 0; i < 17; i++) {
+      seen.add(fx);
+      fx = nextFx(fx);
+    }
+    expect(seen.size).toBe(17);
+    expect(fx).toBe('none');
+    expect(nextFx('none', -1)).toBe(FX_CHOICES[16]);
+    for (let i = 0; i < 50; i++) {
+      const r = randomFx('robot');
+      expect(r).not.toBe('robot');
+      expect(r).not.toBe('none');
+    }
+  });
+  it('the sticky effect survives a new round', () => {
+    const s = { ...withChunks(['a', 0]), fx: 'helium' as const, fxOpen: true };
+    const r = resetFor(s, 'K2', 5000);
+    expect(r.fx).toBe('helium');
+    expect(r.fxOpen).toBe(false);
+    expect(r.chunks).toEqual([]);
   });
 });

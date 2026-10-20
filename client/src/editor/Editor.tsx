@@ -1,5 +1,16 @@
-import type { ClipInfo } from '@dub/shared';
-import { Check, CirclePlay, Gauge, Hourglass, Keyboard, Mic, Play, RotateCcw, Trash2, Undo2 } from 'lucide-react';
+import type { ClipInfo, FxId } from '@dub/shared';
+import {
+  Check,
+  CirclePlay,
+  Gauge,
+  Hourglass,
+  Keyboard,
+  Mic,
+  Play,
+  RotateCcw,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { getAudioContext } from '@/audio/context';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +19,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Kbd } from '@/components/ui/kbd';
 import { Spinner } from '@/components/ui/spinner';
 import { DubPlayer, type DubChunk } from '@/dub/DubPlayer';
+import { dubChunkFor, fxCache } from '@/dub/fx';
 import { cn } from '@/lib/utils';
 import {
   deleteChunk,
@@ -16,12 +28,15 @@ import {
   formatPrecise,
   formatSeconds,
   media,
+  nextFx,
   resetFor,
+  setChunkFx,
   transport,
   useEditor,
   type EditorChunk,
 } from './editorStore';
 import { Timeline } from './Timeline';
+import { previewFx, stopFxPreview } from './fxPreview';
 import { Countdown, ReferenceAudio, Transport } from './Transport';
 import { useEditorKeys } from './useEditorKeys';
 
@@ -42,6 +57,8 @@ export interface EditorProps {
   onRerecord?: (id: string) => void;
   onDelete?: (id: string) => void;
   onRetry?: (id: string) => void;
+  /** #48: a take's effect changed (store + manifest). Absent → only the store. */
+  onSetFx?: (id: string, fx: FxId) => void;
   onDeadline?: () => void;
   canRecord?: boolean;
   recordHint?: string;
@@ -59,7 +76,8 @@ export function Editor(props: EditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Fresh state for this round (unless we're remounting the same round).
-  if (editorStore.get().key !== editorKey) editorStore.set((s) => resetFor(s, editorKey, clip.durationMs));
+  if (editorStore.get().key !== editorKey)
+    editorStore.set((s) => resetFor(s, editorKey, clip.durationMs));
 
   // ---- media wiring ----
   useEffect(() => {
@@ -86,18 +104,34 @@ export function Editor(props: EditorProps) {
     media.video = video;
     media.player = player;
 
+    // #48: takes with an effect play their processed render once it is ready (dry until then,
+    // a few hundred ms after recording or picking); the render re-syncs when it lands.
+    let disposed = false;
+    const waiting = new Set<Promise<unknown>>();
     const syncChunks = (s = editorStore.get()) => {
       const skip = s.recording?.replacingId ?? null;
       const list: DubChunk[] = [];
       for (const c of s.chunks) {
         if (!c.buffer || c.meta.id === skip) continue;
-        list.push({ id: c.meta.id, startMs: c.meta.startMs, offsetMs: c.meta.offsetMs, durationMs: c.meta.durationMs, buffer: c.buffer });
+        const p = fxCache.peek(c.meta, c.buffer);
+        if (!p) {
+          const pending = fxCache.get(c.meta, c.buffer);
+          if (pending && !waiting.has(pending)) {
+            waiting.add(pending);
+            pending.then(
+              () => !disposed && syncChunks(),
+              (e: unknown) => console.warn('[fx] render failed, playing dry', e),
+            );
+          }
+        }
+        list.push(dubChunkFor(c.meta, c.buffer, p));
       }
       player.setChunks(list);
     };
     syncChunks();
     const unsub = useEditor.subscribe((s, prev) => {
-      if (s.chunks !== prev.chunks || s.recording?.replacingId !== prev.recording?.replacingId) syncChunks(s);
+      if (s.chunks !== prev.chunks || s.recording?.replacingId !== prev.recording?.replacingId)
+        syncChunks(s);
     });
 
     const setCursor = () => {
@@ -130,9 +164,17 @@ export function Editor(props: EditorProps) {
     ];
     for (const [t, f] of evs) video.addEventListener(t, f);
 
-    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__dubEditor = { editorStore, media, transport, dubLog };
+    if (import.meta.env.DEV)
+      (window as unknown as Record<string, unknown>).__dubEditor = {
+        editorStore,
+        media,
+        transport,
+        dubLog,
+      };
 
     return () => {
+      disposed = true;
+      stopFxPreview();
       for (const [t, f] of evs) video.removeEventListener(t, f);
       unsub();
       video.pause();
@@ -154,11 +196,43 @@ export function Editor(props: EditorProps) {
     [props.onDelete],
   );
 
+  const setFx = useCallback(
+    (id: string, fx: FxId) => {
+      if (props.onSetFx) props.onSetFx(id, fx);
+      else editorStore.set((s) => setChunkFx(s, id, fx));
+    },
+    [props.onSetFx],
+  );
+
+  /** Picker tile: sticky effect for new takes, applied to the selected take, previewed. */
+  const pickFx = useCallback(
+    (fx: FxId) => {
+      const s = editorStore.get();
+      editorStore.set((x) => ({ ...x, fx }));
+      const sel = s.chunks.find((c) => c.meta.id === s.selectedId);
+      if (sel && sel.status !== 'restoring') setFx(sel.meta.id, fx);
+      // Hear it on the selected take, else on the latest one.
+      const target = sel ?? s.chunks.filter((c) => c.buffer).sort((a, b) => b.take - a.take)[0];
+      if (target) void previewFx(target, fx);
+    },
+    [setFx],
+  );
+
+  const cycleFx = useCallback(
+    (id: string) => {
+      const c = editorStore.get().chunks.find((x) => x.meta.id === id);
+      if (!c || c.status === 'restoring') return;
+      pickFx(nextFx(c.meta.fx ?? 'none'));
+    },
+    [pickFx],
+  );
+
   useEditorKeys({
     onRecord: props.onRecord,
     onStopRecording: props.onRecord,
     onRerecord: props.onRerecord,
     onDelete: del,
+    onCycleFx: cycleFx,
     disabled: props.done,
   });
 
@@ -175,6 +249,8 @@ export function Editor(props: EditorProps) {
               onCancelRecord={props.onCancelRecord}
               canRecord={props.canRecord && !props.done}
               recordHint={props.recordHint}
+              onPickFx={pickFx}
+              fxDisabled={props.done}
             />
           </CardContent>
         </Card>
@@ -196,7 +272,12 @@ export function Editor(props: EditorProps) {
       <Card>
         <CardContent className="flex flex-col gap-4 p-3 sm:p-5">
           <Timeline onRetry={props.onRetry} />
-          <SelectionBar onRerecord={props.onRerecord} onDelete={del} status={props.status} limitsLabel={props.limitsLabel} />
+          <SelectionBar
+            onRerecord={props.onRerecord}
+            onDelete={del}
+            status={props.status}
+            limitsLabel={props.limitsLabel}
+          />
         </CardContent>
       </Card>
     </div>
@@ -206,7 +287,16 @@ export function Editor(props: EditorProps) {
 /** DEV: DubPlayer events, for checking resync rates from Playwright (`__dubEditor.dubLog`). */
 const dubLog: unknown[] = [];
 
-function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount, onDone, onDeadline }: EditorProps) {
+function EditorHeader({
+  clip,
+  roundLabel,
+  phaseEndsAt,
+  done,
+  doneBusy,
+  doneCount,
+  onDone,
+  onDeadline,
+}: EditorProps) {
   const recording = useEditor((s) => s.recording !== null);
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -222,13 +312,21 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount
             </span>
           )}
         </p>
-        <h2 className="mt-2 truncate font-display text-3xl font-extrabold sm:text-4xl" data-testid="clip-title">
+        <h2
+          className="mt-2 truncate font-display text-3xl font-extrabold sm:text-4xl"
+          data-testid="clip-title"
+        >
           {clip.title}
         </h2>
         <p className="mt-0.5 truncate text-xs text-zinc-400">
           {clip.attribution.author} · {clip.attribution.source} ·{' '}
           {clip.attribution.licenseUrl ? (
-            <a href={clip.attribution.licenseUrl} target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-zinc-300 hover:underline">
+            <a
+              href={clip.attribution.licenseUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="underline-offset-2 hover:text-zinc-300 hover:underline"
+            >
               {clip.attribution.license}
             </a>
           ) : (
@@ -243,7 +341,12 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount
             <Undo2 /> Keep editing
           </Button>
         ) : (
-          <Button variant="success" data-testid="done" disabled={recording || doneBusy} onClick={() => onDone(true)}>
+          <Button
+            variant="success"
+            data-testid="done"
+            disabled={recording || doneBusy}
+            onClick={() => onDone(true)}
+          >
             {doneBusy ? <Spinner className="size-4" /> : <Check strokeWidth={3} />}
             {doneBusy ? 'Saving…' : "I'm done"}
           </Button>
@@ -256,8 +359,8 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount
         >
           <Hourglass className="size-4 shrink-0 animate-pulse text-emerald-300" />
           <span>
-            Submitted. Waiting for the others ({doneCount.done}/{doneCount.total} done). You can still
-            listen back, or keep editing until the timer runs out.
+            Submitted. Waiting for the others ({doneCount.done}/{doneCount.total} done). You can
+            still listen back, or keep editing until the timer runs out.
           </span>
         </div>
       )}
@@ -265,7 +368,13 @@ function EditorHeader({ clip, roundLabel, phaseEndsAt, done, doneBusy, doneCount
   );
 }
 
-function VideoStage({ clip, videoRef }: { clip: ClipInfo; videoRef: React.RefObject<HTMLVideoElement | null> }) {
+function VideoStage({
+  clip,
+  videoRef,
+}: {
+  clip: ClipInfo;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+}) {
   const playing = useEditor((s) => s.playing);
   const speed = useEditor((s) => s.speed);
   const recording = useEditor((s) => s.recording);
@@ -274,9 +383,15 @@ function VideoStage({ clip, videoRef }: { clip: ClipInfo; videoRef: React.RefObj
     <div
       className={cn(
         'relative mx-auto w-full overflow-hidden rounded-2xl border-2 border-[#1a1027] bg-black transition-shadow duration-300',
-        recording && recording.phase === 'recording' && 'shadow-[0_0_0_3px_rgba(244,63,94,0.85),0_0_40px_rgba(244,63,94,0.35)]',
+        recording &&
+          recording.phase === 'recording' &&
+          'shadow-[0_0_0_3px_rgba(244,63,94,0.85),0_0_40px_rgba(244,63,94,0.35)]',
       )}
-      style={{ aspectRatio: aspect, maxHeight: 'min(46vh, 540px)', maxWidth: `calc(min(46vh, 540px) * ${aspect})` }}
+      style={{
+        aspectRatio: aspect,
+        maxHeight: 'min(46vh, 540px)',
+        maxWidth: `calc(min(46vh, 540px) * ${aspect})`,
+      }}
     >
       <video
         ref={videoRef}
@@ -306,7 +421,11 @@ function VideoStage({ clip, videoRef }: { clip: ClipInfo; videoRef: React.RefObj
         {recording && (
           <Badge className="animate-fade-in border-transparent bg-rose-600 px-3 py-1 text-sm text-white shadow-lg shadow-rose-600/40">
             <span className="mr-1 size-2 animate-blink rounded-full bg-white" />
-            {recording.phase === 'arming' ? 'Get ready…' : recording.replacingId ? 'Re-recording' : 'Recording'}
+            {recording.phase === 'arming'
+              ? 'Get ready…'
+              : recording.replacingId
+                ? 'Re-recording'
+                : 'Recording'}
           </Badge>
         )}
         {!recording && speed !== 1 && (
@@ -336,7 +455,12 @@ function SelectionBar({
   return (
     <div className="flex min-h-11 flex-wrap items-center justify-between gap-3 px-1">
       {sel ? (
-        <SelectedInfo chunk={sel} recording={recording} onRerecord={onRerecord} onDelete={onDelete} />
+        <SelectedInfo
+          chunk={sel}
+          recording={recording}
+          onRerecord={onRerecord}
+          onDelete={onDelete}
+        />
       ) : (
         <p className="flex items-center gap-2 text-sm text-zinc-500">
           <Mic className="size-4" />
@@ -347,7 +471,11 @@ function SelectionBar({
       )}
       <div className="flex items-center gap-3 text-xs text-zinc-500">
         {status}
-        {limitsLabel && <span className="font-mono tabular-nums" data-testid="chunk-count">{limitsLabel}</span>}
+        {limitsLabel && (
+          <span className="font-mono tabular-nums" data-testid="chunk-count">
+            {limitsLabel}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -370,10 +498,16 @@ function SelectedInfo({
       <span className="mr-1 text-sm">
         <span className="font-semibold text-zinc-100">Take {take}</span>{' '}
         <span className="font-mono text-xs tabular-nums text-zinc-400">
-          {formatPrecise(meta.startMs)} → {formatPrecise(meta.startMs + meta.durationMs)} · {formatSeconds(meta.durationMs)}
+          {formatPrecise(meta.startMs)} → {formatPrecise(meta.startMs + meta.durationMs)} ·{' '}
+          {formatSeconds(meta.durationMs)}
         </span>
       </span>
-      <Button size="sm" variant="ghost" disabled={recording} onClick={() => transport.playFrom(meta.startMs)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={recording}
+        onClick={() => transport.playFrom(meta.startMs)}
+      >
         <CirclePlay /> Play
       </Button>
       <Button
@@ -409,6 +543,8 @@ function Shortcuts() {
     [['M'], 'Original audio'],
     [['Del'], 'Delete take'],
     [['⇧', 'R'], 'Re-record take'],
+    [['E'], 'Voice effects'],
+    [['⇧', 'E'], 'Next effect on take'],
     [['Esc'], 'Deselect / stop'],
   ];
   return (
@@ -422,7 +558,11 @@ function Shortcuts() {
             <dt className="flex items-center gap-1">
               {keys.map((k, i) => (
                 <span key={k} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-zinc-600">{keys[0] === '1' ? '–' : keys[0] === '←' ? '/' : '+'}</span>}
+                  {i > 0 && (
+                    <span className="text-zinc-600">
+                      {keys[0] === '1' ? '–' : keys[0] === '←' ? '/' : '+'}
+                    </span>
+                  )}
                   <Kbd>{k}</Kbd>
                 </span>
               ))}

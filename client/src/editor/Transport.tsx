@@ -1,4 +1,4 @@
-import { formatClock } from '@dub/shared';
+import { formatClock, type FxId } from '@dub/shared';
 import {
   Headphones,
   Pause,
@@ -21,8 +21,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import { serverNow } from '@/state/session';
 import { formatPrecise, mediaNowMs, SPEEDS, transport, useEditor } from './editorStore';
+import { FxPicker } from './FxPicker';
 
-function Tip({ label, keys, children }: { label: string; keys?: string[]; children: React.ReactNode }) {
+function Tip({
+  label,
+  keys,
+  children,
+}: {
+  label: string;
+  keys?: string[];
+  children: React.ReactNode;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
@@ -45,9 +54,19 @@ export interface TransportProps {
   onCancelRecord?: () => void;
   canRecord?: boolean;
   recordHint?: string;
+  /** #48: effect picker (absent → no picker). */
+  onPickFx?: (fx: FxId) => void;
+  fxDisabled?: boolean;
 }
 
-export function Transport({ onRecord, onCancelRecord, canRecord = true, recordHint }: TransportProps) {
+export function Transport({
+  onRecord,
+  onCancelRecord,
+  canRecord = true,
+  recordHint,
+  onPickFx,
+  fxDisabled,
+}: TransportProps) {
   const playing = useEditor((s) => s.playing);
   const speed = useEditor((s) => s.speed);
   const recording = useEditor((s) => s.recording);
@@ -58,12 +77,27 @@ export function Transport({ onRecord, onCancelRecord, canRecord = true, recordHi
     <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
       <div className="flex items-center gap-1.5">
         <Tip label="Jump to start" keys={['Home']}>
-          <Button variant="ghost" size="icon" aria-label="Jump to start" disabled={rec} onMouseDown={noFocus} onClick={() => transport.seek(0)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Jump to start"
+            disabled={rec}
+            onMouseDown={noFocus}
+            onClick={() => transport.seek(0)}
+          >
             <SkipBack />
           </Button>
         </Tip>
         <Tip label="Back 5 s" keys={['←']}>
-          <Button variant="ghost" size="icon" aria-label="Back 5 seconds" data-testid="back-5" disabled={rec} onMouseDown={noFocus} onClick={() => transport.nudge(-5000)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Back 5 seconds"
+            data-testid="back-5"
+            disabled={rec}
+            onMouseDown={noFocus}
+            onClick={() => transport.nudge(-5000)}
+          >
             <Undo2 />
           </Button>
         </Tip>
@@ -78,11 +112,23 @@ export function Transport({ onRecord, onCancelRecord, canRecord = true, recordHi
             onClick={() => transport.toggle()}
             className="size-13 rounded-2xl [&_svg]:size-6"
           >
-            {playing ? <Pause fill="currentColor" /> : <Play fill="currentColor" className="translate-x-px" />}
+            {playing ? (
+              <Pause fill="currentColor" />
+            ) : (
+              <Play fill="currentColor" className="translate-x-px" />
+            )}
           </Button>
         </Tip>
         <Tip label="Forward 5 s" keys={['→']}>
-          <Button variant="ghost" size="icon" aria-label="Forward 5 seconds" data-testid="fwd-5" disabled={rec} onMouseDown={noFocus} onClick={() => transport.nudge(5000)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Forward 5 seconds"
+            data-testid="fwd-5"
+            disabled={rec}
+            onMouseDown={noFocus}
+            onClick={() => transport.nudge(5000)}
+          >
             <Redo2 />
           </Button>
         </Tip>
@@ -121,6 +167,7 @@ export function Transport({ onRecord, onCancelRecord, canRecord = true, recordHi
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        {onPickFx && <FxPicker onPick={onPickFx} disabled={rec || fxDisabled} />}
         {rec && onCancelRecord && (
           <Tip label="Discard this take" keys={[]}>
             <Button
@@ -135,7 +182,10 @@ export function Transport({ onRecord, onCancelRecord, canRecord = true, recordHi
             </Button>
           </Tip>
         )}
-        <Tip label={rec ? 'Stop recording' : (recordHint ?? 'Record from the cursor (always 1×)')} keys={rec ? ['R', 'Esc'] : ['R']}>
+        <Tip
+          label={rec ? 'Stop recording' : (recordHint ?? 'Record from the cursor (always 1×)')}
+          keys={rec ? ['R', 'Esc'] : ['R']}
+        >
           <span tabIndex={-1}>
             <RecordButton
               recording={rec}
@@ -215,7 +265,10 @@ function TimeReadout({ durationMs }: { durationMs: number }) {
     return () => cancelAnimationFrame(raf);
   }, []);
   return (
-    <div className="flex items-baseline gap-1.5 rounded-2xl bg-black/30 px-3.5 py-2 font-mono tabular-nums" data-testid="time-readout">
+    <div
+      className="flex items-baseline gap-1.5 rounded-2xl bg-black/30 px-3.5 py-2 font-mono tabular-nums"
+      data-testid="time-readout"
+    >
       <span ref={ref} className="text-lg font-semibold text-zinc-50">
         0:00.00
       </span>
@@ -247,7 +300,9 @@ export function ReferenceAudio() {
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-zinc-300">Original audio</span>
-            <span className="font-mono tabular-nums text-zinc-500">{on ? `${Math.round(vol * 100)}%` : 'off'}</span>
+            <span className="font-mono tabular-nums text-zinc-500">
+              {on ? `${Math.round(vol * 100)}%` : 'off'}
+            </span>
           </div>
           <Slider
             aria-label="Original audio volume"

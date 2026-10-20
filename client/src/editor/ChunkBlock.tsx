@@ -1,3 +1,4 @@
+import { FX_INFO } from '@dub/shared';
 import { AlertTriangle, Check, CloudUpload, Loader2, RotateCw } from 'lucide-react';
 import { memo, useEffect, useLayoutEffect, useRef, type PointerEvent } from 'react';
 import { PEAKS_PER_SEC } from '@/dub/chunkLoader';
@@ -79,6 +80,7 @@ export const ChunkBlock = memo(function ChunkBlock({
   onRetry,
 }: ChunkBlockProps) {
   const { meta, status, peaks, take } = chunk;
+  const fx = meta.fx && meta.fx !== 'none' ? FX_INFO[meta.fx] : null;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const left = meta.startMs * pxPerMs;
   const width = Math.max(4, meta.durationMs * pxPerMs);
@@ -103,9 +105,10 @@ export const ChunkBlock = memo(function ChunkBlock({
       data-chunk-id={meta.id}
       data-status={status}
       data-lane={lane}
+      data-fx={meta.fx ?? 'none'}
       data-selected={selected || undefined}
-      aria-label={`Take ${take}, ${formatPrecise(meta.startMs)}, ${formatSeconds(meta.durationMs)}`}
-      title={`Take ${take} · ${formatPrecise(meta.startMs)} – ${formatPrecise(meta.startMs + meta.durationMs)}`}
+      aria-label={`Take ${take}, ${formatPrecise(meta.startMs)}, ${formatSeconds(meta.durationMs)}${fx ? `, ${fx.name}` : ''}`}
+      title={`Take ${take} · ${formatPrecise(meta.startMs)} – ${formatPrecise(meta.startMs + meta.durationMs)}${fx ? ` · ${fx.emoji} ${fx.name}` : ''}`}
       onPointerDown={down}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -132,7 +135,10 @@ export const ChunkBlock = memo(function ChunkBlock({
       {/* soft top highlight */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/20" />
       {peaks ? (
-        <canvas ref={canvasRef} className="pointer-events-none absolute inset-x-1 inset-y-1.5 h-[calc(100%-12px)] w-[calc(100%-8px)]" />
+        <canvas
+          ref={canvasRef}
+          className="pointer-events-none absolute inset-x-1 inset-y-1.5 h-[calc(100%-12px)] w-[calc(100%-8px)]"
+        />
       ) : (
         <div className="absolute inset-x-2 top-1/2 h-px bg-white/40" />
       )}
@@ -141,9 +147,26 @@ export const ChunkBlock = memo(function ChunkBlock({
         // re-sampled the timeline every frame and froze Firefox again from the second take on (#49).
         <span className="pointer-events-none absolute left-2 top-1 rounded-md bg-black/35 px-1.5 text-[10px] font-bold leading-4 tracking-wide">
           {take}
+          {fx && (
+            <span className="ml-1 text-[11px]" data-testid="chunk-fx">
+              {fx.emoji}
+            </span>
+          )}
         </span>
       )}
-      <StatusIcon status={status} narrow={narrow} onRetry={onRetry ? () => onRetry(meta.id) : undefined} />
+      {narrow && fx && (
+        <span
+          className="pointer-events-none absolute left-0.5 top-0.5 text-[10px] leading-none"
+          data-testid="chunk-fx"
+        >
+          {fx.emoji}
+        </span>
+      )}
+      <StatusIcon
+        status={status}
+        narrow={narrow}
+        onRetry={onRetry ? () => onRetry(meta.id) : undefined}
+      />
     </div>
   );
 });
@@ -177,8 +200,10 @@ function StatusIcon({
   }
   if (narrow) return null;
   const cls = 'pointer-events-none absolute right-1.5 top-1.5 size-3.5 drop-shadow';
-  if (status === 'uploading') return <CloudUpload className={cn(cls, 'animate-blink opacity-90')} aria-label="Uploading" />;
-  if (status === 'restoring') return <Loader2 className={cn(cls, 'animate-spin')} aria-label="Restoring" />;
+  if (status === 'uploading')
+    return <CloudUpload className={cn(cls, 'animate-blink opacity-90')} aria-label="Uploading" />;
+  if (status === 'restoring')
+    return <Loader2 className={cn(cls, 'animate-spin')} aria-label="Restoring" />;
   return (
     <Check
       className={cn(cls, 'opacity-0 transition-opacity group-hover:opacity-80')}

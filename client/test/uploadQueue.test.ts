@@ -32,7 +32,10 @@ function setup(replies: Record<string, Reply[]> = {}) {
       return {
         ok: r >= 200 && r < 300,
         status: r,
-        json: async () => (r >= 400 ? { error: r === 409 ? 'BAD_PHASE' : 'LIMIT', message: 'nope' } : { id, bytes: 10 }),
+        json: async () =>
+          r >= 400
+            ? { error: r === 409 ? 'BAD_PHASE' : 'LIMIT', message: 'nope' }
+            : { id, bytes: 10 },
       };
     }),
     sendManifest: (_round, chunks) => manifests.push(chunks.map((c) => c.id)),
@@ -152,5 +155,23 @@ describe('restorable', () => {
     const r = restorable([meta('b', 900), meta('lost', 10), meta('a', 100)], ['a', 'b']);
     expect(r.keep.map((c) => c.id)).toEqual(['a', 'b']);
     expect(r.lost).toBe(1);
+  });
+});
+
+describe('UploadQueue effects (#48)', () => {
+  it('setFx updates the take in the manifest and resends it; none drops the field', async () => {
+    const t = setup();
+    t.q.add(meta('a', 500), blob());
+    await t.q.whenIdle();
+    const n = t.manifests.length;
+    t.q.setFx('a', 'robot');
+    expect(t.manifests.length).toBe(n + 1);
+    expect(t.q.manifest()[0]!.fx).toBe('robot');
+    t.q.setFx('a', 'robot'); // unchanged → not resent
+    expect(t.manifests.length).toBe(n + 1);
+    t.q.setFx('a', 'none');
+    expect(t.q.manifest()[0]).not.toHaveProperty('fx');
+    t.q.setFx('missing', 'ghost');
+    expect(t.manifests.length).toBe(n + 2);
   });
 });

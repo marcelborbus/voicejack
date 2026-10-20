@@ -62,6 +62,24 @@ export default defineConfig({
         },
       },
     },
+    {
+      // #48: voice effects in Firefox (OfflineAudioContext + AudioWorklet), after the frame-rate
+      // check so the two Firefox runs never share the machine.
+      name: 'firefox-fx',
+      testMatch: /fx\.spec\.ts/,
+      dependencies: ['firefox'],
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          firefoxUserPrefs: {
+            'media.navigator.streams.fake': true,
+            'media.navigator.permission.disabled': true,
+            'media.autoplay.default': 0,
+            'media.autoplay.block-webaudio': false,
+          },
+        },
+      },
+    },
   ],
   webServer: {
     command: 'bash scripts/serve.sh',

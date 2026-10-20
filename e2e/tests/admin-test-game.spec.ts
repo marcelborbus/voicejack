@@ -85,7 +85,8 @@ test('admin test game: 3 bots, short dubbing, plays to FINAL', async ({ browser 
     await expect(async () => {
       if (await final.isVisible()) return;
       const pick = page.getByTestId('vote-pick-7');
-      if (await pick.isVisible()) await pick.click().catch(() => {});
+      // Short click timeout: a pick that turns disabled (vote locked) must not stall the loop.
+      if (await pick.isVisible()) await pick.click({ timeout: 1000 }).catch(() => {});
       throw new Error('not final yet');
     }).toPass({ timeout: 90_000, intervals: [500, 1000] });
     await expect(page.getByTestId('final-standings').locator('li')).toHaveCount(4);

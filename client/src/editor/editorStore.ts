@@ -1,4 +1,4 @@
-import type { ChunkMeta } from '@dub/shared';
+import { FX_IDS, type ChunkMeta, type FxId } from '@dub/shared';
 import { create } from 'zustand';
 import type { DubPlayer } from '@/dub/DubPlayer';
 
@@ -59,6 +59,10 @@ export interface EditorData {
   recording: RecordingInfo | null;
   /** Restore from the server manifest is running. */
   restoring: boolean;
+  /** #48: the effect new takes get (sticky: the last one picked). */
+  fx: FxId;
+  /** #48: effect picker open. */
+  fxOpen: boolean;
 }
 
 export const initialEditorData: EditorData = {
@@ -75,6 +79,8 @@ export const initialEditorData: EditorData = {
   zoom: 1,
   recording: null,
   restoring: false,
+  fx: 'none',
+  fxOpen: false,
 };
 
 // ---------- pure reducers ----------
@@ -106,7 +112,12 @@ export function addOrReplaceChunk(
   const idx = replaceId === null ? -1 : s.chunks.findIndex((c) => c.meta.id === replaceId);
   if (idx === -1) {
     const added: EditorChunk = { ...chunk, take: s.nextTake };
-    return { ...s, chunks: [...s.chunks, added], nextTake: s.nextTake + 1, selectedId: chunk.meta.id };
+    return {
+      ...s,
+      chunks: [...s.chunks, added],
+      nextTake: s.nextTake + 1,
+      selectedId: chunk.meta.id,
+    };
   }
   const chunks = s.chunks.slice();
   chunks[idx] = { ...chunk, take: s.chunks[idx]!.take };
@@ -137,7 +148,35 @@ export function resetFor(s: EditorData, key: string, durationMs: number): Editor
     refAudio: s.refAudio,
     refVolume: s.refVolume,
     zoom: s.zoom,
+    fx: s.fx,
   };
+}
+
+/** Every effect choice in picker order ('none' first). */
+export const FX_CHOICES: readonly FxId[] = ['none', ...FX_IDS];
+
+/** The effect after (or before) `fx` in picker order, wrapping. */
+export function nextFx(fx: FxId, dir: 1 | -1 = 1): FxId {
+  const i = FX_CHOICES.indexOf(fx);
+  return FX_CHOICES[(i + dir + FX_CHOICES.length) % FX_CHOICES.length]!;
+}
+
+/** A random effect other than `not` (and never 'none'). */
+export function randomFx(not: FxId, rng: () => number = Math.random): FxId {
+  const pool = FX_IDS.filter((f) => f !== not);
+  return pool[Math.floor(rng() * pool.length)]!;
+}
+
+/** Sets a take's effect (`meta.fx`; 'none' removes the field, so dry takes look like before). */
+export function setChunkFx(s: EditorData, id: string, fx: FxId): EditorData {
+  let hit = false;
+  const chunks = s.chunks.map((c) => {
+    if (c.meta.id !== id || (c.meta.fx ?? 'none') === fx) return c;
+    hit = true;
+    const { fx: _old, ...rest } = c.meta;
+    return { ...c, meta: fx === 'none' ? rest : { ...rest, fx } };
+  });
+  return hit ? { ...s, chunks } : s;
 }
 
 /** Selection to move to with ←/→-style cycling through takes sorted by start. */
@@ -263,6 +302,10 @@ export const transport = {
 
   selectNeighbour(dir: 1 | -1): void {
     editorStore.set((s) => selectChunk(s, neighbourChunk(s, dir)));
+  },
+
+  setFxOpen(open: boolean): void {
+    editorStore.set((s) => (s.fxOpen === open ? s : { ...s, fxOpen: open }));
   },
 
   /** Play the selected (or given) chunk from its start. */

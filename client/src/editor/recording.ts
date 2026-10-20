@@ -1,4 +1,4 @@
-import { paths, type Limits } from '@dub/shared';
+import { paths, type ChunkMeta, type Limits } from '@dub/shared';
 import { getAudioContext, unlockAudio } from '@/audio/context';
 import { acquireMic, getMicStream } from '@/audio/mic';
 import { playAndWaitFirstFrame, Recorder } from '@/audio/recorder';
@@ -55,7 +55,8 @@ export function recordBlocker(limits: Limits, replacing = false): string | null 
   if (locked) return "Time's up";
   if (!replacing && s.chunks.length >= limits.maxChunksPerSubmission)
     return `You've hit the limit of ${limits.maxChunksPerSubmission} takes. Delete one first.`;
-  if (totalBytes(s) >= limits.maxSubmissionBytes * 0.97) return 'Your dub is full. Delete a take first.';
+  if (totalBytes(s) >= limits.maxSubmissionBytes * 0.97)
+    return 'Your dub is full. Delete a take first.';
   return null;
 }
 
@@ -147,7 +148,9 @@ export async function startRecording(replacingId: string | null): Promise<void> 
     v.removeEventListener('ended', onEnd);
     v.removeEventListener('timeupdate', onTime);
   };
-  editorStore.set((x) => (x.recording ? { ...x, recording: { ...x.recording, phase: 'recording' } } : x));
+  editorStore.set((x) =>
+    x.recording ? { ...x, recording: { ...x.recording, phase: 'recording' } } : x,
+  );
 }
 
 function finish(a: Active): void {
@@ -178,7 +181,9 @@ export async function stopRecording(): Promise<void> {
   const v = media.video;
   const resultP = rec.stop(); // measures the stop time now
   v?.pause();
-  editorStore.set((x) => (x.recording ? { ...x, recording: { ...x.recording, phase: 'finishing' } } : x));
+  editorStore.set((x) =>
+    x.recording ? { ...x, recording: { ...x.recording, phase: 'finishing' } } : x,
+  );
   try {
     const res = await resultP;
     const s = editorStore.get();
@@ -193,8 +198,14 @@ export async function stopRecording(): Promise<void> {
     const replacedBytes = a.replacingId
       ? (s.chunks.find((x) => x.meta.id === a.replacingId)?.meta.bytes ?? 0)
       : 0;
-    if (res.blob.size > c.limits.maxChunkBytes || totalBytes(s) - replacedBytes + res.blob.size > c.limits.maxSubmissionBytes) {
-      toast('That take is too big to keep', { variant: 'error', description: 'Try a shorter take.' });
+    if (
+      res.blob.size > c.limits.maxChunkBytes ||
+      totalBytes(s) - replacedBytes + res.blob.size > c.limits.maxSubmissionBytes
+    ) {
+      toast('That take is too big to keep', {
+        variant: 'error',
+        description: 'Try a shorter take.',
+      });
       return;
     }
     const audio = await decodeWithPeaks(getAudioContext(), await res.blob.arrayBuffer());
@@ -203,19 +214,30 @@ export async function stopRecording(): Promise<void> {
       toast('Take too short, discarded');
       return;
     }
-    const meta = {
+    // #48: recorded dry; the effect is a label. A re-record keeps its take's effect, a new
+    // take gets the sticky one.
+    const fx = a.replacingId
+      ? (s.chunks.find((x) => x.meta.id === a.replacingId)?.meta.fx ?? 'none')
+      : editorStore.get().fx;
+    const meta: ChunkMeta = {
       id: crypto.randomUUID(),
       startMs: a.startMs,
       offsetMs: Math.round(res.offsetMs),
       durationMs,
       mime: res.mime,
       bytes: res.blob.size,
+      ...(fx !== 'none' && { fx }),
     };
     editorStore.set((x) =>
-      addOrReplaceChunk(x, { meta, buffer: audio.buffer, peaks: audio.peaks, status: 'uploading' }, a.replacingId),
+      addOrReplaceChunk(
+        x,
+        { meta, buffer: audio.buffer, peaks: audio.peaks, status: 'uploading' },
+        a.replacingId,
+      ),
     );
     c.queue.add(meta, res.blob, a.replacingId);
-    if (c.submissionId) primeChunkCache(paths.chunk(c.code, c.round, c.submissionId, meta.id), audio);
+    if (c.submissionId)
+      primeChunkCache(paths.chunk(c.code, c.round, c.submissionId, meta.id), audio);
   } catch (e) {
     toast('Recording failed', {
       variant: 'error',

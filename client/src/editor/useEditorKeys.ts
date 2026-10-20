@@ -10,6 +10,8 @@ export interface EditorKeyHandlers {
   onDelete?: (id: string) => void;
   /** Esc while recording. */
   onStopRecording?: () => void;
+  /** #48 E: open/close the effect picker. Shift+E: next effect on the selected take. */
+  onCycleFx?: (id: string) => void;
   /** Disable all shortcuts (e.g. after Done). */
   disabled?: boolean;
 }
@@ -29,7 +31,8 @@ function isTextTarget(t: EventTarget | null): boolean {
 /**
  * Editor shortcuts (§2.3): Space play/pause · R record/stop · ←/→ ±5 s · Shift+←/→ ±0.1 s ·
  * Home start · 1–4 speed · M reference audio · Del/Backspace delete · Shift+R re-record ·
- * Esc deselect / stop recording. Inactive while typing in an input.
+ * E effect picker · Shift+E next effect on the selected take · Esc close picker / deselect /
+ * stop recording. Inactive while typing in an input.
  */
 export function useEditorKeys(handlers: EditorKeyHandlers): void {
   const ref = useRef(handlers);
@@ -42,7 +45,8 @@ export function useEditorKeys(handlers: EditorKeyHandlers): void {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (isTextTarget(e.target)) return;
       // Leave arrow keys to a focused slider (volume).
-      const onSlider = e.target instanceof HTMLElement && e.target.getAttribute('role') === 'slider';
+      const onSlider =
+        e.target instanceof HTMLElement && e.target.getAttribute('role') === 'slider';
       const s = editorStore.get();
       const recording = s.recording !== null;
       let handled = true;
@@ -81,6 +85,12 @@ export function useEditorKeys(handlers: EditorKeyHandlers): void {
           transport.setSpeed(SPEEDS[i]!);
           break;
         }
+        case 'KeyE':
+          if (e.repeat || recording) break;
+          if (e.shiftKey) {
+            if (s.selectedId) h.onCycleFx?.(s.selectedId);
+          } else transport.setFxOpen(!s.fxOpen);
+          break;
         case 'KeyM':
           transport.setRefAudio(!s.refAudio);
           break;
@@ -90,6 +100,7 @@ export function useEditorKeys(handlers: EditorKeyHandlers): void {
           break;
         case 'Escape':
           if (recording) h.onStopRecording?.();
+          else if (s.fxOpen) transport.setFxOpen(false);
           else if (s.selectedId) transport.select(null);
           else handled = false;
           break;
@@ -107,7 +118,8 @@ export function useEditorKeys(handlers: EditorKeyHandlers): void {
     };
     // Space on a focused button would also "click" it on keyup.
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !ref.current.disabled && !isTextTarget(e.target)) e.preventDefault();
+      if (e.code === 'Space' && !ref.current.disabled && !isTextTarget(e.target))
+        e.preventDefault();
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
