@@ -16,6 +16,8 @@ export interface DubChunk {
   startMs: number;
   offsetMs: number;
   durationMs: number;
+  /** #48: effect tail past `durationMs` that rings out (reverb, echo). Default 0. */
+  tailMs?: number;
   buffer: AudioBufferLike;
 }
 
@@ -139,7 +141,8 @@ export class DubPlayer {
       ['pause', () => this.stopAll('pause')],
       ['waiting', () => this.stopAll('waiting')],
       ['seeking', () => this.onSeeking()],
-      ['ended', () => this.stopAll('ended')],
+      // #48: at the clip end, effect tails (reverb, echo) ring out instead of being cut.
+      ['ended', () => this.release('ended')],
       ['emptied', () => this.stopAll('emptied')],
     ];
     for (const [t, fn] of this.listeners) this.video.addEventListener(t, fn);
@@ -370,6 +373,13 @@ export class DubPlayer {
     }
     this.live.clear();
     if (reason !== null && this.anchor) this.onEvent?.({ type: 'stop', reason });
+    this.anchor = null;
+  }
+
+  /** Stop following the video but let the sources already playing finish on their own. */
+  private release(reason: string): void {
+    this.clearMotion();
+    if (this.anchor) this.onEvent?.({ type: 'stop', reason });
     this.anchor = null;
   }
 

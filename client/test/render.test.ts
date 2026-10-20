@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  renderTailMs,
   pickRenderMime,
   RENDER_MIMES,
   renderExtension,
@@ -56,5 +57,33 @@ describe('renderSize', () => {
     expect(renderSize(1920, 1080)).toEqual({ width: 1280, height: 720 });
     expect(renderSize(1280, 534)).toEqual({ width: 1280, height: 534 });
     expect(renderSize(641, 361)).toEqual({ width: 642, height: 362 });
+  });
+});
+
+describe('renderTailMs (#48)', () => {
+  const b = {
+    duration: 1,
+    length: 1,
+    sampleRate: 1,
+    numberOfChannels: 1,
+    getChannelData: () => new Float32Array(1),
+  };
+  it('250 ms by default, longer for a tail past the clip end, at most 2 s', () => {
+    expect(renderTailMs([], 10_000)).toBe(250);
+    expect(
+      renderTailMs([{ id: 'a', startMs: 0, offsetMs: 0, durationMs: 1000, buffer: b }], 10_000),
+    ).toBe(250);
+    expect(
+      renderTailMs(
+        [{ id: 'a', startMs: 8000, offsetMs: 0, durationMs: 1900, tailMs: 1500, buffer: b }],
+        10_000,
+      ),
+    ).toBe(1500);
+    expect(
+      renderTailMs(
+        [{ id: 'a', startMs: 9000, offsetMs: 0, durationMs: 1000, tailMs: 2000, buffer: b }],
+        10_000,
+      ),
+    ).toBe(2000);
   });
 });

@@ -546,3 +546,36 @@ describe('computePeaks', () => {
     expect(Array.from(peaks).map((x) => Math.round(x * 10) / 10)).toEqual([0.5, 0.9, 0.3]);
   });
 });
+
+describe('DubPlayer effect tails (#48)', () => {
+  it('schedules the tail past durationMs and lets it ring out at the clip end', () => {
+    const ctx = new FakeCtx();
+    const video = new FakeVideo();
+    const timers = new FakeTimers();
+    const player = new DubPlayer({
+      video,
+      ctx,
+      timers,
+      perfNow: () => timers.now,
+      waitForMotion: false,
+    });
+    player.setChunks([
+      { id: 'x', startMs: 1000, offsetMs: 0, durationMs: 2000, tailMs: 1500, buffer: buffer(3.5) },
+    ]);
+    video.startPlaying();
+    const [s] = ctx.take().filter((x) => x.started);
+    expect(s!.started).toEqual({ when: 101, offset: 0, duration: 3.5 });
+    video.ended = true;
+    video.paused = true;
+    video.emit('ended');
+    expect(s!.stoppedAt).toBeNull(); // not cut
+    expect(player.running).toBe(false);
+    // A pause, by contrast, does cut.
+    video.ended = false;
+    video.startPlaying();
+    const [s2] = ctx.take().filter((x) => x.started);
+    video.doPause();
+    expect(s2!.stoppedAt).not.toBeNull();
+    player.dispose();
+  });
+});

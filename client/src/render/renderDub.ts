@@ -54,6 +54,13 @@ export function renderSize(width: number, height: number): { width: number; heig
   return { width: even(w0), height: even(h0) };
 }
 
+/** How long to keep recording after the clip ends: 250 ms, or until the last effect tail ends (≤ 2 s). */
+export function renderTailMs(chunks: readonly DubChunk[], clipMs: number): number {
+  let end = 0;
+  for (const c of chunks) end = Math.max(end, c.startMs + c.durationMs + (c.tailMs ?? 0) - clipMs);
+  return Math.round(Math.max(250, Math.min(2000, end + 100)));
+}
+
 export interface RenderOptions {
   clip: ClipInfo;
   chunks: readonly DubChunk[];
@@ -204,9 +211,11 @@ export async function renderDub(opts: RenderOptions): Promise<RenderResult> {
       drawFrame(g, video, width, height, opts.credit);
       opts.onProgress?.(Math.min(1, video.currentTime / durationS));
     };
-    const rvfc = (video as HTMLVideoElement & {
-      requestVideoFrameCallback?: (cb: () => void) => number;
-    }).requestVideoFrameCallback?.bind(video);
+    const rvfc = (
+      video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: () => void) => number;
+      }
+    ).requestVideoFrameCallback?.bind(video);
     if (rvfc) {
       const onFrame = () => {
         paint();
@@ -235,7 +244,8 @@ export async function renderDub(opts: RenderOptions): Promise<RenderResult> {
     recorder.ondataavailable = (e) => e.data.size > 0 && parts.push(e.data);
     const finished = new Promise<void>((resolve, reject) => {
       recorder.onstop = () => resolve();
-      recorder.onerror = (e) => reject((e as unknown as { error?: Error }).error ?? new Error('Recording failed'));
+      recorder.onerror = (e) =>
+        reject((e as unknown as { error?: Error }).error ?? new Error('Recording failed'));
     });
     finished.catch(() => undefined); // awaited below; avoid an unhandled rejection on abort
 
@@ -271,9 +281,10 @@ export async function renderDub(opts: RenderOptions): Promise<RenderResult> {
       throw e;
     });
 
-    // Let the last frame and the audio tail reach the recorder.
+    // Let the last frame and the audio tail reach the recorder (#48: and effect tails of takes
+    // near the clip end ring out over the last frame, up to 2 s).
     paint();
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, renderTailMs(opts.chunks, clip.durationMs)));
     if (recorder.state !== 'inactive') recorder.stop();
     await finished;
     opts.onProgress?.(1);

@@ -1,8 +1,8 @@
 import type { ClipInfo, ShowcaseItem } from '@dub/shared';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getAudioContext } from '@/audio/context';
-import { loadChunks } from '@/dub/chunkLoader';
-import { DubPlayer, type DubChunk } from '@/dub/DubPlayer';
+import { DubPlayer } from '@/dub/DubPlayer';
+import { loadDub } from '@/dub/fx';
 import { useRoom } from '@/state/room';
 import { send, serverToPerf } from '@/state/session';
 import { getToken } from '@/state/storage';
@@ -64,7 +64,8 @@ export function useShowcasePlayback(
     if (!video) return;
     const player = new DubPlayer({ video, ctx: getAudioContext() });
     playerRef.current = player;
-    if (import.meta.env.DEV) (window as unknown as { __showcasePlayer?: DubPlayer }).__showcasePlayer = player;
+    if (import.meta.env.DEV)
+      (window as unknown as { __showcasePlayer?: DubPlayer }).__showcasePlayer = player;
     return () => {
       player.dispose();
       playerRef.current = null;
@@ -84,18 +85,12 @@ export function useShowcasePlayback(
     Promise.all([
       // No abort signal here: decoded chunks are cached by URL and shared, so an aborted
       // fetch would poison the cache for the next mount (StrictMode, quick remounts).
-      loadChunks(ctx, item.chunks, { token }),
+      // #48: effects are rendered here too, before `preloaded`, so playback is just buffers.
+      loadDub(ctx, item.chunks, { token }),
       waitCanPlayThrough(video, ac.signal),
     ]).then(
-      ([chunks]) => {
+      ([dub]) => {
         if (ac.signal.aborted) return;
-        const dub: DubChunk[] = chunks.map((c) => ({
-          id: c.meta.id,
-          startMs: c.meta.startMs,
-          offsetMs: c.meta.offsetMs,
-          durationMs: c.meta.durationMs,
-          buffer: c.buffer,
-        }));
         player.setChunks(dub);
         setLoaded({ subId, state: 'ready', count: dub.length });
       },
