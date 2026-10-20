@@ -70,6 +70,7 @@ export async function startServer(
   });
   const rooms = new RoomManager({
     botSounds: () => botSounds.get(),
+    onBotSoundsChange: (fn) => botSounds.onChange(fn),
     analytics,
     config,
     clips: clips.clips.map(toClipInfo),

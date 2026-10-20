@@ -72,9 +72,15 @@ export interface RoomManagerDeps {
   bots?: BotEnv;
   /**
    * Bot sound pool provider (v1.2 #46: snippets of the official library, `LibraryBotSounds`).
-   * Default `loadBotSounds(clipsDir)`. Called at startup with DEV_BOTS, else on each test room.
+   * Default `loadBotSounds(clipsDir)`. Called at startup (#53: never awaited by a request) and
+   * on each test room.
    */
   botSounds?: () => Promise<readonly BotSound[]>;
+  /**
+   * #53: pushes of intermediate pools (the cache, fallback tones, partial snippets) while
+   * `botSounds()` is still running (`LibraryBotSounds.onChange`).
+   */
+  onBotSoundsChange?: (fn: (pool: readonly BotSound[]) => void) => () => void;
   clock?: Clock;
   scheduler?: Scheduler;
   rng?: () => number;
@@ -117,6 +123,9 @@ export class RoomManager {
   private readonly bots: BotEnv;
   /** Our own sound array (filled in place) unless `deps.bots` was given. */
   private readonly ownSounds: BotSound[] | null = null;
+  /** The pool before the last swap, so in-flight `botVoice` URLs keep resolving. */
+  private retiredSounds: readonly BotSound[] = [];
+  private unsubSounds: (() => void) | null = null;
   /** Resolves once the bot sound pool is loaded (immediately without DEV_BOTS). */
   botsReady: Promise<void>;
 
@@ -135,8 +144,9 @@ export class RoomManager {
       };
       // Bots only need sounds once a round starts. DEV_BOTS: the quick dev pool (script output
       // or synthetic tones) right away, then the library pool once it is cut (`botSounds`).
+      const own = this.ownSounds;
+      this.unsubSounds = deps.onBotSoundsChange?.((s) => this.swapSounds(s)) ?? null;
       if (deps.config.devBots) {
-        const own = this.ownSounds;
         this.botsReady = loadBotSounds(deps.config.clipsDir).then(
           (s) => {
             if (own.length === 0) own.push(...s);
@@ -144,8 +154,20 @@ export class RoomManager {
           },
           () => {},
         );
+      } else if (deps.botSounds) {
+        // #53: load (or start cutting) the library pool at startup, not on the first test room.
+        void this.refreshBotSounds();
       }
     }
+  }
+
+  /** Replaces the shared pool in place (bots pick per chunk; recorded chunks stay as they are). */
+  private swapSounds(s: readonly BotSound[]): void {
+    const own = this.ownSounds;
+    if (!own || s.length === 0 || (s.length === own.length && s.every((x, i) => x === own[i])))
+      return;
+    this.retiredSounds = [...own];
+    own.splice(0, own.length, ...s);
   }
 
   private botRefresh: Promise<void> = Promise.resolve();
@@ -156,33 +178,19 @@ export class RoomManager {
     if (!own) return Promise.resolve();
     const load = this.deps.botSounds ?? (() => loadBotSounds(this.deps.config.clipsDir));
     this.botRefresh = load().then(
-      (s) => {
-        if (s.length > 0 || own.length === 0) own.splice(0, own.length, ...s);
-      },
+      (s) => this.swapSounds(s),
       () => {},
     );
     return this.botRefresh;
   }
 
   /**
-   * Waits (at most `timeoutMs`) for the latest sound pool refresh: bots pick their snippets when
-   * DUBBING starts, so a test room should not start before the first pool exists.
+   * v1.2 #47: the pool snippet behind `GET /api/bot-sounds/:key`, if it is in the pool (or was,
+   * before the last swap).
    */
-  async waitForBotSounds(timeoutMs: number): Promise<void> {
-    let t: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      this.botRefresh,
-      new Promise<void>((r) => {
-        t = setTimeout(r, timeoutMs);
-        t.unref?.();
-      }),
-    ]);
-    clearTimeout(t);
-  }
-
-  /** v1.2 #47: the pool snippet behind `GET /api/bot-sounds/:key`, if it is in the pool. */
   botSound(key: string): BotSound | undefined {
-    return this.bots.sounds.find((s) => botSoundKey(s) === key);
+    const match = (s: BotSound) => botSoundKey(s) === key;
+    return this.bots.sounds.find(match) ?? this.retiredSounds.find(match);
   }
 
   /** Number of snippets bots can "record" (0 = bots submit empty dubs). */
@@ -198,7 +206,8 @@ export class RoomManager {
    * v1.2 #46 admin test game: a private room hosted by `name` (linked to `userId` if given), its
    * settings applied (short dubbing times allowed), and `bots` bots seated. The room allows the
    * lobby's bot controls without DEV_BOTS and never reaches analytics or Elo. Refreshes the bot
-   * sound pool in the background (the bots need it once DUBBING starts).
+   * sound pool in the background; #53: never waits for it (a cold pool plays the fallback tones
+   * and swaps to the library snippets when they are cut).
    */
   createTestRoom(opts: {
     name: string;
@@ -521,6 +530,8 @@ export class RoomManager {
   async stop(): Promise<void> {
     if (this.sweepHandle) clearInterval(this.sweepHandle);
     this.sweepHandle = null;
+    this.unsubSounds?.();
+    this.unsubSounds = null;
     for (const code of [...this.rooms.keys()]) await this.dispose(code);
   }
 }

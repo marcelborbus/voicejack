@@ -12,6 +12,8 @@ import type { Room } from '../src/room/Room.js';
 import type { AnalyticsEvent, Tracker } from '../src/analytics/Analytics.js';
 import { LibraryBotSounds, type SoundSourceLibrary } from '../src/bots/librarySounds.js';
 import { SNIPPET, SNIPPET_RECIPE } from '../src/bots/snippets.js';
+import type { BotSound } from '../src/bots/BotPlayer.js';
+import { botSoundKey } from '../src/bots/BotVoice.js';
 import { makeClipsDir, testConfig, tmpDir } from './helpers.js';
 
 describe('JobQueue low priority (v1.2 #46)', () => {
@@ -137,6 +139,64 @@ describe('admin test room (v1.2 #46)', () => {
   });
 });
 
+describe('test room vs. a cold bot sound pool (#53)', () => {
+  it('answers at once, plays pushed pools as they come, keeps old snippet URLs', async () => {
+    const sound = (name: string): BotSound => ({
+      name,
+      durationMs: 3000,
+      mime: 'audio/webm;codecs=opus',
+      data: Buffer.from(name),
+    });
+    let finish!: (s: BotSound[]) => void;
+    const generating = new Promise<BotSound[]>((r) => (finish = r));
+    const listeners = new Set<(p: readonly BotSound[]) => void>();
+    let calls = 0;
+    const config = testConfig({ adminDev: true, devBots: false });
+    const clips = ClipLibrary.load(makeClipsDir(4));
+    const rooms = new RoomManager({
+      config,
+      clips: clips.clips,
+      library: clips,
+      botSounds: () => {
+        calls++;
+        return generating;
+      },
+      onBotSoundsChange: (fn) => {
+        listeners.add(fn);
+        return () => listeners.delete(fn);
+      },
+    });
+    const app = await buildApp({ config, clips, rooms });
+    try {
+      expect(calls).toBe(1); // started at construction (server startup), not lazily
+      const t0 = Date.now();
+      const res = await app.inject({
+        method: 'POST',
+        url: TEST_ROOM_PATH,
+        payload: { bots: 2 },
+        remoteAddress: '127.0.0.1',
+      });
+      expect(res.statusCode).toBe(201);
+      expect(Date.now() - t0).toBeLessThan(1000);
+      expect(res.json<TestRoomResponse>().botSounds).toBe(0);
+
+      const tone = sound('synth-440');
+      for (const fn of listeners) fn([tone]); // fallback tones while cutting
+      expect(rooms.botSoundCount).toBe(1);
+      const toneKey = botSoundKey(tone);
+      expect(rooms.botSound(toneKey)).toBe(tone);
+
+      finish([sound('s00-0.webm'), sound('s00-1.webm')]);
+      await vi.waitFor(() => expect(rooms.botSoundCount).toBe(2));
+      // A botVoice URL sent just before the swap still resolves.
+      expect(rooms.botSound(toneKey)).toBe(tone);
+    } finally {
+      await app.close();
+      await rooms.stop();
+    }
+  });
+});
+
 describe.skipIf(!hasFfmpeg())('LibraryBotSounds (ffmpeg)', () => {
   const src = tmpDir('dub-botsrc-');
   const clipFile = path.join(src, 'a.mp4');
@@ -182,8 +242,13 @@ describe.skipIf(!hasFfmpeg())('LibraryBotSounds (ffmpeg)', () => {
       clipsDir: makeClipsDir(1),
       now: () => now,
     });
+    const pushed: number[] = [];
+    pool.onChange((p) => pushed.push(p.length));
     const first = await pool.get();
     expect(first.length).toBeGreaterThan(0);
+    // #53: fallback tones / partial snippets first, then the final pool.
+    expect(pushed.length).toBeGreaterThanOrEqual(2);
+    expect(pushed.at(-1)).toBe(first.length);
     expect(lib.pushed).toBe(1);
     for (const s of first) {
       expect(s.mime).toBe('audio/webm;codecs=opus');

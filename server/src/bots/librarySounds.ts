@@ -22,6 +22,10 @@ import { SNIPPET_RECIPE, cutClipSnippets, type CutSnippet } from './snippets.js'
  * the library changed it regenerates, at most once per `minRegenMs` (1 h; until then the old
  * pool keeps playing). A cache made with another recipe regenerates right away. Without ffmpeg or
  * clips it falls back to the dev pool / synthetic tones (`loadBotSounds`).
+ *
+ * #53: nothing waits for a generation. `onChange` listeners get every usable pool as soon as it
+ * exists: the disk cache (even a stale one) at once, the synthetic tones while a cold pool is
+ * cut, then the snippets cut so far after each clip, then the final pool.
  */
 
 export const BOT_SOUNDS_CACHE_DIR = '.bot-sounds';
@@ -89,6 +93,9 @@ export class LibraryBotSounds {
   private readonly rng: () => number;
   private readonly log: (msg: string) => void;
   private readonly minRegenMs: number;
+  private readonly listeners = new Set<(pool: readonly BotSound[]) => void>();
+  /** The pool is the fallback (synthetic tones / dev pool), not library snippets. */
+  private fallback = false;
   readonly dir: string;
 
   constructor(private readonly opts: LibraryBotSoundsOptions) {
@@ -97,6 +104,30 @@ export class LibraryBotSounds {
     this.rng = opts.rng ?? Math.random;
     this.log = opts.log ?? (() => {});
     this.minRegenMs = opts.minRegenMs ?? 3600_000;
+  }
+
+  /** Called with each new usable pool (see the class comment). Returns unsubscribe. */
+  onChange(fn: (pool: readonly BotSound[]) => void): () => void {
+    this.listeners.add(fn);
+    return () => void this.listeners.delete(fn);
+  }
+
+  /** The pool right now (may be empty, stale or the fallback). */
+  current(): readonly BotSound[] {
+    return this.pool;
+  }
+
+  private setPool(pool: BotSound[], fallback = false): void {
+    this.pool = pool;
+    this.fallback = fallback;
+    if (pool.length === 0) return;
+    for (const fn of [...this.listeners]) {
+      try {
+        fn(pool);
+      } catch (e) {
+        this.log(`bot sounds listener: ${(e as Error).message}`);
+      }
+    }
   }
 
   /** Enabled clips of every official library, in a stable order. */
@@ -152,7 +183,7 @@ export class LibraryBotSounds {
       const cache = this.readCache();
       const cached = cache ? loadSoundDir(this.dir, this.log) : [];
       if (cached.length > 0) {
-        this.pool = cached;
+        this.setPool(cached);
         this.poolSig = typeof cache?.source === 'string' ? cache.source : 'unknown';
         // Another recipe (older, shorter snippets): regenerate now, not after the hourly limit.
         const sameRecipe = cache?.recipe === SNIPPET_RECIPE;
@@ -167,21 +198,46 @@ export class LibraryBotSounds {
     if (this.pool.length > 0 && this.now() - this.lastGenAt < this.minRegenMs) return this.pool;
     const ffmpeg = this.opts.ffmpeg ?? spawnSync('ffmpeg', ['-version']).status === 0;
     if (sources.length === 0 || !ffmpeg) {
-      if (this.pool.length === 0) this.pool = await loadBotSounds(this.opts.clipsDir, this.log);
+      if (this.pool.length === 0)
+        this.setPool(await loadBotSounds(this.opts.clipsDir, this.log), true);
       return this.pool;
     }
     this.lastGenAt = this.now();
+    // Cold: bots play the synthetic tones (or the dev pool) until the first snippets are cut.
+    if (this.pool.length === 0)
+      this.setPool(await loadBotSounds(this.opts.clipsDir, this.log), true);
     const job = this.opts.library.jobs.push(() => this.generate(sources, sig), {
       priority: 'low',
     });
     const made = job ? await job : [];
     if (made.length > 0) {
-      this.pool = made;
       this.poolSig = sig;
+      this.setPool(made);
     } else if (this.pool.length === 0) {
-      this.pool = await loadBotSounds(this.opts.clipsDir, this.log);
+      this.setPool(await loadBotSounds(this.opts.clipsDir, this.log), true);
     }
     return this.pool;
+  }
+
+  /** Snippets already cut into `dir` (in memory, so the later rename does not matter). */
+  private loadPartial(dir: string, sounds: readonly CutSnippet[]): BotSound[] {
+    const out: BotSound[] = [];
+    for (const s of sounds) {
+      try {
+        const data = fs.readFileSync(path.join(dir, s.file));
+        if (data.length > 0) {
+          out.push({
+            name: s.file,
+            durationMs: s.durationMs,
+            mime: 'audio/webm;codecs=opus',
+            data,
+          });
+        }
+      } catch {
+        // skipped
+      }
+    }
+    return out.length > 0 ? out : this.pool;
   }
 
   /** Cuts the snippets into a temp dir, then swaps it in for `.bot-sounds/`. */
@@ -210,6 +266,10 @@ export class LibraryBotSounds {
         rng: this.rng,
       });
       for (const m of made) sounds.push({ ...m, clipId: src.clipId });
+      // #53: a cold pool (fallback tones) takes the snippets cut so far.
+      if (made.length > 0 && (this.fallback || this.pool.length === 0)) {
+        this.setPool(this.loadPartial(tmp, sounds), true);
+      }
     }
     const manifest = { source: sig, recipe: SNIPPET_RECIPE, generatedAt: t0, sounds };
     fs.writeFileSync(path.join(tmp, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');

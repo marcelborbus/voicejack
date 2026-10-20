@@ -11,9 +11,6 @@ import { compileTrust } from '../security/trustedProxy.js';
 import { originAllowed } from '../ws/gateway.js';
 import { adminIdentity } from './admin.js';
 
-/** How long the request waits for a (re)generating bot sound pool before answering anyway. */
-export const BOT_SOUNDS_WAIT_MS = 25_000;
-
 /**
  * v1.2 #46 `POST /api/admin/test-room` {bots, libraryId?, rounds, dubbingSeconds, name?}: a
  * private room with the admin as host and 1–7 bots, for testing in prod without DEV_BOTS.
@@ -61,8 +58,8 @@ export function register(app: FastifyInstance, deps: AppDeps): void {
           return reply.status(status).send(sendError(made.code, made.message));
         }
         req.log.info({ bots: b.bots }, 'admin test room created');
-        // First test room after a start / library change: the pool may still be cutting.
-        await rooms.waitForBotSounds(BOT_SOUNDS_WAIT_MS);
+        // #53: never wait for the bot sound pool (it loads at startup; a cold pool plays the
+        // fallback tones until the snippets are cut).
         const res: TestRoomResponse = {
           code: made.room.code,
           token: made.join.token,
