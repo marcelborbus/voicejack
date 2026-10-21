@@ -23,6 +23,11 @@ import { JobQueue } from './normalize.js';
 
 /** Id of the official library imported from `CLIPS_DIR/manifest.json`. */
 export const BUILTIN_LIBRARY_ID = 'classics';
+/** #53: 480p renditions live in `<libraryDir>/.variants/<libraryId>/<name>-480.mp4`. */
+export const VARIANTS_DIR = '.variants';
+export function lowFileOf(file: string): string {
+  return `${file.replace(/\.[^./]+$/, '')}-480.mp4`;
+}
 const BUILTIN_NAME = 'Classics';
 const BUILTIN_DESCRIPTION = 'The built-in collection of open-licensed film clips.';
 
@@ -304,8 +309,14 @@ export class ClipLibrary implements RoomLibrarySource {
         this.serve.set(`${r.library_id}/${f}`, dir);
         if (r.origin === 'manifest') this.serve.set(`/${f}`, dir);
       }
+      // #53: 480p rendition (official libraries, made in the background by ClipVariants).
+      const lowDir = this.variantDirOf(r.library_id);
+      const low = lowDir && lowFileOf(r.file);
+      const hasLow = !!low && fs.existsSync(path.join(lowDir, low));
+      if (hasLow) this.serve.set(`${r.library_id}/${low}`, lowDir);
       if (r.enabled !== 1) continue;
       const clip = this.toLibraryClip(r, hasPoster);
+      if (hasLow) clip.lowUrl = libraryPaths.libraryClip(r.library_id, low);
       this.playable.get(r.library_id)?.push(clip);
       this.byId.set(clip.id, clip);
     }
@@ -317,6 +328,27 @@ export class ClipLibrary implements RoomLibrarySource {
   onChange(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => void this.listeners.delete(fn);
+  }
+
+  /** `<libraryDir>/.variants/<libraryId>` for official libraries, else null. */
+  variantDirOf(libraryId: string): string | null {
+    if (!this.libraryDir || this.libs.get(libraryId)?.visibility !== 'official') return null;
+    return path.join(this.libraryDir, VARIANTS_DIR, libraryId);
+  }
+
+  /** #53: ready official clips (enabled or not) whose 480p rendition is missing. */
+  missingVariants(): { libraryId: string; input: string; output: string }[] {
+    const out: { libraryId: string; input: string; output: string }[] = [];
+    for (const r of this.rows.values()) {
+      if (r.status !== 'ready') continue;
+      const lowDir = this.variantDirOf(r.library_id);
+      const dir = this.dirOf(r);
+      if (!lowDir || !dir) continue;
+      const input = path.join(dir, r.file);
+      const output = path.join(lowDir, lowFileOf(r.file));
+      if (fs.existsSync(input) && !fs.existsSync(output)) out.push({ libraryId: r.library_id, input, output });
+    }
+    return out;
   }
 
   private dirOf(r: ClipRow): string | null {

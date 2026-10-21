@@ -14,6 +14,8 @@ import { Matchmaker } from './match/Matchmaker.js';
 import { Reports } from './match/Reports.js';
 import { Friends } from './friends/Friends.js';
 import { LibraryBotSounds } from './bots/librarySounds.js';
+import { ClipVariants } from './clips/variants.js';
+import { hasFfmpeg } from './clips/normalize.js';
 import { Ratings } from './elo/Ratings.js';
 import { Analytics } from './analytics/Analytics.js';
 
@@ -79,6 +81,13 @@ export async function startServer(
     ratings,
   });
   clips.onChange(() => rooms.libraryChanged());
+  // #53: 480p renditions of official clips for lite mode / weak devices, in the background.
+  let variantLog = (m: string) => console.warn(`[clips] ${m}`);
+  const variants = new ClipVariants(clips, { log: (m) => variantLog(m) });
+  if (hasFfmpeg()) {
+    clips.onChange(() => variants.pump());
+    variants.pump();
+  }
   const presence = new Presence({ rooms });
   const reports = new Reports(db);
   const matchmaker = new Matchmaker({
@@ -109,8 +118,10 @@ export async function startServer(
   cleanupTimer.unref();
   matchmaker.setLog(app.log);
   botLog = (m) => app.log.info(m);
+  variantLog = (m) => app.log.warn(m);
   app.addHook('onClose', async () => {
     clearInterval(cleanupTimer);
+    variants.stop();
     friends.dispose();
     matchmaker.dispose();
     presence.dispose();

@@ -77,6 +77,8 @@ export interface ClipInfo {
   id: string;
   title: string;
   url: string; // "/clips/<file>"
+  /** #53: 480p rendition without audio (official clips; showcase lite mode / weak devices). */
+  lowUrl?: string;
   durationMs: number;
   width: number;
   height: number;
@@ -194,6 +196,8 @@ export interface ShowcaseItem {
   lockAt: ServerTime | null;
   votesCast: number;
   votersExpected: number;
+  /** #53: the next item's clip, so clients fetch it into memory ahead of time. */
+  nextClip?: ClipInfo;
 }
 export type ShowcaseStatus = ShowcaseItem['status'];
 

@@ -1330,6 +1330,7 @@ export class Room {
     const item = sc.order[sc.index]!;
     let expected = 0;
     for (const q of this.players.values()) if (q.connected && q.id !== item.playerId) expected++;
+    const next = sc.order[sc.index + 1];
     return {
       submissionId: item.id,
       index: sc.index,
@@ -1341,6 +1342,7 @@ export class Room {
       lockAt: sc.lockAt,
       votesCast: sc.votes.size,
       votersExpected: expected,
+      ...(next && { nextClip: next.clip }),
     };
   }
 

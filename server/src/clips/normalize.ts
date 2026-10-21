@@ -1,5 +1,6 @@
 import { execFile, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import { LIBRARY_CLIP_MAX_SECONDS } from '@dub/shared';
 
 /**
@@ -101,6 +102,33 @@ function fitFilter(w: number, h: number): string {
     "scale='trunc(iw*sar/2)*2':ih,setsar=1," +
     `scale=w='min(${w},iw)':h='min(${h},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2`
   );
+}
+
+/**
+ * #53: 480p, video only (the showcase / final replay play muted), faststart. Atomic via `.part`.
+ * Same input guard as uploads; runs under `nice` with one thread.
+ */
+export async function encodeLow(input: string, outFile: string): Promise<void> {
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  const part = `${outFile}.part`;
+  try {
+    await run(
+      'ffmpeg',
+      [
+        ...['-hide_banner', '-loglevel', 'error', '-nostdin', '-y'],
+        ...['-protocol_whitelist', 'file', '-i', input],
+        ...['-map', '0:v:0', '-an', '-sn', '-dn', '-map_metadata', '-1'],
+        ...['-vf', fitFilter(854, 480)],
+        ...['-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast', '-pix_fmt', 'yuv420p'],
+        ...['-threads', '1', '-movflags', '+faststart', '-f', 'mp4', part],
+      ],
+      ENCODE_TIMEOUT_MS,
+      true,
+    );
+    fs.renameSync(part, outFile);
+  } finally {
+    fs.rmSync(part, { force: true });
+  }
 }
 
 export interface TrimRequest {
@@ -289,8 +317,13 @@ export class JobQueue {
   refusal(opts: JobOptions = {}): 'busy' | 'owner' | null {
     const priority = opts.priority ?? 'admin';
     if (opts.owner && this.pendingFor(opts.owner) >= this.maxPerOwner) return 'owner';
-    const cap =
-      priority === 'admin' ? this.maxPending : priority === 'user' ? this.maxUserPending : 1;
+    // `low`: one queued-or-running job per kind of background work (#53: the bot sound pool
+    // and the 480p renditions each get theirs; they still run one at a time like everything).
+    if (priority === 'low') {
+      const same = this.all().filter((j) => j.priority === 'low' && j.owner === opts.owner);
+      return same.length >= 1 ? 'busy' : null;
+    }
+    const cap = priority === 'admin' ? this.maxPending : this.maxUserPending;
     return this.sizeOf(priority) >= cap ? 'busy' : null;
   }
 
