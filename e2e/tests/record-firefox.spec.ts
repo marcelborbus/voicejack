@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { closeAll, newPlayer, readyUp, type Player } from './helpers';
+import { closeAll, newPlayer, type Player } from './helpers';
 
 // #49: pressing record in the editor of an admin test game (3 bots) froze Firefox: the
 // recording UI cost Firefox most of its frames (infinite ping/pulse animations over 120 px
@@ -64,10 +64,8 @@ test('firefox: admin test game, record 2 takes, Done, showcase', async ({ browse
     await card.getByTestId('test-game-seconds').fill('60');
     await card.getByTestId('test-game-start').click();
     await page.waitForURL(/\/r\/[A-Z0-9]{6}$/);
-    await expect(page.getByTestId('bot-badge')).toHaveCount(3);
-    await readyUp(admin);
-    await page.getByTestId('start-game').click();
-    await expect(page.getByTestId('editor')).toBeVisible();
+    // #53: "Start right away" (default): no ready/start clicks, the editor comes up by itself.
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 20_000 });
     // Let the clip load before the first take.
     await expect
       .poll(() => page.evaluate(() => document.querySelector('video')?.readyState ?? 0))
