@@ -1,6 +1,6 @@
 import type { ClipInfo, ShowcaseItem } from '@dub/shared';
 import { Clapperboard, EyeOff, Sparkles, Users, VenetianMask } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ClipAttribution } from '@/components/showcase/ClipAttribution';
 import { FxBadge } from '@/components/showcase/FxBadge';
 import { recordShowcaseItem } from '@/components/showcase/showcaseHistory';
@@ -45,17 +45,7 @@ export function Showcase() {
               className="relative overflow-hidden rounded-[1.25rem] border-2 border-[#1a1027] bg-black"
               style={{ aspectRatio: `${clip.width} / ${clip.height}` }}
             >
-              <video
-                ref={videoRef}
-                src={clip.url}
-                poster={clip.posterUrl}
-                muted
-                playsInline
-                preload="auto"
-                disablePictureInPicture
-                className="absolute inset-0 size-full object-contain"
-                data-testid="showcase-video"
-              />
+              <ShowcaseVideo videoRef={videoRef} poster={clip.posterUrl} />
               {item && <VideoOverlay item={item} load={load} />}
               {item && <FxBadge chunks={item.chunks} />}
               {item && (
@@ -102,6 +92,32 @@ export function Showcase() {
     </div>
   );
 }
+
+/**
+ * #53: the `<video>` in a memoized leaf with stable props: snapshot updates (votes, the vote
+ * slider, the countdown, the speaking strip) never re-render it. Its `src` is set imperatively
+ * by `useShowcasePlayback` (an in-memory object URL), never by React.
+ */
+const ShowcaseVideo = memo(function ShowcaseVideo({
+  videoRef,
+  poster,
+}: {
+  videoRef: RefObject<HTMLVideoElement | null>;
+  poster?: string;
+}) {
+  return (
+    <video
+      ref={videoRef}
+      poster={poster}
+      muted
+      playsInline
+      preload="auto"
+      disablePictureInPicture
+      className="absolute inset-0 size-full object-contain"
+      data-testid="showcase-video"
+    />
+  );
+});
 
 function statusText(item: ShowcaseItem | null, now: number): string {
   if (!item) return 'Done';

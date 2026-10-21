@@ -12,7 +12,7 @@ function glow(rgb: string, alpha: number): string {
 /** Decorative, fixed background: brand glows and a sparse doodle wallpaper ("studio wall"). */
 export function Backdrop() {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div aria-hidden data-decor className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       <div
         className="absolute -left-[17.5rem] -top-[17.5rem] size-[51rem]"
         style={{ backgroundImage: glow('192 38 211', 0.16) }}

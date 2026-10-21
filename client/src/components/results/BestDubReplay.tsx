@@ -4,13 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import { getAudioContext, unlockAudio } from '@/audio/context';
 import { DubPlayer, type DubChunk } from '@/dub/DubPlayer';
 import { loadDub } from '@/dub/fx';
+import { premixDub } from '@/dub/premix';
+import { clipSource } from '@/lib/lite';
 import { Button } from '@/components/ui/button';
 import { FxBadge } from '@/components/showcase/FxBadge';
 import { Spinner } from '@/components/ui/spinner';
 import { useRoom } from '@/state/room';
 import { getToken } from '@/state/storage';
 
-/** Decodes a submission's chunks (cached by URL) and renders their effects (#48) into DubPlayer input. */
+/**
+ * Decodes a submission's chunks (cached by URL), renders their effects (#48) and mixes them into
+ * one buffer (#53: one source node for the replay and the Save-video render).
+ */
 export function useDubChunks(chunks: readonly ChunkRef[]): DubChunk[] | null {
   const code = useRoom((s) => s.code);
   const [out, setOut] = useState<DubChunk[] | null>(null);
@@ -19,9 +24,12 @@ export function useDubChunks(chunks: readonly ChunkRef[]): DubChunk[] | null {
     let alive = true;
     setOut(null);
     const token = code ? getToken(code) : null;
-    loadDub(getAudioContext(), chunks, { token }).then((dub) => {
-      if (alive) setOut(dub);
-    });
+    const ctx = getAudioContext();
+    loadDub(ctx, chunks, { token })
+      .then((dub) => premixDub(dub, { sampleRate: ctx.sampleRate }).catch(() => dub))
+      .then((dub) => {
+        if (alive) setOut(dub);
+      });
     return () => {
       alive = false;
     };
@@ -102,7 +110,7 @@ export function BestDubReplay({
       >
         <video
           ref={videoRef}
-          src={clip.url}
+          src={clipSource(clip)}
           poster={clip.posterUrl}
           muted
           playsInline

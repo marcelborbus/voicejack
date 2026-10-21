@@ -341,6 +341,28 @@
   background-color: rgb(9 9 11 / 0.95);
 }
 
+/* #53 lite mode (the showcase video dropped frames): the rest of the session without decorative
+   animations or backdrop effects. Functional transitions stay. */
+:root[data-lite] .backdrop-blur,
+:root[data-lite] .backdrop-blur-sm,
+:root[data-lite] .backdrop-blur-md {
+  backdrop-filter: none;
+}
+:root[data-lite] .backdrop-blur-md {
+  background-color: rgb(9 9 11 / 0.95);
+}
+:root[data-lite] [class*='animate-']:not(.animate-spin),
+:root[data-lite] .mug:hover,
+:root[data-lite] .speaking-chip[data-speaking='true'] .speaking-bars > span {
+  animation: none !important;
+}
+:root[data-lite] .speaking-chip[data-speaking='true'] .speaking-bars > span {
+  transform: scaleY(0.8);
+}
+:root[data-lite] [data-decor] {
+  display: none;
+}
+
 /* #51: showcase "who is talking" chips. State comes from `data-speaking` (set from a store
    subscription, not React); bars only animate while speaking, via transform. */
 .speaking-chip {

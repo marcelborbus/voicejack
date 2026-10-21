@@ -80,6 +80,23 @@ export default defineConfig({
         },
       },
     },
+    {
+      // #53: showcase sync under main-thread jank, in Firefox too (after the other Firefox runs).
+      name: 'firefox-jank',
+      testMatch: /showcase-jank\.spec\.ts/,
+      dependencies: ['firefox-fx'],
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          firefoxUserPrefs: {
+            'media.navigator.streams.fake': true,
+            'media.navigator.permission.disabled': true,
+            'media.autoplay.default': 0,
+            'media.autoplay.block-webaudio': false,
+          },
+        },
+      },
+    },
   ],
   webServer: {
     command: 'bash scripts/serve.sh',
