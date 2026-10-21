@@ -33,6 +33,14 @@ test('admin test game: 3 bots, short dubbing, plays to FINAL', async ({ browser 
   const admin = await newPlayer(browser, 'Admin');
   try {
     const { page } = admin;
+    await admin.context.addInitScript(() => {
+      new MutationObserver(() => {
+        const n = document.querySelectorAll(
+          '[data-testid=round-results] [data-testid=speaking-strip-player]',
+        ).length;
+        if (n) (window as unknown as { __rrStrip?: number }).__rrStrip = n;
+      }).observe(document, { subtree: true, childList: true });
+    });
     // Every chunk of every showcased dub (the bots' ones are the only non-empty dubs).
     const chunkMs = new Map<string, number>();
     page.on('websocket', (ws) =>
@@ -115,6 +123,13 @@ test('admin test game: 3 bots, short dubbing, plays to FINAL', async ({ browser 
       throw new Error('not final yet');
     }).toPass({ timeout: 90_000, intervals: [500, 1000] });
     await expect(page.getByTestId('final-standings').locator('li')).toHaveCount(4);
+    // #53: the speaking strip is on the round results and under the winner too.
+    expect(await page.evaluate(() => (window as unknown as { __rrStrip?: number }).__rrStrip)).toBe(
+      4,
+    );
+    await expect(
+      page.getByTestId('final').getByTestId('speaking-strip').getByTestId('speaking-strip-player'),
+    ).toHaveCount(4);
     // Bot dubs are made of long snippets (3–8 s, capped at the 8 s fixture clip).
     expect(chunkMs.size).toBeGreaterThanOrEqual(9); // 3 bots × at least 3 chunks
     for (const ms of chunkMs.values()) expect(ms).toBeGreaterThanOrEqual(3000);

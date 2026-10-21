@@ -7,6 +7,7 @@ import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { BestDubReplay, useDubChunks } from '@/components/results/BestDubReplay';
 import { Confetti, CountUp } from '@/components/results/motion';
 import { SaveVideo } from '@/components/results/SaveVideo';
+import { SpeakingStrip } from '@/components/showcase/SpeakingStrip';
 import { SupportPrompt } from '@/components/support';
 import { MoodPrompt } from '@/components/feedback';
 import { PublicFinalActions } from '@/components/match';
@@ -75,6 +76,8 @@ export function Final() {
             ? 'That was you. Take a bow!'
             : `${snap.totalRounds} round${snap.totalRounds === 1 ? '' : 's'} of questionable voice acting are over.`}
         </p>
+        {/* #53: who is talking while the winner is presented. */}
+        <SpeakingStrip align="center" className="mt-1" />
       </section>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { buildStandings, Leaderboard } from '@/components/results/Leaderboard';
 import { RevealList } from '@/components/results/RevealList';
 import { ClipAttribution } from '@/components/showcase/ClipAttribution';
+import { SpeakingStrip } from '@/components/showcase/SpeakingStrip';
 import { useServerNow } from '@/components/showcase/useServerNow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,8 +81,10 @@ export function RoundResults() {
               {isLast ? 'Final scores are coming next.' : 'Totals after this round.'}
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-5">
             <Leaderboard rows={standings} youId={youId} />
+            {/* #53: who is talking while the results are revealed. */}
+            <SpeakingStrip />
           </CardContent>
         </Card>
       </div>

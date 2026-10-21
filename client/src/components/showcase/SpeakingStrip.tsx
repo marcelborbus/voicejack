@@ -1,6 +1,7 @@
 import type { PlayerId, PlayerPublic } from '@dub/shared';
 import { useEffect, useRef } from 'react';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { isLite } from '@/lib/lite';
 import { cn } from '@/lib/utils';
 import { useRoom } from '@/state/room';
 import { useVoice, type VoiceState } from '@/voice/voiceStore';
@@ -13,12 +14,19 @@ export function isSpeaking(v: VoiceState, id: PlayerId, selfId: PlayerId | undef
 }
 
 /**
- * #51: who is talking while you vote. A compact strip of every player in the room (bots too),
+ * #51: who is talking while you vote (#53: also on the round results and under the winner). A compact strip of every player in the room (bots too),
  * so it says nothing about who made the dub on screen. The speaking state is written straight
  * to `data-speaking` on each chip from a store subscription: no React render per meter tick,
  * and the indicator itself is CSS (a ring plus three bars).
  */
-export function SpeakingStrip({ className }: { className?: string }) {
+export function SpeakingStrip({
+  className,
+  align = 'start',
+}: {
+  className?: string;
+  /** #53: centred under the winner on the final screen. */
+  align?: 'start' | 'center';
+}) {
   const players = useRoom((s) => s.snapshot?.players ?? EMPTY);
   const selfId = useRoom((s) => s.snapshot?.you.playerId);
   const active = useVoice((s) => s.active);
@@ -38,14 +46,32 @@ export function SpeakingStrip({ className }: { className?: string }) {
       }
     };
     apply(useVoice.getState());
-    return useVoice.subscribe(apply);
+    // #53 lite mode: at most 4 updates a second.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = useVoice.subscribe((v) => {
+      if (!isLite()) return apply(v);
+      timer ??= setTimeout(() => {
+        timer = null;
+        apply(useVoice.getState());
+      }, 250);
+    });
+    return () => {
+      unsub();
+      if (timer) clearTimeout(timer);
+    };
   }, [selfId, shown.length, players]);
 
   if (!active || shown.length === 0) return null;
   return (
-    <div className={cn('flex flex-col gap-2', className)} data-testid="speaking-strip">
+    <div
+      className={cn('flex flex-col gap-2', align === 'center' && 'items-center', className)}
+      data-testid="speaking-strip"
+    >
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">In voice</p>
-      <ul ref={listRef} className="flex flex-wrap gap-1.5">
+      <ul
+        ref={listRef}
+        className={cn('flex flex-wrap gap-1.5', align === 'center' && 'justify-center')}
+      >
         {shown.map((p) => (
           <li
             key={p.id}
